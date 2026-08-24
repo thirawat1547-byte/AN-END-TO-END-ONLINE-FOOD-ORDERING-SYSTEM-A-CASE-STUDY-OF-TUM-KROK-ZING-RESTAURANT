@@ -1,0 +1,22 @@
+# ใช้ Node.js เวอร์ชัน 22 แบบ Alpine (ขนาดเล็กและเบา)
+FROM node:22-alpine
+
+# กำหนดโฟลเดอร์ทำงานภายใน Container
+WORKDIR /app
+
+# คัดลอกไฟล์จัดการแพ็กเกจ และติดตั้ง Dependencies
+COPY package*.json ./
+RUN npm install
+
+# คัดลอกโค้ดทั้งหมดใน backend เข้าไป
+COPY . .
+
+# สร้าง Prisma Client เพื่อเชื่อมต่อฐานข้อมูล
+RUN npx prisma generate
+
+
+# เปิดพอร์ต 3000 สำหรับ API
+EXPOSE 3000
+
+# คำสั่งเริ่มต้นเมื่อ Container รัน (เริ่มรัน API)
+CMD ["npx", "tsx", "watch", "index.ts"]

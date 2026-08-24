@@ -1,13 +1,154 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  user_id      Int      @id @default(autoincrement())
+  username     String   @db.VarChar(100)
+  password     String   @db.VarChar(255)
+  email        String?  @db.VarChar(150)
+  phone_number String?  @db.VarChar(15)
+  role         String   @db.VarChar(20)
+
+  orders       Order[]
+  @@map("USERS")
+}
+
+model Table {
+  table_id     Int      @id @default(autoincrement())
+  table_number String   @db.VarChar(10)
+  capacity     Int
+  status       String   @db.VarChar(20)
+
+  orders       Order[]
+  @@map("TABLES")
+}
+
+model Category {
+  category_id   Int    @id @default(autoincrement())
+  category_name String @db.VarChar(100)
+
+  menus         Menu[]
+  @@map("CATEGORIES")
+}
+
+model Menu {
+  menu_id      Int      @id @default(autoincrement())
+  category_id  Int
+  menu_name    String   @db.VarChar(150)
+  description  String?  @db.Text
+  price        Decimal  @db.Decimal(10, 2)
+  image_url    String?  @db.VarChar(255)
+  calories     Int?
+  is_available Boolean  @default(true)
+
+  category     Category         @relation(fields: [category_id], references: [category_id])
+  allergens    MenuAllergen[]
+  ingredients  MenuIngredient[]
+  order_items  OrderItem[]
+  @@map("MENUS")
+}
+
+model Allergen {
+  allergen_id   Int      @id @default(autoincrement())
+  allergen_name String   @db.VarChar(100)
+  icon_url      String?  @db.VarChar(255)
+
+  menus         MenuAllergen[]
+  @@map("ALLERGENS")
+}
+
+model MenuAllergen {
+  menu_id     Int
+  allergen_id Int
+
+  menu        Menu     @relation(fields: [menu_id], references: [menu_id])
+  allergen    Allergen @relation(fields: [allergen_id], references: [allergen_id])
+
+  @@id([menu_id, allergen_id])
+  @@map("MENU_ALLERGENS")
+}
+
+model Promotion {
+  promo_id        Int      @id @default(autoincrement())
+  code            String   @db.VarChar(50)
+  discount_type   String   @db.VarChar(20)
+  discount_value  Decimal  @db.Decimal(10, 2)
+  min_order_price Decimal  @db.Decimal(10, 2)
+  expiry_date     DateTime
+
+  orders          Order[]
+  @@map("PROMOTIONS")
+}
+
+model Order {
+  order_id    Int      @id @default(autoincrement())
+  user_id     Int?
+  table_id    Int?
+  promo_id    Int?
+  order_type  String   @db.VarChar(20)
+  status      String   @db.VarChar(30)
+  total_price Decimal  @db.Decimal(10, 2)
+  created_at  DateTime @default(now())
+
+  user        User?         @relation(fields: [user_id], references: [user_id])
+  table       Table?        @relation(fields: [table_id], references: [table_id])
+  promotion   Promotion?    @relation(fields: [promo_id], references: [promo_id])
+  order_items OrderItem[]
+  transaction Transaction[]
+  @@map("ORDERS")
+}
+
+model OrderItem {
+  order_item_id Int     @id @default(autoincrement())
+  order_id      Int
+  menu_id       Int
+  quantity      Int
+  customization Json?
+  subtotal      Decimal @db.Decimal(10, 2)
+
+  order         Order   @relation(fields: [order_id], references: [order_id])
+  menu          Menu    @relation(fields: [menu_id], references: [menu_id])
+  @@map("ORDER_ITEMS")
+}
+
+model Transaction {
+  transaction_id   Int      @id @default(autoincrement())
+  order_id         Int
+  amount           Decimal  @db.Decimal(10, 2)
+  payment_method   String   @db.VarChar(50)
+  payment_status   String   @db.VarChar(20)
+  payment_slip_url String?  @db.VarChar(255)
+
+  order            Order    @relation(fields: [order_id], references: [order_id])
+  @@map("TRANSACTIONS")
+}
+
+model Ingredient {
+  ingredient_id     Int      @id @default(autoincrement())
+  ingredient_name   String   @db.VarChar(100)
+  quantity_in_stock Decimal  @db.Decimal(10, 2)
+  unit              String   @db.VarChar(50)
+  reorder_level     Decimal  @db.Decimal(10, 2)
+  last_updated      DateTime @updatedAt
+
+  menus             MenuIngredient[]
+  @@map("INGREDIENTS")
+}
+
+model MenuIngredient {
+  menu_id       Int
+  ingredient_id Int
+  quantity_used Decimal @db.Decimal(10, 2)
+
+  menu          Menu       @relation(fields: [menu_id], references: [menu_id])
+  ingredient    Ingredient @relation(fields: [ingredient_id], references: [ingredient_id])
+
+  @@id([menu_id, ingredient_id])
+  @@map("MENU_INGREDIENTS")
 }

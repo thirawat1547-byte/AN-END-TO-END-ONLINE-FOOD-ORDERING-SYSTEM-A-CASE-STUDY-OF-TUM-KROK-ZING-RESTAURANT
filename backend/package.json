@@ -10,6 +10,17 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "prisma": "^7.9.1"
+    "@types/node": "^26.2.0",
+    "prisma": "^5.22.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "dotenv": "^17.4.2"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }
