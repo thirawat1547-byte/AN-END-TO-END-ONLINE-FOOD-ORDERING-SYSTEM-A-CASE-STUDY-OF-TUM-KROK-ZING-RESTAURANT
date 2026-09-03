@@ -1,0 +1,21 @@
+name: Auto Deploy Tum Krok Zing
+
+on:
+  push:
+    branches: [ "main" ] 
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: SSH into OCI Server and Deploy
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          cd ~/AN-END-TO-END-ONLINE-FOOD-ORDERING-SYSTEM-A-CASE-STUDY-OF-TUM-KROK-ZING-RESTAURANT
+          git pull origin main
+          sudo docker compose up -d --build
