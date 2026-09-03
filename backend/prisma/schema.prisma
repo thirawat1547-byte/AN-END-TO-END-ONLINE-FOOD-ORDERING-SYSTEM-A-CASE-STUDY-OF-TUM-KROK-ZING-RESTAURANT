@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["views"]
 }
 
 datasource db {
@@ -8,24 +9,26 @@ datasource db {
 }
 
 model User {
-  user_id      Int      @id @default(autoincrement())
-  username     String   @db.VarChar(100)
-  password     String   @db.VarChar(255)
-  email        String?  @db.VarChar(150)
-  phone_number String?  @db.VarChar(15)
-  role         String   @db.VarChar(20)
+  user_id      Int     @id @default(autoincrement())
+  username     String  @db.VarChar(100)
+  password     String  @db.VarChar(255)
+  email        String? @db.VarChar(150)
+  phone_number String? @db.VarChar(15)
+  role         String  @db.VarChar(20)
 
-  orders       Order[]
+  orders Order[]
+
   @@map("USERS")
 }
 
 model Table {
-  table_id     Int      @id @default(autoincrement())
-  table_number String   @db.VarChar(10)
+  table_id     Int    @id @default(autoincrement())
+  table_number String @db.VarChar(10)
   capacity     Int
-  status       String   @db.VarChar(20)
+  status       String @db.VarChar(20)
 
-  orders       Order[]
+  orders Order[]
+
   @@map("TABLES")
 }
 
@@ -33,33 +36,37 @@ model Category {
   category_id   Int    @id @default(autoincrement())
   category_name String @db.VarChar(100)
 
-  menus         Menu[]
+  menus Menu[]
+
   @@map("CATEGORIES")
 }
 
 model Menu {
-  menu_id      Int      @id @default(autoincrement())
+  menu_id      Int     @id @default(autoincrement())
   category_id  Int
-  menu_name    String   @db.VarChar(150)
-  description  String?  @db.Text
-  price        Decimal  @db.Decimal(10, 2)
-  image_url    String?  @db.VarChar(255)
+  menu_name    String  @db.VarChar(150)
+  description  String? @db.Text
+  price        Decimal @db.Decimal(10, 2)
+  image_url    String? @db.VarChar(255)
   calories     Int?
-  is_available Boolean  @default(true)
+  is_available Boolean @default(true)
 
-  category     Category         @relation(fields: [category_id], references: [category_id])
-  allergens    MenuAllergen[]
-  ingredients  MenuIngredient[]
-  order_items  OrderItem[]
+  category    Category         @relation(fields: [category_id], references: [category_id])
+  allergens   MenuAllergen[]
+  ingredients MenuIngredient[]
+  order_items OrderItem[]
+
+  @@index([category_id])
   @@map("MENUS")
 }
 
 model Allergen {
-  allergen_id   Int      @id @default(autoincrement())
-  allergen_name String   @db.VarChar(100)
-  icon_url      String?  @db.VarChar(255)
+  allergen_id   Int     @id @default(autoincrement())
+  allergen_name String  @db.VarChar(100)
+  icon_url      String? @db.VarChar(255)
 
-  menus         MenuAllergen[]
+  menus MenuAllergen[]
+
   @@map("ALLERGENS")
 }
 
@@ -67,22 +74,25 @@ model MenuAllergen {
   menu_id     Int
   allergen_id Int
 
-  menu        Menu     @relation(fields: [menu_id], references: [menu_id])
-  allergen    Allergen @relation(fields: [allergen_id], references: [allergen_id])
+  menu     Menu     @relation(fields: [menu_id], references: [menu_id])
+  allergen Allergen @relation(fields: [allergen_id], references: [allergen_id])
 
   @@id([menu_id, allergen_id])
+  @@index([menu_id])
+  @@index([allergen_id])
   @@map("MENU_ALLERGENS")
 }
 
 model Promotion {
   promo_id        Int      @id @default(autoincrement())
-  code            String   @db.VarChar(50)
+  code            String   @unique @db.VarChar(50)
   discount_type   String   @db.VarChar(20)
   discount_value  Decimal  @db.Decimal(10, 2)
   min_order_price Decimal  @db.Decimal(10, 2)
   expiry_date     DateTime
 
-  orders          Order[]
+  orders Order[]
+
   @@map("PROMOTIONS")
 }
 
@@ -101,6 +111,11 @@ model Order {
   promotion   Promotion?    @relation(fields: [promo_id], references: [promo_id])
   order_items OrderItem[]
   transaction Transaction[]
+
+  @@index([user_id])
+  @@index([table_id])
+  @@index([status])
+  @@index([created_at])
   @@map("ORDERS")
 }
 
@@ -112,20 +127,26 @@ model OrderItem {
   customization Json?
   subtotal      Decimal @db.Decimal(10, 2)
 
-  order         Order   @relation(fields: [order_id], references: [order_id])
-  menu          Menu    @relation(fields: [menu_id], references: [menu_id])
+  order Order @relation(fields: [order_id], references: [order_id])
+  menu  Menu  @relation(fields: [menu_id], references: [menu_id])
+
+  @@index([order_id])
+  @@index([menu_id])
   @@map("ORDER_ITEMS")
 }
 
 model Transaction {
-  transaction_id   Int      @id @default(autoincrement())
+  transaction_id   Int     @id @default(autoincrement())
   order_id         Int
-  amount           Decimal  @db.Decimal(10, 2)
-  payment_method   String   @db.VarChar(50)
-  payment_status   String   @db.VarChar(20)
-  payment_slip_url String?  @db.VarChar(255)
+  amount           Decimal @db.Decimal(10, 2)
+  payment_method   String  @db.VarChar(50)
+  payment_status   String  @db.VarChar(20)
+  payment_slip_url String? @db.VarChar(255)
 
-  order            Order    @relation(fields: [order_id], references: [order_id])
+  order Order @relation(fields: [order_id], references: [order_id])
+
+  @@index([order_id])
+  @@index([payment_status])
   @@map("TRANSACTIONS")
 }
 
@@ -137,7 +158,8 @@ model Ingredient {
   reorder_level     Decimal  @db.Decimal(10, 2)
   last_updated      DateTime @updatedAt
 
-  menus             MenuIngredient[]
+  menus MenuIngredient[]
+
   @@map("INGREDIENTS")
 }
 
@@ -146,9 +168,69 @@ model MenuIngredient {
   ingredient_id Int
   quantity_used Decimal @db.Decimal(10, 2)
 
-  menu          Menu       @relation(fields: [menu_id], references: [menu_id])
-  ingredient    Ingredient @relation(fields: [ingredient_id], references: [ingredient_id])
+  menu       Menu       @relation(fields: [menu_id], references: [menu_id])
+  ingredient Ingredient @relation(fields: [ingredient_id], references: [ingredient_id])
 
   @@id([menu_id, ingredient_id])
+  @@index([menu_id])
+  @@index([ingredient_id])
   @@map("MENU_INGREDIENTS")
+}
+
+// 1. สรุปยอดขายรวม (ออเดอร์)
+view OrderSummary {
+  order_id     Int      @unique
+  table_number String?
+  total_price  Decimal  @db.Decimal(10, 2)
+  status       String
+  order_date   DateTime
+
+  @@map("ORDER_SUMMARIES_VIEW")
+}
+
+// 2. รายการใบเสร็จ / เช็คบิล
+view TransactionReceipt {
+  transaction_id Int      @unique
+  order_id       Int
+  customer_name  String?
+  total_amount   Decimal  @db.Decimal(10, 2)
+  payment_method String
+  payment_status String
+  payment_date   DateTime
+
+  @@map("TRANSACTION_RECEIPTS_VIEW")
+}
+
+// 3. เมนูยอดฮิต (ขายดี)
+view TopSellingMenu {
+  menu_id       Int     @unique
+  menu_name     String
+  category_name String
+  total_sold    Int
+  total_revenue Decimal @db.Decimal(10, 2)
+
+  @@map("TOP_SELLING_MENUS_VIEW")
+}
+
+// 4. แจ้งเตือนวัตถุดิบใกล้หมด
+view LowStockAlert {
+  ingredient_id     Int     @unique
+  ingredient_name   String
+  quantity_in_stock Decimal @db.Decimal(10, 2)
+  reorder_level     Decimal @db.Decimal(10, 2)
+  unit              String
+
+  @@map("LOW_STOCK_ALERTS_VIEW")
+}
+
+// 5. สถานะโต๊ะแบบเรียลไทม์
+view LiveTableStatus {
+  table_id         Int      @unique
+  table_number     String
+  capacity         Int
+  current_status   String
+  current_order_id Int?
+  current_total    Decimal? @db.Decimal(10, 2)
+
+  @@map("LIVE_TABLE_STATUS_VIEW")
 }
