@@ -2,7 +2,7 @@ name: Auto Deploy Tum Krok Zing
 
 on:
   push:
-    branches: [ "main" ] 
+    branches: [ "main" ]
 
 jobs:
   deploy:
@@ -17,5 +17,10 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
           cd ~/AN-END-TO-END-ONLINE-FOOD-ORDERING-SYSTEM-A-CASE-STUDY-OF-TUM-KROK-ZING-RESTAURANT
-          git pull origin main
-          sudo docker compose up -d --build
+          
+          # ยกเลิกการใช้ git pull และบังคับให้เซิร์ฟเวอร์ก๊อปปี้โค้ดให้ตรงกับ GitHub แบบเป๊ะๆ 100%
+          git fetch origin main
+          git reset --hard origin/main
+          
+          # เปลี่ยนมาใช้ docker-compose (มีขีดกลาง)
+          sudo docker-compose up -d --build
