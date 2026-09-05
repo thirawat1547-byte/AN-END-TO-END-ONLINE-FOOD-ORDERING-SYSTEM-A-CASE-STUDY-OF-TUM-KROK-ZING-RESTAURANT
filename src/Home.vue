@@ -1,9 +1,7 @@
 <template>
   <div class="page-container">
     <div class="main-layout">
-      <!-- ส่วนเนื้อหาหลักด้านซ้าย -->
       <div class="content-area">
-        <!-- Header -->
         <header class="navbar">
           <div class="logo-section">
             <img src="./assets/logo.png" alt="Logo" class="logo-img">
@@ -20,10 +18,24 @@
             <input type="text" placeholder="ค้นหาของอร่อยออร์แกนิก..." v-model="searchQuery">
           </div>
 
-          <div class="location-box">
-            <span class="loc-icon">📍</span>
-            <span class="loc-text">จัดส่งที่: <b>ตลาดปากเกร็ด</b></span>
-            <span class="dropdown-arrow">▼</span>
+          <div class="location-wrapper">
+            <div class="location-box" @click="showAddressDropdown = !showAddressDropdown">
+              <span class="loc-icon">📍</span>
+              <span class="loc-text">
+                จัดส่งที่: <b>{{ displayAddress }}</b>
+              </span>
+              <span class="dropdown-arrow" :class="{ 'arrow-up': showAddressDropdown }">▼</span>
+            </div>
+
+            <div class="address-dropdown-menu" v-if="showAddressDropdown">
+              <div class="addr-title">📍 ที่อยู่จัดส่งปัจจุบัน</div>
+              <div class="addr-full-text">
+                {{ isLoggedIn && userProfile.address ? userProfile.address : 'ตลาดปากเกร็ด (ค่าเริ่มต้น)' }}
+              </div>
+              <button class="addr-edit-btn" @click.stop="$router.push('/profile')">
+                ✏️ แก้ไขที่อยู่
+              </button>
+            </div>
           </div>
 
           <div class="header-actions">
@@ -41,7 +53,6 @@
           </div>
         </header>
 
-        <!-- Hero Banner -->
         <div class="hero-banner">
           <div class="hero-text-box">
             <h1 class="hero-title">ส่งฟรีเมื่อสั่งเกิน<br>B300!</h1>
@@ -50,7 +61,6 @@
           </div>
         </div>
 
-        <!-- Categories Tabs -->
         <div class="category-tabs" v-if="!searchQuery">
           <button 
             v-for="tab in tabs" 
@@ -63,10 +73,8 @@
           </button>
         </div>
 
-        <!-- แสดงชื่อหัวข้อ -->
         <h2 class="section-heading">{{ searchQuery ? 'ผลการค้นหา' : currentCategory }}</h2>
 
-        <!-- Product Grid -->
         <div class="products-grid">
           <div class="food-card" v-for="item in filteredMenu" :key="item.id" @click="openModalOrAdd(item)">
             <div class="img-wrapper">
@@ -83,7 +91,6 @@
         </div>
       </div>
 
-      <!-- แผงตะกร้าสินค้าด้านขวา -->
       <aside class="cart-panel" v-if="cartItems.length > 0">
         <h3 class="cart-header-title">ตะกร้าของคุณ</h3>
         <p class="cart-sub">พร้อมชำระเงินหรือยัง?</p>
@@ -93,7 +100,6 @@
             <div class="cart-item-info">
               <div class="cart-item-name">{{ item.name }}</div>
               
-              <!-- แสดงตัวเลือกที่เลือกมาในตะกร้า -->
               <div class="cart-item-options">
                 <span v-if="item.spiceLevel" class="opt-badge">🌶️ {{ item.spiceLevel }}</span>
                 <span v-for="addon in item.addons" :key="addon.name" class="opt-badge">+ {{ addon.name }}</span>
@@ -134,15 +140,12 @@
       </aside>
     </div>
 
-    <!-- Pop-up เลือกรายละเอียดสินค้า (Modal) -->
     <div class="modal-overlay" v-if="showItemModal" @click.self="closeItemModal">
       <div class="item-modal-content">
-        <!-- ซ้าย: รูปภาพ -->
         <div class="item-modal-left">
           <img :src="selectedItem.img" :alt="selectedItem.name">
         </div>
         
-        <!-- ขวา: รายละเอียดและตัวเลือก -->
         <div class="item-modal-right">
           <button class="close-modal-btn" @click="closeItemModal">✕</button>
           
@@ -153,7 +156,6 @@
           <p class="modal-desc">{{ selectedItem.desc }}</p>
 
           <div class="modal-scroll-area">
-            <!-- เลือกระดับความเผ็ด -->
             <div class="option-group" v-if="selectedItem.isSpicy">
               <div class="option-group-title">
                 <h3>ระดับความเผ็ด</h3>
@@ -172,7 +174,6 @@
               </div>
             </div>
 
-            <!-- เลือกส่วนเสริม -->
             <div class="option-group">
               <div class="option-group-title">
                 <h3>ส่วนเสริม</h3>
@@ -189,13 +190,11 @@
               </div>
             </div>
 
-            <!-- หมายเหตุเพิ่มเติม -->
             <div class="option-group">
               <input type="text" class="note-input" placeholder="เช่น แพ้อาหาร, ขอทิชชู่เพิ่ม..." v-model="modalOptions.note">
             </div>
           </div>
 
-          <!-- Footer ปุ่มเพิ่มลงตะกร้า -->
           <div class="modal-footer">
             <div class="modal-qty-box">
               <button @click="modalOptions.qty > 1 ? modalOptions.qty-- : null">-</button>
@@ -210,7 +209,6 @@
       </div>
     </div>
 
-    <!-- Pop-up แจ้งเตือนบังคับเข้าสู่ระบบ -->
     <div class="modal-overlay" v-if="showAuthModal">
       <div class="auth-modal-content">
         <span class="close-modal" @click="showAuthModal = false">✕</span>
@@ -229,11 +227,14 @@ export default {
     return {
       isLoggedIn: false,
       showAuthModal: false,
+      showAddressDropdown: false, // ตัวแปรสำหรับเปิดปิด Dropdown ที่อยู่
       searchQuery: '',
       cartItems: [],
       currentCategory: 'ขายดีที่สุด',
       tabs: ['ขายดีที่สุด', 'เมนูอาหาร', 'เมนูอาหารอีสาน', 'เครื่องดื่ม'],
       
+      userProfile: { address: '' },
+
       showItemModal: false,
       selectedItem: null,
       spiceLevels: ['เผ็ดน้อย', 'เผ็ดกลาง', 'เผ็ดมาก'],
@@ -241,12 +242,7 @@ export default {
         { name: 'ไข่ดาว', price: 10 },
         { name: 'ไข่เจียว', price: 10 }
       ],
-      modalOptions: {
-        spiceLevel: 'เผ็ดกลาง',
-        addons: [],
-        note: '',
-        qty: 1
-      },
+      modalOptions: { spiceLevel: 'เผ็ดกลาง', addons: [], note: '', qty: 1 },
 
       menuItems: [
         { id: 1, name: 'กระเพราหมู', price: 40, category: ['เมนูอาหาร', 'ขายดีที่สุด'], desc: 'หอมฟุ้ง อร่อยเด็ดสะใจ!', img: 'https://images.unsplash.com/photo-1606854426282-358c9735d64a?q=80&w=500', isPopular: true, isSpicy: true },
@@ -277,102 +273,74 @@ export default {
     }
   },
   computed: {
-    subtotal() {
-      return this.cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    },
+    subtotal() { return this.cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0); },
     filteredMenu() {
       const searchWord = this.searchQuery.trim().toLowerCase();
       if (searchWord !== '') {
-        return this.menuItems.filter(item => 
-          item.name.toLowerCase().includes(searchWord)
-        );
+        return this.menuItems.filter(item => item.name.toLowerCase().includes(searchWord));
       }
-      return this.menuItems.filter(item => 
-        item.category.includes(this.currentCategory)
-      );
+      return this.menuItems.filter(item => item.category.includes(this.currentCategory));
     },
     calculatedModalPrice() {
       if (!this.selectedItem) return 0;
       let addonTotal = this.modalOptions.addons.reduce((sum, addon) => sum + addon.price, 0);
       return (this.selectedItem.price + addonTotal) * this.modalOptions.qty;
+    },
+    displayAddress() {
+      if (!this.isLoggedIn) return 'ตลาดปากเกร็ด';
+      if (this.userProfile && this.userProfile.address) {
+        let addr = this.userProfile.address;
+        return addr.length > 20 ? addr.substring(0, 20) + '...' : addr;
+      }
+      return 'กรุณาเพิ่มที่อยู่';
     }
   },
   mounted() {
     this.isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    const profileData = localStorage.getItem('userProfile');
+    if (profileData) {
+      this.userProfile = JSON.parse(profileData);
+    } else if (this.isLoggedIn) {
+      this.userProfile = { address: '35/369 หมู่ 1 ต.บ้านใหม่ อ.เมืองปทุมธานี จ.ปทุมธานี 12000' };
+    }
+    const savedCart = localStorage.getItem('cartData');
+    if (savedCart) {
+      this.cartItems = JSON.parse(savedCart);
+    }
   },
   methods: {
     openModalOrAdd(item) {
-      if (!this.isLoggedIn) {
-        this.showAuthModal = true;
-        return;
-      }
-      
+      if (!this.isLoggedIn) { this.showAuthModal = true; return; }
       if (item.category.includes('เครื่องดื่ม')) {
         this.addDirectToCart(item);
       } else {
         this.selectedItem = item;
-        this.modalOptions = {
-          spiceLevel: item.isSpicy ? 'เผ็ดกลาง' : null,
-          addons: [],
-          note: '',
-          qty: 1
-        };
+        this.modalOptions = { spiceLevel: item.isSpicy ? 'เผ็ดกลาง' : null, addons: [], note: '', qty: 1 };
         this.showItemModal = true;
       }
     },
-    closeItemModal() {
-      this.showItemModal = false;
-      this.selectedItem = null;
-    },
+    closeItemModal() { this.showItemModal = false; this.selectedItem = null; },
     confirmAddToCart() {
       let addonTotal = this.modalOptions.addons.reduce((sum, addon) => sum + addon.price, 0);
       let finalPrice = this.selectedItem.price + addonTotal;
-
       this.cartItems.push({
-        name: this.selectedItem.name,
-        price: finalPrice,
-        qty: this.modalOptions.qty,
-        spiceLevel: this.modalOptions.spiceLevel,
-        addons: [...this.modalOptions.addons],
-        note: this.modalOptions.note
+        name: this.selectedItem.name, price: finalPrice, qty: this.modalOptions.qty,
+        spiceLevel: this.modalOptions.spiceLevel, addons: [...this.modalOptions.addons], note: this.modalOptions.note
       });
-      
       this.closeItemModal();
     },
     addDirectToCart(item) {
       let found = this.cartItems.find(i => i.name === item.name && !i.spiceLevel && i.addons?.length === 0);
-      if (found) {
-        found.qty++;
-      } else {
-        this.cartItems.push({ 
-          name: item.name, 
-          price: item.price, 
-          qty: 1,
-          spiceLevel: null,
-          addons: []
-        });
-      }
+      if (found) { found.qty++; } else { this.cartItems.push({ name: item.name, price: item.price, qty: 1, spiceLevel: null, addons: [] }); }
     },
     updateQty(index, change) {
       if (change === -1 && this.cartItems[index].qty <= 1) return;
       this.cartItems[index].qty += change;
     },
-    removeItem(index) {
-      this.cartItems.splice(index, 1);
-    },
-    goToLogin() {
-      this.showAuthModal = false;
-      this.$router.push('/login');
-    },
-    goToRegister() {
-      this.showAuthModal = false;
-      this.$router.push('/register');
-    },
-    logout() {
-      localStorage.removeItem('isLoggedIn');
-      this.isLoggedIn = false;
-      this.cartItems = [];
-    },
+    removeItem(index) { this.cartItems.splice(index, 1); },
+    goToLogin() { this.showAuthModal = false; this.$router.push('/login'); },
+    goToRegister() { this.showAuthModal = false; this.$router.push('/register'); },
+    logout() { localStorage.removeItem('isLoggedIn'); this.isLoggedIn = false; this.cartItems = []; },
     proceedToCheckout() {
       localStorage.setItem('cartData', JSON.stringify(this.cartItems));
       this.$router.push('/checkout');
@@ -383,7 +351,6 @@ export default {
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap');
-
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Prompt', sans-serif; }
 .page-container { background-color: #f7f6f0; min-height: 100vh; width: 100%; padding: 20px 0; position: relative; }
 .main-layout { display: flex; width: 100%; background: #f7f6f0; gap: 20px; padding: 0 30px; }
@@ -399,9 +366,21 @@ export default {
 .search-box input { width: 100%; padding: 8px 12px 8px 32px; border-radius: 20px; border: 1px solid #e0dfd5; background: #fff; font-size: 13px; color: #333; outline: none; position: relative; z-index: 11; }
 .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 12px; color: #888; z-index: 12; }
 
-.location-box { display: flex; align-items: center; gap: 5px; font-size: 13px; color: #444; background: #f1ede1; padding: 6px 12px; border-radius: 20px; cursor: pointer; white-space: nowrap; }
+/* อัปเดต CSS ของกล่องที่อยู่ (Location Box) */
+.location-wrapper { position: relative; display: inline-block; z-index: 20; }
+.location-box { display: flex; align-items: center; gap: 5px; font-size: 13px; color: #444; background: #f1ede1; padding: 6px 12px; border-radius: 20px; cursor: pointer; white-space: nowrap; transition: 0.2s; border: 1px solid transparent; }
+.location-box:hover { background: #e8e4d5; border-color: #d6d2c4; }
 .loc-icon { color: #557c61; }
-.dropdown-arrow { font-size: 10px; color: #777; margin-left: 3px; }
+.dropdown-arrow { font-size: 10px; color: #777; margin-left: 3px; transition: transform 0.3s ease; }
+.dropdown-arrow.arrow-up { transform: rotate(180deg); color: #557c61; }
+
+.address-dropdown-menu { position: absolute; top: calc(100% + 10px); left: 50%; transform: translateX(-50%); background: white; border: 1px solid #e5e2d5; border-radius: 16px; padding: 15px 20px; width: 260px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 100; cursor: default; }
+/* ลูกศรชี้ขึ้นตรงขอบกล่อง Dropdown */
+.address-dropdown-menu::before { content: ''; position: absolute; top: -6px; left: 50%; transform: translateX(-50%) rotate(45deg); width: 12px; height: 12px; background: white; border-left: 1px solid #e5e2d5; border-top: 1px solid #e5e2d5; }
+.addr-title { font-size: 13px; font-weight: 600; color: #557c61; margin-bottom: 6px; }
+.addr-full-text { font-size: 13px; color: #555; line-height: 1.5; margin-bottom: 12px; word-wrap: break-word; background: #faf9f5; padding: 10px; border-radius: 8px; }
+.addr-edit-btn { width: 100%; background: white; border: 1px solid #557c61; color: #557c61; padding: 8px; border-radius: 10px; font-size: 13px; font-weight: 500; cursor: pointer; transition: 0.2s; font-family: inherit; }
+.addr-edit-btn:hover { background: #f4faeb; }
 
 .header-actions { display: flex; align-items: center; gap: 15px; white-space: nowrap; }
 .icon-btn { background: none; border: none; font-size: 16px; cursor: pointer; }
