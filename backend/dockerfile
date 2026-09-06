@@ -11,6 +11,9 @@ RUN npm install
 # คัดลอกโค้ดทั้งหมดใน backend เข้าไป
 COPY . .
 
+# ติดตั้ง openssl เพื่อให้ Prisma ทำงานบน Alpine Linux ได้
+RUN apk add --no-cache openssl
+
 # สร้าง Prisma Client เพื่อเชื่อมต่อฐานข้อมูล
 RUN npx prisma generate
 
@@ -19,4 +22,4 @@ RUN npx prisma generate
 EXPOSE 3000
 
 # คำสั่งเริ่มต้นเมื่อ Container รัน (เริ่มรัน API)
-CMD ["npx", "tsx", "watch", "index.ts"]
+CMD ["npm", "run", "start:dev"]
