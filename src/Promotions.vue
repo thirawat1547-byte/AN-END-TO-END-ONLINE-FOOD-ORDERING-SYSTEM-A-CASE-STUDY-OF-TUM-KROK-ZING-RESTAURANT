@@ -1,18 +1,28 @@
 <template>
   <div class="page-container">
     <header class="navbar">
-      <img src="./assets/logo.png" alt="Logo" class="logo-img">
-      <nav class="nav-menu">
-        <router-link to="/" class="nav-item">ค้นหา</router-link>
-        <router-link to="/tracking" class="nav-item">คำสั่งซื้อ</router-link>
-        <router-link to="/promotions" class="nav-item active">ข้อเสนอ</router-link>
-        <router-link to="/help" class="nav-item">ความช่วยเหลือ</router-link>
-      </nav>
-      <div class="nav-actions">
+      <!-- กลุ่มซ้าย: โลโก้ + เมนู -->
+      <div class="nav-left-group">
+        <img src="./assets/logo.png" alt="Logo" class="logo-img" @click="$router.push('/')">
+        <nav class="nav-menu">
+          <router-link to="/" class="nav-item">ค้นหา</router-link>
+          <router-link to="/tracking" class="nav-item">คำสั่งซื้อ</router-link>
+          <router-link to="/history" class="nav-item">ประวัติคำสั่งซื้อ</router-link>
+          <router-link to="/promotions" class="nav-item">โปรโมชั่น</router-link>
+          <router-link to="/help" class="nav-item">ช่วยเหลือ</router-link>
+        </nav>
+      </div>
+      
+      <!-- พื้นที่ว่างดันไปขวา -->
+      <div class="header-spacer"></div>
+
+      <!-- กลุ่มขวา: จัดเรียงแนวนอนทั้งหมด -->
+      <div class="header-actions">
         <button class="icon-btn">🔔</button>
-        <button class="icon-btn">🛒</button>
+        <button class="icon-btn" @click="$router.push('/')" v-if="$route.path !== '/'">🛒</button>
+        <button class="logout-btn" @click="logout">ออกจากระบบ</button>
         <div class="profile-avatar" @click="$router.push('/profile')">
-          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop" alt="Profile">
+          <img :src="userProfile.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop'" alt="Profile">
         </div>
       </div>
     </header>
@@ -109,6 +119,47 @@
   </div>
 </template>
 
+<script>
+export default {
+  data() {
+    return {
+      searchQuery: '',
+      showAddressDropdown: false,
+      isLoggedIn: false,
+      userProfile: { address: '', avatar: '' }
+    }
+  },
+  computed: {
+    // คำนวณความยาวที่อยู่สำหรับโชว์บน Header
+    displayAddress() {
+      if (!this.isLoggedIn) return 'ตลาดปากเกร็ด';
+      if (this.userProfile && this.userProfile.address) {
+        let addr = this.userProfile.address;
+        return addr.length > 20 ? addr.substring(0, 20) + '...' : addr;
+      }
+      return 'กรุณาเพิ่มที่อยู่';
+    }
+  },
+  mounted() {
+    // โหลดข้อมูล User เมื่อเปิดหน้าเว็บ
+    this.isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    const profileData = localStorage.getItem('userProfile');
+    if (profileData) {
+      this.userProfile = { ...this.userProfile, ...JSON.parse(profileData) };
+    } else if (this.isLoggedIn) {
+      this.userProfile.address = '35/369 หมู่ 1 ต.บ้านใหม่ อ.เมืองปทุมธานี จ.ปทุมธานี 12000';
+    }
+  },
+  methods: {
+    logout() {
+      localStorage.removeItem('isLoggedIn');
+      this.isLoggedIn = false;
+      this.$router.push('/');
+    }
+  }
+}
+</script>
+
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap');
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Prompt', sans-serif; }
@@ -176,4 +227,11 @@
 .footer-links a { text-decoration: none; color: #666; }
 .footer-links a:hover { color: #557c61; }
 .footer-copy { color: #888; }
+
+.navbar { display: flex; align-items: center; justify-content: space-between; padding: 15px 40px; background: #f7f6f0; border-bottom: 1px solid #e5e2d5; }
+.nav-left-group { display: flex; align-items: center; gap: 30px; } /* โค้ดสำคัญ: บังคับให้อยู่แถวเดียวกัน */
+.logo-img { height: 40px; cursor: pointer; display: block; }
+.nav-menu { display: flex; align-items: center; gap: 20px; white-space: nowrap; margin-top: 5px; }
+
+.header-actions { display: flex; align-items: center; gap: 15px; }
 </style>

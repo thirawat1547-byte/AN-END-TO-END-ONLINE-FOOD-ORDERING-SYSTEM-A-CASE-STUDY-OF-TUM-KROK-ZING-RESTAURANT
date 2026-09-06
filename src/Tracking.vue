@@ -1,123 +1,141 @@
 <template>
   <div class="tracking-container">
+    <!-- Header -->
     <header class="navbar">
-      <div class="logo-section">
-        <img src="./assets/logo.png" alt="Logo" class="logo-img">
+      <!-- กลุ่มซ้าย: โลโก้ + เมนู -->
+      <div class="nav-left-group">
+        <img src="./assets/logo.png" alt="Logo" class="logo-img" @click="$router.push('/')">
+        <nav class="nav-menu">
+          <router-link to="/" class="nav-item">ค้นหา</router-link>
+          <router-link to="/tracking" class="nav-item">คำสั่งซื้อ</router-link>
+          <router-link to="/history" class="nav-item">ประวัติคำสั่งซื้อ</router-link>
+          <router-link to="/promotions" class="nav-item">โปรโมชั่น</router-link>
+          <router-link to="/help" class="nav-item">ช่วยเหลือ</router-link>
+        </nav>
       </div>
-      <nav class="nav-menu">
-        <router-link to="/" class="nav-item">ค้นหา</router-link>
-        <router-link to="/history" class="nav-item active">คำสั่งซื้อ</router-link>
-        <router-link to="/promotions" class="nav-item">ข้อเสนอ</router-link>
-        <router-link to="/help" class="nav-item">ความช่วยเหลือ</router-link>
-      </nav>
-      <div class="nav-actions">
+      
+      <!-- พื้นที่ว่างดันไปขวา -->
+      <div class="header-spacer"></div>
+
+      <!-- กลุ่มขวา: จัดเรียงแนวนอนทั้งหมด -->
+      <div class="header-actions">
         <button class="icon-btn">🔔</button>
-        <button class="icon-btn">🛒</button>
+        <button class="icon-btn" @click="$router.push('/')" v-if="$route.path !== '/'">🛒</button>
+        <button class="logout-btn" @click="logout">ออกจากระบบ</button>
         <div class="profile-avatar" @click="$router.push('/profile')">
-          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop" alt="Profile">
+          <img :src="userProfile.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop'" alt="Profile">
         </div>
       </div>
     </header>
 
-    <div class="map-banner">
-      <div class="map-overlay-simulation">
-        <iframe 
-          width="100%" 
-          height="100%" 
-          frameborder="0" 
-          style="border:0;"
-          :src="mapUrl" 
-          allowfullscreen>
-        </iframe>
-      </div>
-    </div>
-
-    <div class="tracking-content">
-      
-      <div class="card status-card">
-        <h3 class="card-title">สถานะการจัดส่ง</h3>
-        <div class="timeline">
-          <div class="timeline-item completed">
-            <div class="dot"></div>
-            <div class="content">
-              <h4>ยืนยันคำสั่งซื้อแล้ว</h4>
-              <p>ระบบได้รับออเดอร์ของคุณแล้ว</p>
-            </div>
-          </div>
-          <div class="timeline-item completed">
-            <div class="dot"></div>
-            <div class="content">
-              <h4>กำลังเตรียมอาหาร</h4>
-              <p>ร้านกำลังปรุงอาหารสดใหม่</p>
-            </div>
-          </div>
-          <div class="timeline-item active">
-            <div class="dot"></div>
-            <div class="content">
-              <h4>กำลังจัดส่ง</h4>
-              <p>กำลังมุ่งไปหาคุณที่: {{ userProfile.address }}</p>
-            </div>
-          </div>
-          <div class="timeline-item">
-            <div class="dot pending"></div>
-            <div class="content text-muted">
-              <h4>มาถึงแล้ว</h4>
-            </div>
-          </div>
+    <!-- 🟢 ส่วนที่ 1: จะแสดงผลเมื่อ "มี" ออเดอร์ (hasActiveOrder = true) -->
+    <template v-if="hasActiveOrder">
+      <div class="map-banner">
+        <div class="map-overlay-simulation">
+          <iframe 
+            width="100%" 
+            height="100%" 
+            frameborder="0" 
+            style="border:0;"
+            :src="mapUrl" 
+            allowfullscreen>
+          </iframe>
         </div>
       </div>
 
-      <div class="card rider-card">
-        <h3 class="card-title">รายละเอียดผู้จัดส่ง</h3>
-        <div class="rider-profile-box">
-          <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop" alt="Rider" class="rider-img">
-          <h4 class="rider-name">สิริโชค คำมา</h4>
-          <p class="rider-vehicle">🛵 Honda Wave • 1กข 1234</p>
+      <div class="tracking-content">
+        <div class="card status-card">
+          <h3 class="card-title">สถานะการจัดส่ง</h3>
+          <div class="timeline">
+            <div class="timeline-item completed">
+              <div class="dot"></div>
+              <div class="content">
+                <h4>ยืนยันคำสั่งซื้อแล้ว</h4>
+                <p>ระบบได้รับออเดอร์ของคุณแล้ว</p>
+              </div>
+            </div>
+            <div class="timeline-item completed">
+              <div class="dot"></div>
+              <div class="content">
+                <h4>กำลังเตรียมอาหาร</h4>
+                <p>ร้านกำลังปรุงอาหารสดใหม่</p>
+              </div>
+            </div>
+            <div class="timeline-item active">
+              <div class="dot"></div>
+              <div class="content">
+                <h4>กำลังจัดส่ง</h4>
+                <p>กำลังมุ่งไปหาคุณที่: {{ userProfile.address }}</p>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="dot pending"></div>
+              <div class="content text-muted">
+                <h4>มาถึงแล้ว</h4>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="rider-actions">
-          <button class="action-btn call-btn" @click="callRider">
-            <span>📞</span> โทรหาคนขับ
+
+        <div class="card rider-card">
+          <h3 class="card-title">รายละเอียดผู้จัดส่ง</h3>
+          <div class="rider-profile-box">
+            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop" alt="Rider" class="rider-img">
+            <h4 class="rider-name">สิริโชค คำมา</h4>
+            <p class="rider-vehicle">🛵 Honda Wave • 1กข 1234</p>
+          </div>
+          <div class="rider-actions">
+            <button class="action-btn call-btn" @click="callRider">
+              <span>📞</span> โทรหาคนขับ
+            </button>
+            <button class="action-btn chat-btn" @click="chatRider">
+              <span>💬</span> ข้อความ
+            </button>
+          </div>
+        </div>
+
+        <div class="card order-summary-card">
+          <div class="order-header-row">
+            <h3 class="card-title" style="margin-bottom:0;">คำสั่งซื้อ #{{ currentOrder.orderNumber }}</h3>
+            <span class="badge-status">กำลังดำเนินการ</span>
+          </div>
+
+          <div class="eta-box">
+            <div class="eta-icon">⏰</div>
+            <div class="eta-text-group">
+              <span class="eta-label">เวลาที่คาดว่าจะมาถึง</span>
+              <span class="eta-time">15 นาที</span>
+            </div>
+          </div>
+
+          <div class="order-pricing">
+            <div class="price-row">
+              <span>จัดส่งถึง:</span>
+              <span style="text-align:right; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                {{ userProfile.name }}
+              </span>
+            </div>
+            <div class="price-row">
+              <span>เบอร์ติดต่อ:</span>
+              <span>{{ userProfile.phone }}</span>
+            </div>
+          </div>
+
+          <button class="view-receipt-btn" @click="showReceiptModal = true">
+            ดูใบเสร็จแบบเต็ม
           </button>
-          <button class="action-btn chat-btn" @click="chatRider">
-            <span>💬</span> ข้อความ
-          </button>
         </div>
       </div>
+    </template>
 
-      <div class="card order-summary-card">
-        <div class="order-header-row">
-          <!-- ดึงเลขออเดอร์อัตโนมัติมาแสดง -->
-          <h3 class="card-title" style="margin-bottom:0;">คำสั่งซื้อ #{{ currentOrder.orderNumber }}</h3>
-          <span class="badge-status">กำลังดำเนินการ</span>
-        </div>
-
-        <div class="eta-box">
-          <div class="eta-icon">⏰</div>
-          <div class="eta-text-group">
-            <span class="eta-label">เวลาที่คาดว่าจะมาถึง</span>
-            <span class="eta-time">15 นาที</span>
-          </div>
-        </div>
-
-        <div class="order-pricing">
-          <div class="price-row">
-            <span>จัดส่งถึง:</span>
-            <span style="text-align:right; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-              {{ userProfile.name }}
-            </span>
-          </div>
-          <div class="price-row">
-            <span>เบอร์ติดต่อ:</span>
-            <span>{{ userProfile.phone }}</span>
-          </div>
-        </div>
-
-        <!-- กดปุ่มนี้เพื่อเปิด Pop-up ใบเสร็จ -->
-        <button class="view-receipt-btn" @click="showReceiptModal = true">
-          ดูใบเสร็จแบบเต็ม
-        </button>
+    <!-- 🟢 ส่วนที่ 2: จะแสดงผลเมื่อ "ไม่มี" ออเดอร์ (hasActiveOrder = false) -->
+    <div class="empty-tracking-wrapper" v-else>
+      <div class="empty-tracking-card">
+        <div class="empty-icon">🛵💨</div>
+        <h3>ยังไม่มีคำสั่งซื้อในขณะนี้</h3>
+        <p>คุณยังไม่ได้ทำรายการสั่งซื้ออาหาร ไปเลือกเมนูอร่อยๆ กันเลย!</p>
+        <button class="go-home-btn" @click="$router.push('/')">เลือกซื้ออาหาร ➔</button>
       </div>
-
     </div>
 
     <footer class="footer">
@@ -132,21 +150,19 @@
     </footer>
 
     <!-- POP-UP ใบเสร็จแบบเต็ม -->
-    <div class="modal-overlay" v-if="showReceiptModal" @click.self="showReceiptModal = false">
+    <div class="modal-overlay" v-if="showReceiptModal && currentOrder" @click.self="showReceiptModal = false">
       <div class="receipt-modal-content">
         <button class="close-modal-btn" @click="showReceiptModal = false">✕</button>
         <h2 class="receipt-title">ใบเสร็จรับเงิน</h2>
         <p class="receipt-order-num">ออเดอร์ #{{ currentOrder.orderNumber }}</p>
         <div class="receipt-divider"></div>
 
-        <!-- รายการอาหาร -->
         <div class="receipt-items-list">
           <div class="r-item" v-for="(item, index) in currentOrder.items" :key="index">
             <div class="r-item-main">
               <div class="r-item-name"><span class="r-qty">{{ item.qty }}x</span> {{ item.name }}</div>
               <div class="r-item-price">B{{ item.price * item.qty }}</div>
             </div>
-            <!-- ส่วนเสริม/ความเผ็ด -->
             <div class="r-item-sub">
               <span v-if="item.spiceLevel">🌶️ {{ item.spiceLevel }}</span>
               <span v-for="addon in item.addons" :key="addon.name"> +{{ addon.name }}</span>
@@ -161,7 +177,6 @@
 
         <div class="receipt-divider"></div>
 
-        <!-- สรุปราคาในใบเสร็จ -->
         <div class="receipt-summary">
           <div class="r-summary-row">
             <span>ยอดรวมอาหาร</span>
@@ -187,29 +202,28 @@
 export default {
   data() {
     return {
+      hasActiveOrder: false, 
       userProfile: {
         name: '',
         phone: '',
         address: ''
       },
-      currentOrder: {
-        orderNumber: 'XXXX',
-        items: [],
-        subtotal: 0,
-        shippingFee: 0,
-        total: 0
-      },
-      showReceiptModal: false // ตัวควบคุมการเปิดปิด Pop-up ใบเสร็จ
+      currentOrder: null, 
+      showReceiptModal: false 
     }
   },
   computed: {
     mapUrl() {
+      if (!this.hasActiveOrder) return '';
       const address = this.userProfile.address || 'ตลาดปากเกร็ด นนทบุรี'; 
       const encodedAddress = encodeURIComponent(address);
       return `https://maps.google.com/maps?q=${encodedAddress}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
     }
   },
   mounted() {
+    // 🟢 สั่งเคลียร์ออเดอร์เก่าที่ค้างอยู่ในบั๊กของเบราว์เซอร์ทิ้ง
+    localStorage.removeItem('currentOrder');
+
     // 1. โหลดข้อมูลโปรไฟล์
     const profileData = localStorage.getItem('userProfile');
     if (profileData) {
@@ -227,19 +241,28 @@ export default {
       };
     }
 
-    // 2. โหลดข้อมูลออเดอร์ที่สั่งสำเร็จจากหน้า Checkout
-    const savedOrder = localStorage.getItem('currentOrder');
+    // 2. เช็คออเดอร์โดยใช้ sessionStorage แทน (ปิดแท็บ = ออเดอร์หาย รีเซ็ตใหม่)
+    const savedOrder = sessionStorage.getItem('currentOrder');
     if (savedOrder) {
       this.currentOrder = JSON.parse(savedOrder);
+      this.hasActiveOrder = true; // มีออเดอร์ โชว์แผนที่
     } else {
-      // Mock Data กรณีไม่ได้กดสั่งมา (กันหน้าพัง)
-      this.currentOrder = {
-        orderNumber: 'TRX-5042',
-        items: [],
-        subtotal: 0,
-        shippingFee: 20,
-        total: 20
-      };
+      this.currentOrder = null;
+      this.hasActiveOrder = false; // ไม่มีออเดอร์ โชว์หน้าว่างๆ
+    }
+  },
+  methods: {
+    logout() {
+      sessionStorage.removeItem('isLoggedIn');
+      sessionStorage.removeItem('cartData');
+      sessionStorage.removeItem('currentOrder'); // เคลียร์ออเดอร์ตอนออกจากระบบด้วย
+      this.$router.push('/');
+    },
+    callRider() {
+      alert('กำลังโทรหาคนขับ...');
+    },
+    chatRider() {
+      alert('กำลังเปิดหน้าต่างแชท...');
     }
   }
 }
@@ -253,13 +276,20 @@ export default {
 
 /* Navbar */
 .navbar { display: flex; align-items: center; justify-content: space-between; padding: 15px 40px; background: #f7f6f0; border-bottom: 1px solid #e5e2d5; }
-.logo-img { height: 35px; }
-.nav-menu { display: flex; gap: 30px; }
-.nav-item { text-decoration: none; color: #444; font-size: 14px; font-weight: 500; }
-.nav-item.active { color: #557c61; font-weight: 600; border-bottom: 2px solid #557c61; padding-bottom: 3px; }
-.nav-actions { display: flex; align-items: center; gap: 15px; }
+.nav-left-group { display: flex; align-items: center; gap: 30px; }
+.logo-img { height: 40px; cursor: pointer; display: block; }
+.nav-menu { display: flex; align-items: center; gap: 20px; white-space: nowrap; margin-top: 5px; }
+.nav-item { text-decoration: none; color: #444; font-size: 14px; font-weight: 500; transition: 0.2s; }
+.nav-item:hover { color: #557c61; }
+.nav-item.router-link-exact-active { color: #557c61; font-weight: 600; border-bottom: 2px solid #557c61; padding-bottom: 3px; }
+
+.header-spacer { flex-grow: 1; }
+
+.header-actions { display: flex; align-items: center; gap: 15px; }
 .icon-btn { background: none; border: none; font-size: 16px; cursor: pointer; }
-.profile-avatar { width: 34px; height: 34px; border-radius: 50%; overflow: hidden; border: 2px solid #557c61; cursor: pointer; }
+.logout-btn { background: none; border: 1px solid #ff4d4f; color: #ff4d4f; padding: 4px 10px; border-radius: 12px; cursor: pointer; font-size: 12px; font-family: inherit; }
+.profile-avatar { width: 32px; height: 32px; border-radius: 50%; overflow: hidden; cursor: pointer; border: 1px solid transparent; }
+.profile-avatar:hover { border-color: #557c61; }
 .profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
 /* Map Banner */
@@ -267,7 +297,7 @@ export default {
 .map-overlay-simulation { width: 100%; height: 100%; }
 
 /* Tracking Content Layout */
-.tracking-content { display: flex; justify-content: center; gap: 20px; padding: 30px 40px; max-width: 1300px; margin: 0 auto; width: 100%; }
+.tracking-content { display: flex; justify-content: center; gap: 20px; padding: 30px 40px; max-width: 1300px; margin: 0 auto; width: 100%; flex-grow: 1;}
 .card { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); flex: 1; display: flex; flex-direction: column; }
 .card-title { font-size: 18px; font-weight: 600; color: #333; margin-bottom: 20px; }
 
@@ -312,6 +342,15 @@ export default {
 
 .view-receipt-btn { background: #557c61; color: white; border: none; width: 100%; padding: 12px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; transition: 0.2s; margin-top: auto; font-family: inherit; }
 .view-receipt-btn:hover { background: #405e49; }
+
+/* 🔴 สไตล์สำหรับส่วนที่ยังไม่มีออเดอร์ (Empty State) 🔴 */
+.empty-tracking-wrapper { display: flex; justify-content: center; align-items: center; flex-grow: 1; padding: 40px 20px; }
+.empty-tracking-card { background: white; border-radius: 20px; padding: 60px 30px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.02); display: flex; flex-direction: column; align-items: center; gap: 12px; border: 1px solid #e5e2d5; max-width: 600px; width: 100%; }
+.empty-icon { font-size: 60px; margin-bottom: 5px; }
+.empty-tracking-card h3 { font-size: 22px; font-weight: 600; color: #333; }
+.empty-tracking-card p { font-size: 15px; color: #777; margin-bottom: 20px; }
+.go-home-btn { background: #557c61; color: white; border: none; padding: 12px 30px; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: inherit; }
+.go-home-btn:hover { background: #405e49; }
 
 /* Footer */
 .footer { display: flex; justify-content: space-between; align-items: center; padding: 25px 40px; background: #f7f6f0; border-top: 1px solid #e5e2d5; margin-top: auto; font-size: 12px; color: #666; }

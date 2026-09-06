@@ -1,14 +1,17 @@
 <template>
   <div class="page-container">
     <div class="main-layout">
+      <!-- ส่วนเนื้อหาหลักด้านซ้าย -->
       <div class="content-area">
+        <!-- Header -->
         <header class="navbar">
           <div class="logo-section">
             <img src="./assets/logo.png" alt="Logo" class="logo-img">
           </div>
           <nav class="nav-menu">
             <router-link to="/" class="nav-item active">ค้นหา</router-link>
-            <router-link to="/history" class="nav-item">คำสั่งซื้อ</router-link>
+            <router-link to="/tracking" class="nav-item">คำสั่งซื้อ</router-link>
+            <router-link to="/history" class="nav-item">ประวัติคำสั่งซื้อ</router-link>
             <router-link to="/promotions" class="nav-item">โปรโมชั่น</router-link>
             <router-link to="/help" class="nav-item">ช่วยเหลือ</router-link>
           </nav>
@@ -53,6 +56,7 @@
           </div>
         </header>
 
+        <!-- Hero Banner -->
         <div class="hero-banner">
           <div class="hero-text-box">
             <h1 class="hero-title">ส่งฟรีเมื่อสั่งเกิน<br>B300!</h1>
@@ -61,6 +65,7 @@
           </div>
         </div>
 
+        <!-- Categories Tabs -->
         <div class="category-tabs" v-if="!searchQuery">
           <button 
             v-for="tab in tabs" 
@@ -75,6 +80,7 @@
 
         <h2 class="section-heading">{{ searchQuery ? 'ผลการค้นหา' : currentCategory }}</h2>
 
+        <!-- Product Grid -->
         <div class="products-grid">
           <div class="food-card" v-for="item in filteredMenu" :key="item.id" @click="openModalOrAdd(item)">
             <div class="img-wrapper">
@@ -91,6 +97,7 @@
         </div>
       </div>
 
+      <!-- แผงตะกร้าสินค้าด้านขวา -->
       <aside class="cart-panel" v-if="cartItems.length > 0">
         <h3 class="cart-header-title">ตะกร้าของคุณ</h3>
         <p class="cart-sub">พร้อมชำระเงินหรือยัง?</p>
@@ -101,6 +108,7 @@
               <div class="cart-item-name">{{ item.name }}</div>
               
               <div class="cart-item-options">
+                <span v-if="item.seafoodChoice" class="opt-badge">✔️ {{ item.seafoodChoice }}</span>
                 <span v-if="item.spiceLevel" class="opt-badge">🌶️ {{ item.spiceLevel }}</span>
                 <span v-for="addon in item.addons" :key="addon.name" class="opt-badge">+ {{ addon.name }}</span>
               </div>
@@ -140,6 +148,7 @@
       </aside>
     </div>
 
+    <!-- Pop-up เลือกรายละเอียดสินค้า (Modal) -->
     <div class="modal-overlay" v-if="showItemModal" @click.self="closeItemModal">
       <div class="item-modal-content">
         <div class="item-modal-left">
@@ -151,11 +160,35 @@
           
           <div class="modal-header">
             <h2>{{ selectedItem.name }}</h2>
-            <span class="modal-base-price">B{{ selectedItem.price }}</span>
+            <div class="price-cal-box">
+              <span class="modal-base-price">B{{ unitModalPrice }}</span>
+              <span class="modal-cal-text" v-if="selectedItem.calories !== undefined">🔥 ~{{ unitModalCalories }} kcal</span>
+            </div>
           </div>
           <p class="modal-desc">{{ selectedItem.desc }}</p>
 
           <div class="modal-scroll-area">
+            
+            <div class="option-group" v-if="selectedItem.isSeafood">
+              <div class="option-group-title">
+                <h3>เลือกเนื้อสัตว์</h3>
+                <span class="req-badge">จำเป็น</span>
+              </div>
+              <div class="spice-grid">
+                <button 
+                  v-for="choice in ['รวม (หมึก+กุ้ง)', 'เฉพาะหมึก', 'เฉพาะกุ้ง']" :key="choice"
+                  class="spice-btn" 
+                  :class="{ active: modalOptions.seafoodChoice === choice }"
+                  @click="modalOptions.seafoodChoice = choice"
+                >
+                  <span class="leaf-icon" v-if="choice === 'รวม (หมึก+กุ้ง)'">🦑🦐</span>
+                  <span class="leaf-icon" v-else-if="choice === 'เฉพาะหมึก'">🦑</span>
+                  <span class="leaf-icon" v-else>🦐</span>
+                  {{ choice }}
+                </button>
+              </div>
+            </div>
+
             <div class="option-group" v-if="selectedItem.isSpicy">
               <div class="option-group-title">
                 <h3>ระดับความเผ็ด</h3>
@@ -168,7 +201,9 @@
                   :class="{ active: modalOptions.spiceLevel === level }"
                   @click="modalOptions.spiceLevel = level"
                 >
-                  <span class="leaf-icon">🍃</span>
+                  <span class="leaf-icon" v-if="level === 'เผ็ดน้อย'">🌶️</span>
+                  <span class="leaf-icon" v-else-if="level === 'เผ็ดกลาง'">🌶️🌶️</span>
+                  <span class="leaf-icon" v-else>🌶️🌶️🌶️</span>
                   {{ level }}
                 </button>
               </div>
@@ -183,7 +218,10 @@
                 <label class="addon-item" v-for="addon in availableAddons" :key="addon.name">
                   <div class="addon-left">
                     <input type="checkbox" :value="addon" v-model="modalOptions.addons">
-                    <span>{{ addon.name }}</span>
+                    <span>
+                      {{ addon.name }} 
+                      <span class="addon-cal-mini">(+{{ addon.calories }} kcal)</span>
+                    </span>
                   </div>
                   <span class="addon-price">+B{{ addon.price }}</span>
                 </label>
@@ -209,6 +247,7 @@
       </div>
     </div>
 
+    <!-- Pop-up แจ้งเตือนบังคับเข้าสู่ระบบ -->
     <div class="modal-overlay" v-if="showAuthModal">
       <div class="auth-modal-content">
         <span class="close-modal" @click="showAuthModal = false">✕</span>
@@ -227,7 +266,7 @@ export default {
     return {
       isLoggedIn: false,
       showAuthModal: false,
-      showAddressDropdown: false, // ตัวแปรสำหรับเปิดปิด Dropdown ที่อยู่
+      showAddressDropdown: false,
       searchQuery: '',
       cartItems: [],
       currentCategory: 'ขายดีที่สุด',
@@ -238,37 +277,38 @@ export default {
       showItemModal: false,
       selectedItem: null,
       spiceLevels: ['เผ็ดน้อย', 'เผ็ดกลาง', 'เผ็ดมาก'],
+      
       availableAddons: [
-        { name: 'ไข่ดาว', price: 10 },
-        { name: 'ไข่เจียว', price: 10 }
+        { name: 'ไข่ดาว', price: 10, calories: 160 },
+        { name: 'ไข่เจียว', price: 10, calories: 220 }
       ],
-      modalOptions: { spiceLevel: 'เผ็ดกลาง', addons: [], note: '', qty: 1 },
+      modalOptions: { spiceLevel: 'เผ็ดกลาง', seafoodChoice: 'รวม (หมึก+กุ้ง)', addons: [], note: '', qty: 1 },
 
       menuItems: [
-        { id: 1, name: 'กระเพราหมู', price: 40, category: ['เมนูอาหาร', 'ขายดีที่สุด'], desc: 'หอมฟุ้ง อร่อยเด็ดสะใจ!', img: 'https://images.unsplash.com/photo-1606854426282-358c9735d64a?q=80&w=500', isPopular: true, isSpicy: true },
-        { id: 2, name: 'กระเพราทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'เผ็ดร้อน ถึงเครื่อง', img: 'https://images.unsplash.com/photo-1559314809-0d155014e29e?q=80&w=500', isSpicy: true },
-        { id: 3, name: 'ข้าวผัดหมู', price: 40, category: ['เมนูอาหาร'], desc: 'ข้าวผัดหอมกรุ่น', img: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?q=80&w=500', isSpicy: false },
-        { id: 4, name: 'ข้าวผัดกุ้ง', price: 50, category: ['เมนูอาหาร', 'ขายดีที่สุด'], desc: 'กุ้งตัวโตเต็มคำ', img: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?q=80&w=500', isSpicy: false },
-        { id: 5, name: 'ข้าวผัดทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'รวมมิตรทะเลผัด', img: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?q=80&w=500', isSpicy: false },
-        { id: 6, name: 'ผัดพริกแกงหมู', price: 40, category: ['เมนูอาหาร'], desc: 'พริกแกงเข้มข้น', img: 'https://images.unsplash.com/photo-1633504581786-316c8002b1b9?q=80&w=500', isSpicy: true },
-        { id: 7, name: 'ผัดพริกแกงทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'จัดจ้านถึงใจ', img: 'https://images.unsplash.com/photo-1633504581786-316c8002b1b9?q=80&w=500', isSpicy: true },
-        { id: 8, name: 'ผัดคะน้าหมู', price: 40, category: ['เมนูอาหาร'], desc: 'ผักกรอบ หมูนุ่ม', img: 'https://images.unsplash.com/photo-1606854426282-358c9735d64a?q=80&w=500', isSpicy: false },
-        { id: 9, name: 'ผัดคะน้าทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'คะน้ากรอบกับซีฟู้ด', img: 'https://images.unsplash.com/photo-1559314809-0d155014e29e?q=80&w=500', isSpicy: false },
-        { id: 10, name: 'ข้าวหมูกระเทียม', price: 40, category: ['เมนูอาหาร'], desc: 'หอมกระเทียมพริกไทย', img: 'https://images.unsplash.com/photo-1606854426282-358c9735d64a?q=80&w=500', isSpicy: false },
-        { id: 11, name: 'ข้าวไข่เจียวหมูสับ', price: 40, category: ['เมนูอาหาร'], desc: 'ไข่เจียวฟูๆ หมูสับแน่นๆ', img: 'https://images.unsplash.com/photo-1614361556983-dbbb962de97e?q=80&w=500', isSpicy: false },
-        { id: 12, name: 'ข้าวไข่เจียวกุ้ง', price: 50, category: ['เมนูอาหาร'], desc: 'ไข่เจียวฟูกับกุ้ง', img: 'https://images.unsplash.com/photo-1614361556983-dbbb962de97e?q=80&w=500', isSpicy: false },
-        { id: 13, name: 'ยำวุ้นเส้นทะเล', price: 70, category: ['เมนูอาหาร', 'ขายดีที่สุด'], desc: 'เปรี้ยวเผ็ดแซ่บ', img: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=500', isSpicy: true },
+        { id: 1, name: 'กระเพราหมู', price: 40, category: ['เมนูอาหาร', 'ขายดีที่สุด'], desc: 'หอมฟุ้ง อร่อยเด็ดสะใจ!', img: new URL('./assets/kapaomu.jpg', import.meta.url).href, isPopular: true, isSpicy: true, calories: 550 },
+        { id: 2, name: 'กระเพราทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'เผ็ดร้อน ถึงเครื่อง', img: new URL('./assets/kapaotaley.jpg', import.meta.url).href, isSpicy: true, isSeafood: true, calories: 450 },
+        { id: 3, name: 'ข้าวผัดหมู', price: 40, category: ['เมนูอาหาร'], desc: 'ข้าวผัดหอมกรุ่น', img: new URL('./assets/khaopadmu.jpg', import.meta.url).href, isSpicy: false, calories: 550 },
+        { id: 4, name: 'ข้าวผัดกุ้ง', price: 50, category: ['เมนูอาหาร', 'ขายดีที่สุด'], desc: 'กุ้งตัวโตเต็มคำ', img: new URL('./assets/khaopadkung.jpg', import.meta.url).href, isSpicy: false, calories: 500 },
+        { id: 5, name: 'ข้าวผัดทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'รวมมิตรทะเลผัด', img: new URL('./assets/khaopadtalay.jpg', import.meta.url).href, isSpicy: false, isSeafood: true, calories: 520 },
+        { id: 6, name: 'ผัดพริกแกงหมู', price: 40, category: ['เมนูอาหาร'], desc: 'พริกแกงเข้มข้น', img: new URL('./assets/pikkangmu.jpg', import.meta.url).href, isSpicy: true, calories: 550 },
+        { id: 7, name: 'ผัดพริกแกงทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'จัดจ้านถึงใจ', img: new URL('./assets/prikkangtalay.jpg', import.meta.url).href, isSpicy: true, isSeafood: true, calories: 480 },
+        { id: 8, name: 'ผัดคะน้าหมู', price: 40, category: ['เมนูอาหาร'], desc: 'ผักกรอบ หมูนุ่ม', img: new URL('./assets/kanamokrop.jpg', import.meta.url).href, isSpicy: false, calories: 450 },
+        { id: 9, name: 'ผัดคะน้าทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'คะน้ากรอบกับซีฟู้ด', img: new URL('./assets/kanatalay.jpg', import.meta.url).href, isSpicy: false, isSeafood: true, calories: 400 },
+        { id: 10, name: 'ข้าวหมูกระเทียม', price: 40, category: ['เมนูอาหาร'], desc: 'หอมกระเทียมพริกไทย', img: new URL('./assets/mookratiem.jpg', import.meta.url).href, isSpicy: false, calories: 500 },
+        { id: 11, name: 'ข้าวไข่เจียวหมูสับ', price: 40, category: ['เมนูอาหาร'], desc: 'ไข่เจียวฟูๆ หมูสับแน่นๆ', img: new URL('./assets/kaijeawmoosub.jpg', import.meta.url).href, isSpicy: false, calories: 600 },
+        { id: 12, name: 'ข้าวไข่เจียวกุ้ง', price: 50, category: ['เมนูอาหาร'], desc: 'ไข่เจียวฟูกับกุ้ง', img: new URL('./assets/kaikung.jpg', import.meta.url).href, isSpicy: false, calories: 550 },
+        { id: 13, name: 'ยำวุ้นเส้นทะเล', price: 70, category: ['เมนูอาหาร', 'ขายดีที่สุด'], desc: 'เปรี้ยวเผ็ดแซ่บ', img: new URL('./assets/yumtalay.jpg', import.meta.url).href, isSpicy: true, isSeafood: true, calories: 250 },
         
-        { id: 14, name: 'ส้มตำปูปลาร้า', price: 40, category: ['เมนูอาหารอีสาน', 'ขายดีที่สุด'], desc: 'เส้นมะละกอดิบ มะเขือเทศ และพริก', img: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?q=80&w=500', isPopular: true, isSpicy: true },
-        { id: 15, name: 'ส้มตำไทย', price: 40, category: ['เมนูอาหารอีสาน'], desc: 'เปรี้ยวหวาน สามรส', img: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?q=80&w=500', isSpicy: true },
-        { id: 16, name: 'ลาบหมู', price: 60, category: ['เมนูอาหารอีสาน'], desc: 'หอมข้าวคั่ว แซ่บถึงใจ', img: 'https://images.unsplash.com/photo-1544378730-8b5afcb62b88?q=80&w=500', isSpicy: true },
-        { id: 17, name: 'ไก่ทอด (ปีก)', price: 20, category: ['เมนูอาหารอีสาน'], desc: 'กรอบนอกนุ่มใน', img: 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?q=80&w=500', isSpicy: false },
-        { id: 18, name: 'ไก่ทอด (สะโพก)', price: 50, category: ['เมนูอาหารอีสาน', 'ขายดีที่สุด'], desc: 'เนื้อฉ่ำๆ ชิ้นใหญ่', img: 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?q=80&w=500', isSpicy: false },
+        { id: 14, name: 'ส้มตำปูปลาร้า', price: 40, category: ['เมนูอาหารอีสาน', 'ขายดีที่สุด'], desc: 'เส้นมะละกอดิบ มะเขือเทศ และพริก', img: new URL('./assets/tumprara.jpg', import.meta.url).href, isPopular: true, isSpicy: true, calories: 120 },
+        { id: 15, name: 'ส้มตำไทย', price: 40, category: ['เมนูอาหารอีสาน'], desc: 'เปรี้ยวหวาน สามรส', img: new URL('./assets/tumtai.jpg', import.meta.url).href, isSpicy: true, calories: 150 },
+        { id: 16, name: 'ลาบหมู', price: 60, category: ['เมนูอาหารอีสาน'], desc: 'หอมข้าวคั่ว แซ่บถึงใจ', img: new URL('./assets/larbmoo.jpg', import.meta.url).href, isSpicy: true, calories: 200 },
+        { id: 17, name: 'ไก่ทอด (ปีก)', price: 20, category: ['เมนูอาหารอีสาน'], desc: 'กรอบนอกนุ่มใน', img: new URL('./assets/wingchick.jpg', import.meta.url).href, isSpicy: false, calories: 150 },
+        { id: 18, name: 'ไก่ทอด (สะโพก)', price: 50, category: ['เมนูอาหารอีสาน', 'ขายดีที่สุด'], desc: 'เนื้อฉ่ำๆ ชิ้นใหญ่', img: new URL('./assets/chick.jpg', import.meta.url).href, isSpicy: false, calories: 250 },
 
-        { id: 19, name: 'น้ำเก๊กฮวย', price: 20, category: ['เครื่องดื่ม', 'ขายดีที่สุด'], desc: 'หวานเย็น ชื่นใจ', img: 'https://images.unsplash.com/photo-1622760814917-76b9dfa38a7c?q=80&w=500' },
-        { id: 20, name: 'โค้ก (Coke)', price: 20, category: ['เครื่องดื่ม'], desc: 'น้ำอัดลมซ่าสดชื่น', img: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?q=80&w=500' },
-        { id: 21, name: 'สไปรท์ (Sprite)', price: 20, category: ['เครื่องดื่ม'], desc: 'ซ่า สดชื่น กลิ่นเลมอน', img: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?q=80&w=500' },
-        { id: 22, name: 'น้ำเปล่า', price: 10, category: ['เครื่องดื่ม'], desc: 'น้ำดื่มบริสุทธิ์', img: 'https://images.unsplash.com/photo-1548839140-29a749e1bc4c?q=80&w=500' }
+        { id: 19, name: 'น้ำเก๊กฮวย', price: 20, category: ['เครื่องดื่ม', 'ขายดีที่สุด'], desc: 'หวานเย็น ชื่นใจ', img: new URL('./assets/gek.jpg', import.meta.url).href, calories: 120 },
+        { id: 20, name: 'โค้ก (Coke)', price: 20, category: ['เครื่องดื่ม'], desc: 'น้ำอัดลมซ่าสดชื่น', img: new URL('./assets/coke.jpg', import.meta.url).href, calories: 140 },
+        { id: 21, name: 'สไปรท์ (Sprite)', price: 20, category: ['เครื่องดื่ม'], desc: 'ซ่า สดชื่น กลิ่นเลมอน', img: new URL('./assets/sprite.jpg', import.meta.url).href, calories: 140 },
+        { id: 22, name: 'น้ำเปล่า', price: 10, category: ['เครื่องดื่ม'], desc: 'น้ำดื่มบริสุทธิ์', img: new URL('./assets/water.jpg', import.meta.url).href, calories: 0 }
       ]
     }
   },
@@ -281,10 +321,18 @@ export default {
       }
       return this.menuItems.filter(item => item.category.includes(this.currentCategory));
     },
-    calculatedModalPrice() {
+    unitModalPrice() {
       if (!this.selectedItem) return 0;
       let addonTotal = this.modalOptions.addons.reduce((sum, addon) => sum + addon.price, 0);
-      return (this.selectedItem.price + addonTotal) * this.modalOptions.qty;
+      return this.selectedItem.price + addonTotal;
+    },
+    unitModalCalories() {
+      if (!this.selectedItem || this.selectedItem.calories === undefined) return 0;
+      let addonCal = this.modalOptions.addons.reduce((sum, addon) => sum + (addon.calories || 0), 0);
+      return this.selectedItem.calories + addonCal;
+    },
+    calculatedModalPrice() {
+      return this.unitModalPrice * this.modalOptions.qty;
     },
     displayAddress() {
       if (!this.isLoggedIn) return 'ตลาดปากเกร็ด';
@@ -311,27 +359,39 @@ export default {
   methods: {
     openModalOrAdd(item) {
       if (!this.isLoggedIn) { this.showAuthModal = true; return; }
-      if (item.category.includes('เครื่องดื่ม')) {
+      
+      // 🟢 เพิ่มเงื่อนไข: ถ้าเป็นเครื่องดื่ม หรือ ชื่อเมนูมีคำว่า "ไก่ทอด" ให้ลงตะกร้าทันที
+      if (item.category.includes('เครื่องดื่ม') || item.name.includes('ไก่ทอด')) {
         this.addDirectToCart(item);
       } else {
+        // เมนูอื่นๆ เปิด Pop-up เพื่อเลือกส่วนเสริมปกติ
         this.selectedItem = item;
-        this.modalOptions = { spiceLevel: item.isSpicy ? 'เผ็ดกลาง' : null, addons: [], note: '', qty: 1 };
+        this.modalOptions = { 
+          spiceLevel: item.isSpicy ? 'เผ็ดกลาง' : null, 
+          seafoodChoice: item.isSeafood ? 'รวม (หมึก+กุ้ง)' : null, 
+          addons: [], 
+          note: '', 
+          qty: 1 
+        };
         this.showItemModal = true;
       }
     },
     closeItemModal() { this.showItemModal = false; this.selectedItem = null; },
     confirmAddToCart() {
-      let addonTotal = this.modalOptions.addons.reduce((sum, addon) => sum + addon.price, 0);
-      let finalPrice = this.selectedItem.price + addonTotal;
       this.cartItems.push({
-        name: this.selectedItem.name, price: finalPrice, qty: this.modalOptions.qty,
-        spiceLevel: this.modalOptions.spiceLevel, addons: [...this.modalOptions.addons], note: this.modalOptions.note
+        name: this.selectedItem.name, 
+        price: this.unitModalPrice,
+        qty: this.modalOptions.qty,
+        spiceLevel: this.modalOptions.spiceLevel, 
+        seafoodChoice: this.modalOptions.seafoodChoice, 
+        addons: [...this.modalOptions.addons], 
+        note: this.modalOptions.note
       });
       this.closeItemModal();
     },
     addDirectToCart(item) {
-      let found = this.cartItems.find(i => i.name === item.name && !i.spiceLevel && i.addons?.length === 0);
-      if (found) { found.qty++; } else { this.cartItems.push({ name: item.name, price: item.price, qty: 1, spiceLevel: null, addons: [] }); }
+      let found = this.cartItems.find(i => i.name === item.name && !i.spiceLevel && !i.seafoodChoice && i.addons?.length === 0);
+      if (found) { found.qty++; } else { this.cartItems.push({ name: item.name, price: item.price, qty: 1, spiceLevel: null, seafoodChoice: null, addons: [] }); }
     },
     updateQty(index, change) {
       if (change === -1 && this.cartItems[index].qty <= 1) return;
@@ -353,20 +413,20 @@ export default {
 @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap');
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Prompt', sans-serif; }
 .page-container { background-color: #f7f6f0; min-height: 100vh; width: 100%; padding: 20px 0; position: relative; }
-.main-layout { display: flex; width: 100%; background: #f7f6f0; gap: 20px; padding: 0 30px; }
+.main-layout { display: flex; width: 100%; background: #f7f6f0; gap: 20px; padding: 0 30px; align-items: flex-start; }
 
 .content-area { flex: 1; min-width: 0; }
 .navbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 25px; padding-top: 10px; gap: 15px; }
 .logo-img { height: 40px; }
 .nav-menu { display: flex; gap: 20px; white-space: nowrap; }
-.nav-item { text-decoration: none; color: #444; font-size: 14px; font-weight: 500; }
+.nav-item { text-decoration: none; color: #444; font-size: 14px; font-weight: 500; transition: 0.2s; }
+.nav-item:hover { color: #557c61; }
 .nav-item.active { color: #557c61; font-weight: 600; border-bottom: 2px solid #557c61; padding-bottom: 3px; }
 
 .search-box { position: relative; width: 220px; z-index: 10; }
 .search-box input { width: 100%; padding: 8px 12px 8px 32px; border-radius: 20px; border: 1px solid #e0dfd5; background: #fff; font-size: 13px; color: #333; outline: none; position: relative; z-index: 11; }
 .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 12px; color: #888; z-index: 12; }
 
-/* อัปเดต CSS ของกล่องที่อยู่ (Location Box) */
 .location-wrapper { position: relative; display: inline-block; z-index: 20; }
 .location-box { display: flex; align-items: center; gap: 5px; font-size: 13px; color: #444; background: #f1ede1; padding: 6px 12px; border-radius: 20px; cursor: pointer; white-space: nowrap; transition: 0.2s; border: 1px solid transparent; }
 .location-box:hover { background: #e8e4d5; border-color: #d6d2c4; }
@@ -375,7 +435,6 @@ export default {
 .dropdown-arrow.arrow-up { transform: rotate(180deg); color: #557c61; }
 
 .address-dropdown-menu { position: absolute; top: calc(100% + 10px); left: 50%; transform: translateX(-50%); background: white; border: 1px solid #e5e2d5; border-radius: 16px; padding: 15px 20px; width: 260px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 100; cursor: default; }
-/* ลูกศรชี้ขึ้นตรงขอบกล่อง Dropdown */
 .address-dropdown-menu::before { content: ''; position: absolute; top: -6px; left: 50%; transform: translateX(-50%) rotate(45deg); width: 12px; height: 12px; background: white; border-left: 1px solid #e5e2d5; border-top: 1px solid #e5e2d5; }
 .addr-title { font-size: 13px; font-weight: 600; color: #557c61; margin-bottom: 6px; }
 .addr-full-text { font-size: 13px; color: #555; line-height: 1.5; margin-bottom: 12px; word-wrap: break-word; background: #faf9f5; padding: 10px; border-radius: 8px; }
@@ -388,7 +447,8 @@ export default {
 .login-text { color: #557c61; text-decoration: none; }
 .reg-text { color: #333; text-decoration: none; }
 .logout-btn { background: none; border: 1px solid #ff4d4f; color: #ff4d4f; padding: 4px 10px; border-radius: 12px; cursor: pointer; font-size: 12px; font-family: inherit; }
-.profile-avatar { width: 32px; height: 32px; border-radius: 50%; overflow: hidden; cursor: pointer; border: 1px solid #557c61; margin-left: 10px; }
+.profile-avatar { width: 32px; height: 32px; border-radius: 50%; overflow: hidden; cursor: pointer; border: 1px solid transparent; margin-left: 10px; }
+.profile-avatar:hover { border-color: #557c61; }
 .profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
 .hero-banner { background: url('https://images.unsplash.com/photo-1540420773420-3366772f4999?q=80&w=1200') center/cover; border-radius: 24px; padding: 45px 50px; color: white; margin-bottom: 25px; position: relative; overflow: hidden; }
@@ -418,10 +478,10 @@ export default {
 .plus-btn { background: #6b8e73; color: white; border: none; width: 26px; height: 26px; border-radius: 50%; font-size: 16px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .plus-btn:hover { background: #557c61; }
 
-.cart-panel { width: 330px; background: #f7f6f0; padding: 15px 10px; display: flex; flex-direction: column; flex-shrink: 0; }
+.cart-panel { width: 340px; background: white; padding: 25px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.04); display: flex; flex-direction: column; flex-shrink: 0; position: sticky; top: 20px; max-height: calc(100vh - 40px); }
 .cart-header-title { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 2px; }
 .cart-sub { font-size: 12px; color: #777; margin-bottom: 20px; }
-.cart-list { display: flex; flex-direction: column; gap: 15px; flex-grow: 1; overflow-y: auto; max-height: 50vh; }
+.cart-list { display: flex; flex-direction: column; gap: 15px; flex-grow: 1; overflow-y: auto; padding-right: 5px; }
 .cart-row { display: flex; justify-content: space-between; align-items: center; }
 .cart-item-info { font-size: 13px; flex-grow: 1; display: flex; flex-direction: column; gap: 3px; }
 .cart-item-name { font-weight: 600; color: #333; }
@@ -455,9 +515,12 @@ export default {
 .close-modal-btn { position: absolute; top: 20px; right: 20px; background: none; border: none; font-size: 18px; color: #888; cursor: pointer; }
 .close-modal-btn:hover { color: #333; }
 
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
-.modal-header h2 { font-size: 22px; font-weight: 600; color: #333; }
+.modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px; }
+.modal-header h2 { font-size: 22px; font-weight: 600; color: #333; margin-right: 15px; }
+.price-cal-box { display: flex; flex-direction: column; align-items: flex-end; }
 .modal-base-price { font-size: 18px; font-weight: 600; color: #557c61; }
+.modal-cal-text { font-size: 11px; color: #f59e0b; font-weight: 600; margin-top: -2px; }
+
 .modal-desc { font-size: 13px; color: #777; margin-bottom: 20px; }
 
 .modal-scroll-area { flex-grow: 1; overflow-y: auto; padding-right: 10px; display: flex; flex-direction: column; gap: 20px; }
@@ -476,6 +539,7 @@ export default {
 .addon-item:hover { border-color: #ddd; }
 .addon-left { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #444; }
 .addon-left input[type="checkbox"] { accent-color: #557c61; width: 16px; height: 16px; cursor: pointer; }
+.addon-cal-mini { color: #f59e0b; font-size: 11px; margin-left: 4px; font-weight: 500;}
 .addon-price { font-size: 13px; color: #666; font-weight: 500; }
 
 .note-input { width: 100%; padding: 12px 15px; border: 1px solid #ddd; border-radius: 12px; font-size: 13px; font-family: inherit; outline: none; background: white; }

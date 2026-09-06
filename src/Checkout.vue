@@ -1,18 +1,29 @@
 <template>
   <div class="checkout-container">
     <header class="navbar">
-      <div class="logo-section">
-        <img src="./assets/logo.png" alt="Logo" class="logo-img">
+      <!-- กลุ่มซ้าย: โลโก้ + เมนู -->
+      <div class="nav-left-group">
+        <img src="./assets/logo.png" alt="Logo" class="logo-img" @click="$router.push('/')">
+        <nav class="nav-menu">
+          <router-link to="/" class="nav-item">ค้นหา</router-link>
+          <router-link to="/tracking" class="nav-item">คำสั่งซื้อ</router-link>
+          <router-link to="/history" class="nav-item">ประวัติคำสั่งซื้อ</router-link>
+          <router-link to="/promotions" class="nav-item">โปรโมชั่น</router-link>
+          <router-link to="/help" class="nav-item">ช่วยเหลือ</router-link>
+        </nav>
       </div>
-      <nav class="nav-menu">
-        <router-link to="/" class="nav-item">ค้นหา</router-link>
-        <router-link to="/history" class="nav-item">คำสั่งซื้อ</router-link>
-        <router-link to="/promotions" class="nav-item">ข้อเสนอ</router-link>
-        <router-link to="/help" class="nav-item">ช่วยเหลือ</router-link>
-      </nav>
-      <div class="nav-actions">
+      
+      <!-- พื้นที่ว่างดันไปขวา -->
+      <div class="header-spacer"></div>
+
+      <!-- กลุ่มขวา: จัดเรียงแนวนอนทั้งหมด -->
+      <div class="header-actions">
         <button class="icon-btn">🔔</button>
-        <div class="profile-icon" @click="$router.push('/profile')">👤</div>
+        <button class="icon-btn" @click="$router.push('/')" v-if="$route.path !== '/'">🛒</button>
+        <button class="logout-btn" @click="logout">ออกจากระบบ</button>
+        <div class="profile-avatar" @click="$router.push('/profile')">
+          <img :src="userProfile.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop'" alt="Profile">
+        </div>
       </div>
     </header>
 
@@ -37,9 +48,23 @@
                 {{ userProfile.name }} 
                 <span class="phone-text">({{ userProfile.phone }})</span>
               </h4>
-              <p class="address-text">{{ userProfile.address }}</p>
-              <p class="address-note">หมายเหตุ: กรุณาโทรแจ้งเมื่อมาถึง</p>
-              <button class="edit-address-btn" @click="$router.push('/profile')">แก้ไขที่อยู่</button>
+              
+              <!-- โหมดปกติ: แสดงที่อยู่และปุ่มแก้ไข -->
+              <div v-if="!isEditingAddress">
+                <p class="address-text">{{ userProfile.address }}</p>
+                <p class="address-note">หมายเหตุ: กรุณาโทรแจ้งเมื่อมาถึง</p>
+                <button class="edit-address-btn" @click="startEditAddress">แก้ไขที่อยู่</button>
+              </div>
+
+              <!-- โหมดแก้ไข: แสดงกล่องพิมพ์และปุ่มบันทึก -->
+              <div v-else class="edit-address-form">
+                <textarea v-model="editAddressText" class="edit-textarea" rows="3" placeholder="กรอกที่อยู่จัดส่งใหม่..."></textarea>
+                <div class="edit-actions">
+                  <button class="cancel-edit-btn" @click="isEditingAddress = false">ยกเลิก</button>
+                  <button class="save-edit-btn" @click="saveAddress">บันทึก</button>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
@@ -129,7 +154,10 @@ export default {
         phone: '',
         address: ''
       },
-      cartItems: []
+      cartItems: [],
+      // เพิ่มตัวแปรสำหรับระบบแก้ไขที่อยู่
+      isEditingAddress: false,
+      editAddressText: ''
     }
   },
   computed: {
@@ -168,12 +196,37 @@ export default {
       };
     }
 
-    const savedCart = localStorage.getItem('cartData');
+    const savedCart = sessionStorage.getItem('cartData') || localStorage.getItem('cartData');
     if (savedCart) {
       this.cartItems = JSON.parse(savedCart);
     }
   },
   methods: {
+    // เพิ่มฟังก์ชันสำหรับปุ่มออกจากระบบ
+    logout() {
+      sessionStorage.removeItem('isLoggedIn');
+      sessionStorage.removeItem('cartData');
+      sessionStorage.removeItem('currentOrder');
+      this.$router.push('/');
+    },
+    
+    // ฟังก์ชันเปิดโหมดแก้ไขที่อยู่
+    startEditAddress() {
+      this.editAddressText = this.userProfile.address;
+      this.isEditingAddress = true;
+    },
+    
+    // ฟังก์ชันบันทึกที่อยู่ใหม่
+    saveAddress() {
+      if (!this.editAddressText.trim()) {
+        alert('กรุณากรอกที่อยู่สำหรับจัดส่งครับ');
+        return;
+      }
+      this.userProfile.address = this.editAddressText;
+      localStorage.setItem('userProfile', JSON.stringify(this.userProfile));
+      this.isEditingAddress = false;
+    },
+
     confirmOrder() {
       if (this.cartItems.length === 0) {
         alert('กรุณาเลือกอาหารก่อนชำระเงินครับ!');
@@ -181,24 +234,31 @@ export default {
         return;
       }
 
-      // สุ่มเลขที่ออเดอร์ (เช่น TRX-4921)
       const randomOrderNumber = 'TRX-' + Math.floor(1000 + Math.random() * 9000);
 
-      // สร้างแพ็กเกจข้อมูลออเดอร์ปัจจุบัน
       const currentOrder = {
         orderNumber: randomOrderNumber,
+        date: new Date().toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }),
         items: this.cartItems,
         subtotal: this.subtotal,
         shippingFee: this.shippingFee,
-        total: this.total
+        total: this.total,
+        paymentMethod: this.selectedPayment === 'qr' ? 'พร้อมเพย์' : 'เงินสด',
+        deliveryAddress: this.userProfile.address,
+        status: 'กำลังดำเนินการ'
       };
 
-      // บันทึกออเดอร์ปัจจุบันลง localStorage เพื่อให้หน้า Tracking ดึงไปใช้
-      localStorage.setItem('currentOrder', JSON.stringify(currentOrder));
+      // บันทึกออเดอร์ปัจจุบันลง sessionStorage
+      sessionStorage.setItem('currentOrder', JSON.stringify(currentOrder));
+
+      // บันทึกลงประวัติ
+      let history = JSON.parse(localStorage.getItem('orderHistoryList') || '[]');
+      history.unshift(currentOrder);
+      localStorage.setItem('orderHistoryList', JSON.stringify(history));
 
       alert(`สั่งซื้อสำเร็จ!\nเลขออเดอร์: #${randomOrderNumber}\nขอบคุณคุณ ${this.userProfile.name} ระบบกำลังดำเนินการจัดส่งครับ`);
       
-      // ล้างข้อมูลตะกร้าออกเพราะสั่งซื้อไปแล้ว
+      sessionStorage.removeItem('cartData');
       localStorage.removeItem('cartData');
       
       this.$router.push('/tracking');
@@ -212,30 +272,46 @@ export default {
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Prompt', sans-serif; }
 .checkout-container { background-color: #f7f6f0; min-height: 100vh; display: flex; flex-direction: column; }
 .navbar { display: flex; align-items: center; justify-content: space-between; padding: 15px 40px; background: #f7f6f0; border-bottom: 1px solid #e5e2d5; }
-.logo-img { height: 35px; }
-.nav-menu { display: flex; gap: 30px; }
-.nav-item { text-decoration: none; color: #444; font-size: 14px; font-weight: 500; }
+.logo-img { height: 40px; cursor: pointer; display: block; }
+.nav-menu { display: flex; align-items: center; gap: 20px; white-space: nowrap; margin-top: 5px; }
+.nav-item { text-decoration: none; color: #444; font-size: 14px; font-weight: 500; transition: 0.2s; }
 .nav-item:hover { color: #557c61; }
-.nav-actions { display: flex; align-items: center; gap: 15px; }
+.nav-left-group { display: flex; align-items: center; gap: 30px; }
+
+/* CSS ส่วนของ Header ขวาบน (ปุ่มออกระบบและรูปโปรไฟล์) */
+.header-actions { display: flex; align-items: center; gap: 15px; }
 .icon-btn { background: none; border: none; font-size: 16px; cursor: pointer; }
-.profile-icon { width: 32px; height: 32px; background: #e5e2d5; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; }
+.logout-btn { background: none; border: 1px solid #ff4d4f; color: #ff4d4f; padding: 4px 12px; border-radius: 15px; cursor: pointer; font-size: 13px; font-weight: 500; font-family: inherit; transition: 0.2s; }
+.logout-btn:hover { background: #fff0f0; }
+.profile-avatar { width: 34px; height: 34px; border-radius: 50%; overflow: hidden; cursor: pointer; border: 1px solid transparent; display: flex; justify-content: center; align-items: center; }
+.profile-avatar:hover { border-color: #557c61; }
+.profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
 .checkout-main { display: flex; justify-content: center; gap: 30px; padding: 30px 40px; flex-grow: 1; max-width: 1200px; margin: 0 auto; width: 100%; }
 .left-section { flex: 1; display: flex; flex-direction: column; gap: 20px; max-width: 680px; }
-.card-section { background: white; border-radius: 16px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+.card-section { background: white; border-radius: 16px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); border: 1px solid #e5e2d5;}
 .section-title { font-size: 18px; font-weight: 600; color: #333; margin-bottom: 15px; }
 
 .address-box { display: flex; gap: 20px; align-items: flex-start; }
 .map-placeholder { width: 100px; height: 90px; background: #f1ede1; border-radius: 12px; flex-shrink: 0; display: flex; justify-content: center; align-items: center; overflow: hidden;}
-.map-placeholder.map-active { width: 140px; height: 110px; border: 1px solid #e0dfd5; }
+.map-placeholder.map-active { width: 140px; height: 130px; border: 1px solid #e0dfd5; }
 
 .address-details { display: flex; flex-direction: column; gap: 6px; flex-grow: 1; }
 .location-name { font-size: 16px; font-weight: 600; color: #333; }
 .phone-text { font-size: 13px; color: #666; font-weight: 400; }
-.address-text { font-size: 14px; color: #555; line-height: 1.5; background: #faf9f5; padding: 10px 12px; border-radius: 8px; border: 1px solid #eee; }
+.address-text { font-size: 14px; color: #555; line-height: 1.5; background: #faf9f5; padding: 10px 12px; border-radius: 8px; border: 1px solid #eee; margin-top: 5px;}
 .address-note { font-size: 12px; color: #888; margin-bottom: 4px; }
-.edit-address-btn { background: white; border: 1px solid #557c61; color: #557c61; padding: 4px 14px; border-radius: 15px; font-size: 12px; font-weight: 500; cursor: pointer; align-self: flex-start; transition: 0.2s; }
+.edit-address-btn { background: white; border: 1px solid #557c61; color: #557c61; padding: 4px 14px; border-radius: 15px; font-size: 12px; font-weight: 500; cursor: pointer; align-self: flex-start; transition: 0.2s; font-family: inherit;}
 .edit-address-btn:hover { background: #f4faeb; }
+
+/* CSS สำหรับฟอร์มแก้ไขที่อยู่ */
+.edit-address-form { display: flex; flex-direction: column; gap: 10px; margin-top: 5px; }
+.edit-textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical; outline: none; transition: 0.2s; }
+.edit-textarea:focus { border-color: #557c61; box-shadow: 0 0 0 3px rgba(85, 124, 97, 0.1); }
+.edit-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.cancel-edit-btn { background: white; border: 1px solid #ddd; color: #666; padding: 6px 14px; border-radius: 15px; font-size: 12px; cursor: pointer; font-family: inherit; }
+.save-edit-btn { background: #557c61; border: none; color: white; padding: 6px 14px; border-radius: 15px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.save-edit-btn:hover { background: #405e49; }
 
 .delivery-time-box { display: flex; justify-content: space-between; align-items: center; border: 1px solid #e0dfd5; border-radius: 12px; padding: 15px 20px; }
 .time-type { font-weight: 600; font-size: 14px; color: #333; }
@@ -248,7 +324,7 @@ export default {
 .payment-card span { font-size: 14px; font-weight: 500; color: #333; }
 
 .right-section { width: 360px; }
-.summary-card { background: white; border-radius: 16px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); display: flex; flex-direction: column; }
+.summary-card { background: white; border-radius: 16px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); display: flex; flex-direction: column; border: 1px solid #e5e2d5; }
 .summary-title { font-size: 18px; font-weight: 600; color: #333; margin-bottom: 20px; }
 
 .order-items-list { display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 20px; max-height: 350px; overflow-y: auto; }
