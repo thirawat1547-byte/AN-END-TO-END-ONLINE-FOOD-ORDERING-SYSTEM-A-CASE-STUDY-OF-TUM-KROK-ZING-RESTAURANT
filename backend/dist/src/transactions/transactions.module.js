@@ -6,21 +6,18 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AppModule = void 0;
+exports.TransactionsModule = void 0;
 const common_1 = require("@nestjs/common");
-const prisma_service_1 = require("./prisma.service");
-const menus_module_1 = require("./menus/menus.module");
-const auth_module_1 = require("./auth/auth.module");
-const orders_module_1 = require("./orders/orders.module");
-const transactions_module_1 = require("./transactions/transactions.module");
-let AppModule = class AppModule {
+const transactions_service_1 = require("./transactions.service");
+const transactions_controller_1 = require("./transactions.controller");
+const prisma_service_1 = require("../prisma.service");
+let TransactionsModule = class TransactionsModule {
 };
-exports.AppModule = AppModule;
-exports.AppModule = AppModule = __decorate([
+exports.TransactionsModule = TransactionsModule;
+exports.TransactionsModule = TransactionsModule = __decorate([
     (0, common_1.Module)({
-        imports: [menus_module_1.MenusModule, auth_module_1.AuthModule, orders_module_1.OrdersModule, transactions_module_1.TransactionsModule],
-        controllers: [],
-        providers: [prisma_service_1.PrismaService],
+        controllers: [transactions_controller_1.TransactionsController],
+        providers: [transactions_service_1.TransactionsService, prisma_service_1.PrismaService],
     })
-], AppModule);
-//# sourceMappingURL=app.module.js.map
+], TransactionsModule);
+//# sourceMappingURL=transactions.module.js.map
