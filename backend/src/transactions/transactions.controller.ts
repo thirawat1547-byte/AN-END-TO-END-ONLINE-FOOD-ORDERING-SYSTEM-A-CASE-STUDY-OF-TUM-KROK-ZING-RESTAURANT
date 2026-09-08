@@ -4,8 +4,7 @@ import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { TransactionsService } from './transactions.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 
-@ApiTags('Transactions (การชำระเงิน)')
-// เปลี่ยนจาก @Controller('api/v1/transactions') เป็น:
+@ApiTags('Transactions')
 @Controller('transactions')
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}

@@ -45,7 +45,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], TransactionsController.prototype, "findAll", null);
 exports.TransactionsController = TransactionsController = __decorate([
-    (0, swagger_1.ApiTags)('Transactions (การชำระเงิน)'),
+    (0, swagger_1.ApiTags)('Transactions'),
     (0, common_1.Controller)('transactions'),
     __metadata("design:paramtypes", [transactions_service_1.TransactionsService])
 ], TransactionsController);

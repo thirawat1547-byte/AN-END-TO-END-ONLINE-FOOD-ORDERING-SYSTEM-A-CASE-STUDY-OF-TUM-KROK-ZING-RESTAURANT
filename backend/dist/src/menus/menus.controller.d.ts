@@ -10,14 +10,14 @@ export declare class MenusController {
             category_name: string;
         };
     } & {
-        description: string | null;
-        category_id: number;
         menu_name: string;
+        description: string | null;
         price: import("@prisma/client/runtime/library").Decimal;
         image_url: string | null;
         calories: number | null;
         is_available: boolean;
         menu_id: number;
+        category_id: number;
     }>;
     findAll(categoryId?: string, isAvailable?: string): Promise<({
         category: {
@@ -35,14 +35,14 @@ export declare class MenusController {
             allergen_id: number;
         })[];
     } & {
-        description: string | null;
-        category_id: number;
         menu_name: string;
+        description: string | null;
         price: import("@prisma/client/runtime/library").Decimal;
         image_url: string | null;
         calories: number | null;
         is_available: boolean;
         menu_id: number;
+        category_id: number;
     })[]>;
     findOne(id: number): Promise<{
         category: {
@@ -74,14 +74,14 @@ export declare class MenusController {
             quantity_used: import("@prisma/client/runtime/library").Decimal;
         })[];
     } & {
-        description: string | null;
-        category_id: number;
         menu_name: string;
+        description: string | null;
         price: import("@prisma/client/runtime/library").Decimal;
         image_url: string | null;
         calories: number | null;
         is_available: boolean;
         menu_id: number;
+        category_id: number;
     }>;
     update(id: number, updateMenuDto: UpdateMenuDto): Promise<{
         category: {
@@ -89,23 +89,23 @@ export declare class MenusController {
             category_name: string;
         };
     } & {
-        description: string | null;
-        category_id: number;
         menu_name: string;
+        description: string | null;
         price: import("@prisma/client/runtime/library").Decimal;
         image_url: string | null;
         calories: number | null;
         is_available: boolean;
         menu_id: number;
+        category_id: number;
     }>;
     remove(id: number): Promise<{
-        description: string | null;
-        category_id: number;
         menu_name: string;
+        description: string | null;
         price: import("@prisma/client/runtime/library").Decimal;
         image_url: string | null;
         calories: number | null;
         is_available: boolean;
         menu_id: number;
+        category_id: number;
     }>;
 }

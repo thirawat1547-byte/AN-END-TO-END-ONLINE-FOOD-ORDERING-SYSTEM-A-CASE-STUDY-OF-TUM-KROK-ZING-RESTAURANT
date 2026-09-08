@@ -108,7 +108,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], MenusController.prototype, "remove", null);
 exports.MenusController = MenusController = __decorate([
-    (0, swagger_1.ApiTags)('Menu Management'),
+    (0, swagger_1.ApiTags)('Menus'),
     (0, common_1.Controller)('menus'),
     __metadata("design:paramtypes", [menus_service_1.MenusService])
 ], MenusController);

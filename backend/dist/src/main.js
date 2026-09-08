@@ -31,10 +31,10 @@ async function bootstrap() {
         in: 'header',
     }, 'JWT-auth')
         .addTag('Auth', 'ระบบยืนยันตัวตนและการเข้าสู่ระบบ')
-        .addTag('Users', 'การจัดการข้อมูลผู้ใช้')
         .addTag('Menus', 'ระบบจัดการเมนูและหมวดหมู่อาหาร')
         .addTag('Orders', 'ระบบสั่งอาหารและการจัดการสถานะออร์เดอร์')
         .addTag('Tables', 'ระบบจัดการโต๊ะภายในร้าน')
+        .addTag('Transactions', 'ระบบการชำระเงินและปิดบิล')
         .build();
     const document = swagger_1.SwaggerModule.createDocument(app, config);
     swagger_1.SwaggerModule.setup('api/docs', app, document, {
