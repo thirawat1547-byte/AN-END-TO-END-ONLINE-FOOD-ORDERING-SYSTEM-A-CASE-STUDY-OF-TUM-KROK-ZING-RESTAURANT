@@ -12,9 +12,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TransactionsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma.service");
+const Stripe = require('stripe');
 let TransactionsService = class TransactionsService {
     constructor(prisma) {
         this.prisma = prisma;
+        this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
+            apiVersion: '2024-12-18.acacia',
+        });
     }
     async create(createTransactionDto) {
         const { order_id, amount, payment_method, payment_slip_url } = createTransactionDto;
@@ -57,6 +61,56 @@ let TransactionsService = class TransactionsService {
                     },
                 },
             },
+        });
+    }
+    async createStripeIntent(orderId) {
+        const order = await this.prisma.order.findUnique({
+            where: { order_id: orderId },
+        });
+        if (!order) {
+            throw new common_1.NotFoundException(`ไม่พบคำสั่งซื้อรหัส #${orderId}`);
+        }
+        const amountInSatang = Math.round(Number(order.total_price) * 100);
+        if (amountInSatang <= 0) {
+            throw new common_1.BadRequestException('ยอดชำระต้องมากกว่า 0 บาท');
+        }
+        const paymentIntent = await this.stripe.paymentIntents.create({
+            amount: amountInSatang,
+            currency: 'thb',
+            payment_method_types: ['card', 'promptpay'],
+            metadata: {
+                order_id: order.order_id.toString(),
+            },
+        });
+        await this.prisma.transaction.create({
+            data: {
+                order_id: order.order_id,
+                amount: order.total_price,
+                payment_method: 'STRIPE',
+                payment_status: 'PENDING',
+            },
+        });
+        return {
+            clientSecret: paymentIntent.client_secret,
+            paymentIntentId: paymentIntent.id,
+            amount: order.total_price,
+            currency: 'THB',
+        };
+    }
+    async confirmStripePaymentTest(orderId) {
+        const order = await this.prisma.order.findUnique({
+            where: { order_id: orderId },
+        });
+        if (!order) {
+            throw new common_1.NotFoundException(`ไม่พบคำสั่งซื้อรหัส #${orderId}`);
+        }
+        await this.prisma.transaction.updateMany({
+            where: { order_id: orderId },
+            data: { payment_status: 'COMPLETED' },
+        });
+        return this.prisma.order.update({
+            where: { order_id: orderId },
+            data: { status: 'PAID' },
         });
     }
 };

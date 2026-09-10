@@ -27,6 +27,12 @@ let TransactionsController = class TransactionsController {
     findAll() {
         return this.transactionsService.findAll();
     }
+    createStripeIntent(orderId) {
+        return this.transactionsService.createStripeIntent(orderId);
+    }
+    confirmStripeTest(orderId) {
+        return this.transactionsService.confirmStripePaymentTest(orderId);
+    }
 };
 exports.TransactionsController = TransactionsController;
 __decorate([
@@ -44,6 +50,28 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], TransactionsController.prototype, "findAll", null);
+__decorate([
+    (0, common_1.Post)('stripe/create-intent/:orderId'),
+    (0, swagger_1.ApiOperation)({ summary: 'สร้าง Stripe Payment Intent สำหรับคำนวณยอดชำระ' }),
+    (0, swagger_1.ApiParam)({ name: 'orderId', type: Number, description: 'รหัสคำสั่งซื้อ (Order ID)' }),
+    (0, swagger_1.ApiResponse)({ status: 201, description: 'สร้าง Payment Intent สำเร็จ ได้รับ clientSecret' }),
+    (0, swagger_1.ApiResponse)({ status: 404, description: 'ไม่พบคำสั่งซื้อ' }),
+    __param(0, (0, common_1.Param)('orderId', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], TransactionsController.prototype, "createStripeIntent", null);
+__decorate([
+    (0, common_1.Post)('stripe/confirm-test/:orderId'),
+    (0, swagger_1.ApiOperation)({ summary: 'จำลองการชำระเงินผ่าน Stripe สำเร็จ (สำหรับทดสอบ Flow)' }),
+    (0, swagger_1.ApiParam)({ name: 'orderId', type: Number, description: 'รหัสคำสั่งซื้อ (Order ID)' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'ปรับสถานะ Transaction เป็น COMPLETED และ Order เป็น PAID เรียบร้อย' }),
+    (0, swagger_1.ApiResponse)({ status: 404, description: 'ไม่พบคำสั่งซื้อ' }),
+    __param(0, (0, common_1.Param)('orderId', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], TransactionsController.prototype, "confirmStripeTest", null);
 exports.TransactionsController = TransactionsController = __decorate([
     (0, swagger_1.ApiTags)('Transactions'),
     (0, common_1.Controller)('transactions'),
