@@ -31,8 +31,8 @@ export declare class TransactionsController {
                     category_id: number;
                 };
             } & {
-                menu_id: number;
                 created_at: Date;
+                menu_id: number;
                 order_id: number;
                 quantity: number;
                 unit_price: number;
@@ -42,9 +42,9 @@ export declare class TransactionsController {
             user_id: number | null;
             table_id: number | null;
             status: string;
+            created_at: Date;
             order_type: string;
             total_price: import("@prisma/client/runtime/library").Decimal;
-            created_at: Date;
             order_id: number;
             promo_id: number | null;
         };

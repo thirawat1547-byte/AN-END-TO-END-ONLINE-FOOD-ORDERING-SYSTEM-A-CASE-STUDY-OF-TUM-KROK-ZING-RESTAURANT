@@ -24,6 +24,9 @@ async function bootstrap() {
       whitelist: true,
       transform: true,
       forbidNonWhitelisted: true,
+      transformOptions: {
+        enableImplicitConversion: true, // [แนะนำเสริม] ช่วยแปลง Type ของ @Query อัตโนมัติ (เช่น string เป็น number)
+      },
     }),
   );
 
@@ -50,7 +53,7 @@ async function bootstrap() {
     .addTag('Transactions', 'ระบบการชำระเงินและปิดบิล')
     .addTag('Ingredients', 'ระบบจัดการสต็อกวัตถุดิบห้องครัว')
     .addTag('Promotions', 'ระบบโปรโมชันและโค้ดส่วนลด')
-    .build(); 
+    .build();
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document, {
@@ -60,7 +63,8 @@ async function bootstrap() {
   });
 
   const port = process.env.PORT || 5000;
-  await app.listen(port);
+  // [แนะนำเสริม] ใส่ '0.0.0.0' เพื่อให้ Docker Container รับการเชื่อมต่อจากภายนอกได้อย่างสมบูรณ์
+  await app.listen(port, '0.0.0.0');
   logger.log(`🚀 เซิร์ฟเวอร์ทำงานที่: http://localhost:${port}/api/v1`);
   logger.log(`📑 เข้าชม Swagger UI ได้ที่: http://localhost:${port}/api/docs`);
 }

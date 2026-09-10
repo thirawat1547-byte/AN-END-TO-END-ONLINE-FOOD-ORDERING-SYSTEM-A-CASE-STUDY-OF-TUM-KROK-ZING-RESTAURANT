@@ -1,9 +1,15 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class AuthService {
@@ -67,5 +73,46 @@ export class AuthService {
         role: user.role,
       },
     };
+  }
+
+// ดึงข้อมูลโปรไฟล์ล่าสุดจาก Database
+  async getProfile(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { user_id: userId },
+      select: {
+        user_id: true,
+        username: true,
+        email: true,
+        phone_number: true,
+        address: true,
+        role: true,
+        // ตัด created_at ออกแล้ว
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('ไม่พบข้อมูลผู้ใช้งาน');
+    }
+
+    return user;
+  }
+
+  // อัปเดตข้อมูลส่วนตัว / ที่อยู่จัดส่งเดลิเวอรี่
+  async updateProfile(userId: number, dto: UpdateProfileDto) {
+    await this.getProfile(userId);
+
+    return this.prisma.user.update({
+      where: { user_id: userId },
+      data: dto,
+      select: {
+        user_id: true,
+        username: true,
+        email: true,
+        phone_number: true,
+        address: true,
+        role: true,
+        // ตัด updated_at ออกแล้ว
+      },
+    });
   }
 }

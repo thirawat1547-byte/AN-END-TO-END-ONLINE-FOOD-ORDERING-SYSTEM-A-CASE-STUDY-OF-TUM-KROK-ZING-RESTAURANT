@@ -5,6 +5,7 @@ export declare class PromotionsController {
     private readonly promotionsService;
     constructor(promotionsService: PromotionsService);
     findAll(): Promise<{
+        created_at: Date;
         promo_id: number;
         code: string;
         discount_type: string;
@@ -13,6 +14,7 @@ export declare class PromotionsController {
         expiry_date: Date;
     }[]>;
     findActive(): Promise<{
+        created_at: Date;
         promo_id: number;
         code: string;
         discount_type: string;
@@ -21,6 +23,7 @@ export declare class PromotionsController {
         expiry_date: Date;
     }[]>;
     findByCode(code: string): Promise<{
+        created_at: Date;
         promo_id: number;
         code: string;
         discount_type: string;
@@ -29,6 +32,7 @@ export declare class PromotionsController {
         expiry_date: Date;
     }>;
     findOne(id: number): Promise<{
+        created_at: Date;
         promo_id: number;
         code: string;
         discount_type: string;
@@ -37,6 +41,7 @@ export declare class PromotionsController {
         expiry_date: Date;
     }>;
     create(createDto: CreatePromotionDto): Promise<{
+        created_at: Date;
         promo_id: number;
         code: string;
         discount_type: string;
@@ -45,6 +50,7 @@ export declare class PromotionsController {
         expiry_date: Date;
     }>;
     update(id: number, updateDto: UpdatePromotionDto): Promise<{
+        created_at: Date;
         promo_id: number;
         code: string;
         discount_type: string;
@@ -53,6 +59,7 @@ export declare class PromotionsController {
         expiry_date: Date;
     }>;
     remove(id: number): Promise<{
+        created_at: Date;
         promo_id: number;
         code: string;
         discount_type: string;

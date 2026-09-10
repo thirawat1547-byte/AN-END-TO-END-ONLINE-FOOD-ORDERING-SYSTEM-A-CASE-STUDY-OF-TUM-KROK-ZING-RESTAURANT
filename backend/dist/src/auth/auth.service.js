@@ -66,6 +66,38 @@ let AuthService = class AuthService {
             },
         };
     }
+    async getProfile(userId) {
+        const user = await this.prisma.user.findUnique({
+            where: { user_id: userId },
+            select: {
+                user_id: true,
+                username: true,
+                email: true,
+                phone_number: true,
+                address: true,
+                role: true,
+            },
+        });
+        if (!user) {
+            throw new common_1.NotFoundException('ไม่พบข้อมูลผู้ใช้งาน');
+        }
+        return user;
+    }
+    async updateProfile(userId, dto) {
+        await this.getProfile(userId);
+        return this.prisma.user.update({
+            where: { user_id: userId },
+            data: dto,
+            select: {
+                user_id: true,
+                username: true,
+                email: true,
+                phone_number: true,
+                address: true,
+                role: true,
+            },
+        });
+    }
 };
 exports.AuthService = AuthService;
 exports.AuthService = AuthService = __decorate([

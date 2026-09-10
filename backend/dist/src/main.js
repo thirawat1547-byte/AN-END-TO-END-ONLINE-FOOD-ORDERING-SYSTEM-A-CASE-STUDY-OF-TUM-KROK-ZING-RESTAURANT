@@ -17,6 +17,9 @@ async function bootstrap() {
         whitelist: true,
         transform: true,
         forbidNonWhitelisted: true,
+        transformOptions: {
+            enableImplicitConversion: true,
+        },
     }));
     const config = new swagger_1.DocumentBuilder()
         .setTitle('Tum Krok Zing Restaurant API')
@@ -45,7 +48,7 @@ async function bootstrap() {
         },
     });
     const port = process.env.PORT || 5000;
-    await app.listen(port);
+    await app.listen(port, '0.0.0.0');
     logger.log(`🚀 เซิร์ฟเวอร์ทำงานที่: http://localhost:${port}/api/v1`);
     logger.log(`📑 เข้าชม Swagger UI ได้ที่: http://localhost:${port}/api/docs`);
 }
