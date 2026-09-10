@@ -4,56 +4,56 @@ export declare class TransactionsService {
     private readonly prisma;
     constructor(prisma: PrismaService);
     create(createTransactionDto: CreateTransactionDto): Promise<{
+        order_id: number;
         amount: import("@prisma/client/runtime/library").Decimal;
         payment_method: string;
-        payment_status: string;
         payment_slip_url: string | null;
+        payment_status: string;
         transaction_id: number;
-        order_id: number;
     }>;
     findAll(): Promise<({
         order: {
             table: {
                 table_id: number;
-                status: string;
                 table_number: string;
                 capacity: number;
+                status: string;
             };
             order_items: ({
                 menu: {
-                    menu_id: number;
-                    category_id: number;
-                    menu_name: string;
                     description: string | null;
+                    menu_name: string;
                     price: import("@prisma/client/runtime/library").Decimal;
                     image_url: string | null;
                     calories: number | null;
                     is_available: boolean;
+                    menu_id: number;
+                    category_id: number;
                 };
             } & {
-                order_id: number;
-                order_item_id: number;
                 menu_id: number;
+                created_at: Date;
+                order_id: number;
                 quantity: number;
-                customization: import("@prisma/client/runtime/library").JsonValue | null;
-                subtotal: import("@prisma/client/runtime/library").Decimal;
+                unit_price: number;
+                order_item_id: number;
             })[];
         } & {
-            order_id: number;
             user_id: number | null;
             table_id: number | null;
-            promo_id: number | null;
-            order_type: string;
             status: string;
+            order_type: string;
             total_price: import("@prisma/client/runtime/library").Decimal;
             created_at: Date;
+            order_id: number;
+            promo_id: number | null;
         };
     } & {
+        order_id: number;
         amount: import("@prisma/client/runtime/library").Decimal;
         payment_method: string;
-        payment_status: string;
         payment_slip_url: string | null;
+        payment_status: string;
         transaction_id: number;
-        order_id: number;
     })[]>;
 }

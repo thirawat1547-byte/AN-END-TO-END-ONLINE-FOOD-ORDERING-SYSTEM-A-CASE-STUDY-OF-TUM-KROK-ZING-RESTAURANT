@@ -85,16 +85,17 @@ model MenuAllergen {
 }
 
 model Promotion {
-  promo_id        Int      @id @default(autoincrement())
-  code            String   @unique @db.VarChar(50)
-  discount_type   String   @db.VarChar(20)
-  discount_value  Decimal  @db.Decimal(10, 2)
-  min_order_price Decimal  @db.Decimal(10, 2)
-  expiry_date     DateTime
-
-  orders Order[]
-
-  @@map("PROMOTIONS")
+  promotion_id   Int       @id @default(autoincrement())
+  code           String    @unique @db.VarChar(50)
+  description    String?   @db.VarChar(255)
+  discount_type  String    @default("PERCENTAGE") // PERCENTAGE หรือ FIXED
+  discount_value Float
+  min_spend      Float     @default(0)
+  start_date     DateTime  @default(now())
+  end_date       DateTime?
+  is_active      Boolean   @default(true)
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
 }
 
 model Order {
@@ -121,7 +122,15 @@ model Order {
 }
 
 model OrderItem {
-  ...
+  order_item_id Int      @id @default(autoincrement())
+  order_id      Int
+  menu_id       Int
+  quantity      Int
+  unit_price    Float
+  created_at    DateTime @default(now())
+
+  order Order @relation(fields: [order_id], references: [order_id], onDelete: Cascade)
+  menu  Menu  @relation(fields: [menu_id], references: [menu_id])
 }
 
 model Transaction {
@@ -140,18 +149,16 @@ model Transaction {
 }
 
 model Ingredient {
-  ingredient_id     Int      @id @default(autoincrement())
-  ingredient_name   String   @db.VarChar(100)
-  quantity_in_stock Decimal  @db.Decimal(10, 2)
-  unit              String   @db.VarChar(50)
-  reorder_level     Decimal  @db.Decimal(10, 2)
-  last_updated      DateTime @updatedAt
+  ingredient_id    Int              @id @default(autoincrement())
+  name             String           @db.VarChar(100)
+  quantity         Float            @default(0)
+  unit             String           @db.VarChar(20)
+  min_quantity     Float            @default(5)
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
 
-  menus MenuIngredient[]
-
-  @@map("INGREDIENTS")
+  menu_ingredients MenuIngredient[]
 }
-
 model MenuIngredient {
   menu_id       Int
   ingredient_id Int

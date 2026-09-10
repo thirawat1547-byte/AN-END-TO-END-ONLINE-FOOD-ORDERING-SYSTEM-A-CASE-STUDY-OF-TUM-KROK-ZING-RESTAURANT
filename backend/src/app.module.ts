@@ -5,7 +5,8 @@ import { OrdersModule } from './orders/orders.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { TablesModule } from './tables/tables.module';
 import { PrismaService } from './prisma.service';
-
+import { IngredientsModule } from './ingredients/ingredients.module';
+import { PromotionsModule } from './promotions/promotions.module';
 @Module({
   imports: [
     AuthModule,
@@ -13,6 +14,8 @@ import { PrismaService } from './prisma.service';
     OrdersModule,
     TransactionsModule,
     TablesModule,
+    IngredientsModule,
+    PromotionsModule,
   ],
   providers: [PrismaService],
 })

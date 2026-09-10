@@ -14,6 +14,8 @@ const orders_module_1 = require("./orders/orders.module");
 const transactions_module_1 = require("./transactions/transactions.module");
 const tables_module_1 = require("./tables/tables.module");
 const prisma_service_1 = require("./prisma.service");
+const ingredients_module_1 = require("./ingredients/ingredients.module");
+const promotions_module_1 = require("./promotions/promotions.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -25,6 +27,8 @@ exports.AppModule = AppModule = __decorate([
             orders_module_1.OrdersModule,
             transactions_module_1.TransactionsModule,
             tables_module_1.TablesModule,
+            ingredients_module_1.IngredientsModule,
+            promotions_module_1.PromotionsModule,
         ],
         providers: [prisma_service_1.PrismaService],
     })

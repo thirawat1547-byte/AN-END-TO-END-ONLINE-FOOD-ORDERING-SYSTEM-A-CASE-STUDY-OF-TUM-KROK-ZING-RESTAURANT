@@ -35,6 +35,8 @@ async function bootstrap() {
         .addTag('Orders', 'ระบบสั่งอาหารและการจัดการสถานะออร์เดอร์')
         .addTag('Tables', 'ระบบจัดการโต๊ะภายในร้าน')
         .addTag('Transactions', 'ระบบการชำระเงินและปิดบิล')
+        .addTag('Ingredients', 'ระบบจัดการสต็อกวัตถุดิบห้องครัว')
+        .addTag('Promotions', 'ระบบโปรโมชันและโค้ดส่วนลด')
         .build();
     const document = swagger_1.SwaggerModule.createDocument(app, config);
     swagger_1.SwaggerModule.setup('api/docs', app, document, {
