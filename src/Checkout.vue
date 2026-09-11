@@ -136,8 +136,9 @@
             <span class="total-price-highlight">B{{ total }}</span>
           </div>
 
-          <button class="confirm-checkout-btn" @click="confirmOrder" :disabled="cartItems.length === 0">
-            ยืนยันและชำระเงิน B{{ total }}
+          <button class="confirm-checkout-btn" @click="confirmOrder" :disabled="cartItems.length === 0 || isSubmitting">
+            <span v-if="isSubmitting">กำลังส่งคำสั่งซื้อ...</span>
+            <span v-else>ยืนยันและชำระเงิน B{{ total }}</span>
           </button>
         </div>
       </aside>
@@ -146,7 +147,6 @@
     <!-- Popup QR Code สำหรับพร้อมเพย์ -->
     <div v-if="showQrModal" class="qr-modal-backdrop" @click.self="closeQrModal">
       <div class="qr-modal-card">
-        <!-- Modal Header -->
         <div class="qr-modal-header">
           <div class="qr-header-title-group">
             <span class="qr-header-badge">พร้อมเพย์</span>
@@ -155,7 +155,6 @@
           <button class="qr-close-btn" @click="closeQrModal" title="ปิด">✕</button>
         </div>
 
-        <!-- Thai QR Payment / PromptPay Header -->
         <div class="thai-qr-header">
           <div class="thai-qr-brand">
             <span class="brand-thai">THAI QR</span>
@@ -164,7 +163,6 @@
           <div class="promptpay-pill">PromptPay</div>
         </div>
 
-        <!-- QR Code Image Section -->
         <div class="qr-display-section">
           <div class="qr-image-wrapper">
             <img v-if="qrCodeUrl" :src="qrCodeUrl" alt="PromptPay QR Code" class="qr-image" />
@@ -176,7 +174,6 @@
           <p class="qr-scan-hint">ใช้แอปธนาคารใดก็ได้สแกนเพื่อจ่ายเงิน</p>
         </div>
 
-        <!-- Payment Details -->
         <div class="qr-payment-info">
           <div class="qr-info-row">
             <span class="info-label">ชื่อบัญชี</span>
@@ -192,9 +189,8 @@
           </div>
         </div>
 
-        <!-- Modal Actions -->
         <div class="qr-modal-actions">
-          <button class="confirm-qr-btn" @click="confirmQrPayment">
+          <button class="confirm-qr-btn" @click="confirmQrPayment" :disabled="isSubmitting">
             <span>✓</span> ยืนยันการชำระเงิน
           </button>
           <button class="cancel-qr-btn" @click="closeQrModal">
@@ -207,6 +203,7 @@
 </template>
 
 <script>
+import axios from 'axios';
 import QRCode from 'qrcode';
 import { adminStore } from './admin/store/adminData.js';
 
@@ -254,13 +251,12 @@ export default {
         address: ''
       },
       cartItems: [],
-      // เพิ่มตัวแปรสำหรับระบบแก้ไขที่อยู่
       isEditingAddress: false,
       editAddressText: '',
-      // ตัวแปรสำหรับ Popup PromptPay QR Code
       showQrModal: false,
       qrCodeUrl: '',
-      isGeneratingQr: false
+      isGeneratingQr: false,
+      isSubmitting: false
     }
   },
   computed: {
@@ -293,15 +289,15 @@ export default {
     if (profileData) {
       const parsed = JSON.parse(profileData);
       this.userProfile = {
-        name: parsed.name || 'คมชาญ หล่อวัน',
-        phone: parsed.phone || '091-020-7256',
-        address: parsed.address || '35/369 หมู่ 1 ต.บ้านใหม่ อ.เมืองปทุมธานี จ.ปทุมธานี 12000'
+        name: parsed.name || parsed.username || 'ลูกค้าทั่วไป',
+        phone: parsed.phone || '08x-xxx-xxxx',
+        address: parsed.address || 'ตลาดปากเกร็ด นนทบุรี'
       };
     } else {
       this.userProfile = {
-        name: 'คมชาญ หล่อวัน',
-        phone: '091-020-7256',
-        address: '35/369 หมู่ 1 ต.บ้านใหม่ อ.เมืองปทุมธานี จ.ปทุมธานี 12000'
+        name: 'ลูกค้าทั่วไป',
+        phone: '08x-xxx-xxxx',
+        address: 'ตลาดปากเกร็ด นนทบุรี'
       };
     }
 
@@ -311,22 +307,21 @@ export default {
     }
   },
   methods: {
-    // เพิ่มฟังก์ชันสำหรับปุ่มออกจากระบบ
     logout() {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('isLoggedIn');
       sessionStorage.removeItem('isLoggedIn');
       sessionStorage.removeItem('cartData');
       sessionStorage.removeItem('currentOrder');
       this.$router.push('/');
     },
     
-    // ฟังก์ชันเปิดโหมดแก้ไขที่อยู่
     startEditAddress() {
       this.editAddressText = this.userProfile.address;
       this.isEditingAddress = true;
     },
     
-    // ฟังก์ชันบันทึกที่อยู่ใหม่
-    saveAddress() {
+    async saveAddress() {
       if (!this.editAddressText.trim()) {
         alert('กรุณากรอกที่อยู่สำหรับจัดส่งครับ');
         return;
@@ -334,20 +329,30 @@ export default {
       this.userProfile.address = this.editAddressText;
       localStorage.setItem('userProfile', JSON.stringify(this.userProfile));
       this.isEditingAddress = false;
+
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        try {
+          await axios.patch('http://localhost:5000/api/v1/auth/profile', {
+            address: this.editAddressText
+          }, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        } catch (err) {
+          console.warn('อัปเดตที่อยู่ไปยัง Backend ไม่สำเร็จ:', err);
+        }
+      }
     },
 
-    // เปิด Popup แสดง QR Code สำหรับพร้อมเพย์
     async openQrModal() {
       this.showQrModal = true;
       await this.generateQrCode();
     },
 
-    // ปิด Popup
     closeQrModal() {
       this.showQrModal = false;
     },
 
-    // เจน QR Code ด้วย PromptPay Payload
     async generateQrCode() {
       this.isGeneratingQr = true;
       try {
@@ -355,10 +360,7 @@ export default {
         this.qrCodeUrl = await QRCode.toDataURL(payload, {
           width: 240,
           margin: 1,
-          color: {
-            dark: '#000000',
-            light: '#ffffff'
-          }
+          color: { dark: '#000000', light: '#ffffff' }
         });
       } catch (err) {
         console.error('Error generating QR code:', err);
@@ -369,13 +371,11 @@ export default {
       }
     },
 
-    // กดยืนยันการชำระเงินจากในป๊อปอัป QR
     confirmQrPayment() {
       this.showQrModal = false;
       this.processOrderCompletion();
     },
 
-    // ปุ่มชำระเงินหลัก
     confirmOrder() {
       if (this.cartItems.length === 0) {
         alert('กรุณาเลือกอาหารก่อนชำระเงินครับ!');
@@ -383,46 +383,106 @@ export default {
         return;
       }
 
-      // ถ้าเลือกชำระเงินด้วยพร้อมเพย์ ให้เปิดป๊อปอัปสแกน QR Code พร้อมปุ่มยืนยัน
       if (this.selectedPayment === 'qr') {
         this.openQrModal();
       } else {
-        // ชำระด้วยเงินสด ดำเนินการเหมือนเดิมทันที
         this.processOrderCompletion();
       }
     },
 
-    // ดำเนินการสั่งซื้อและบันทึกออเดอร์ (ตามโฟลว์เดิม)
-    processOrderCompletion() {
-      const randomOrderNumber = 'TRX-' + Math.floor(1000 + Math.random() * 9000);
+    async processOrderCompletion() {
+      if (this.isSubmitting) return;
 
-      const currentOrder = {
-        orderNumber: randomOrderNumber,
-        date: new Date().toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }),
-        items: this.cartItems,
-        subtotal: this.subtotal,
-        shippingFee: this.shippingFee,
-        total: this.total,
-        paymentMethod: this.selectedPayment === 'qr' ? 'พร้อมเพย์' : 'เงินสด',
-        deliveryAddress: this.userProfile.address,
-        status: 'กำลังดำเนินการ'
-      };
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        alert('กรุณาเข้าสู่ระบบก่อนทำการสั่งซื้อครับ');
+        this.$router.push('/login');
+        return;
+      }
 
-      // บันทึกออเดอร์ปัจจุบันลง sessionStorage
-      sessionStorage.setItem('currentOrder', JSON.stringify(currentOrder));
+      this.isSubmitting = true;
 
-      // บันทึกลงประวัติ
-      let history = JSON.parse(localStorage.getItem('orderHistoryList') || '[]');
-      history.unshift(currentOrder);
-      localStorage.setItem('orderHistoryList', JSON.stringify(history));
+      try {
+        // 1. ดึงเมนูจริงทั้งหมดจาก Backend มาเพื่อจับคู่ ID ที่ถูกต้องตามชื่ออาหาร
+        let dbMenus = [];
+        try {
+          const menuRes = await axios.get('http://localhost:5000/api/v1/menus');
+          dbMenus = menuRes.data || [];
+        } catch (e) {
+          console.warn('ไม่สามารถดึงข้อมูลเมนูเพื่อเทียบรหัสได้:', e);
+        }
 
-      // แสดง Popup แจ้งเตือนอันเดิม
-      alert(`สั่งซื้อสำเร็จ!\nเลขออเดอร์: #${randomOrderNumber}\nขอบคุณคุณ ${this.userProfile.name} ระบบกำลังดำเนินการจัดส่งครับ`);
-      
-      sessionStorage.removeItem('cartData');
-      localStorage.removeItem('cartData');
-      
-      this.$router.push('/tracking');
+        // 2. แปลงรายการอาหารโดยใช้ ID จริงจาก Database
+        const orderPayload = {
+          items: this.cartItems.map(item => {
+            const cleanItemName = (item.name || '').trim().toLowerCase();
+            const matched = dbMenus.find(m => {
+              const dbName = (m.name || m.menu_name || '').trim().toLowerCase();
+              return dbName === cleanItemName || dbName.includes(cleanItemName) || cleanItemName.includes(dbName);
+            });
+
+            // ใช้ ID ที่แมปเจอ ถ้าไม่เจอใช้ตัวแรกสุดใน Database เพื่อไม่ให้คำสั่งซื้อล้มเหลว
+            const realMenuId = matched?.menu_id ?? matched?.id ?? item.id ?? item.menu_id ?? (dbMenus[0]?.menu_id || dbMenus[0]?.id || 1);
+
+            const options = [];
+            if (item.dishType) options.push(item.dishType);
+            if (item.spiceLevel) options.push(item.spiceLevel);
+            if (item.seafoodChoice) options.push(item.seafoodChoice);
+            if (item.addons && item.addons.length > 0) {
+              options.push('ส่วนเสริม: ' + item.addons.map(a => a.name).join(', '));
+            }
+            if (item.note) options.push('โน้ต: ' + item.note);
+
+            return {
+              menu_id: Number(realMenuId),
+              quantity: Number(item.qty),
+              notes: options.join(' | ')
+            };
+          })
+        };
+
+        // 3. ยิงคำสั่งซื้อเข้า Backend
+        const response = await axios.post('http://localhost:5000/api/v1/orders', orderPayload, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        const createdOrder = response.data;
+        const orderId = createdOrder?.order_id || createdOrder?.id || ('TRX-' + Math.floor(1000 + Math.random() * 9000));
+
+        const orderInfo = {
+          orderNumber: String(orderId),
+          date: new Date().toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }),
+          items: this.cartItems,
+          subtotal: this.subtotal,
+          shippingFee: this.shippingFee,
+          total: this.total,
+          paymentMethod: this.selectedPayment === 'qr' ? 'พร้อมเพย์' : 'เงินสด',
+          deliveryAddress: this.userProfile.address,
+          status: 'กำลังดำเนินการ'
+        };
+
+        sessionStorage.setItem('currentOrder', JSON.stringify(orderInfo));
+
+        let history = JSON.parse(localStorage.getItem('orderHistoryList') || '[]');
+        history.unshift(orderInfo);
+        localStorage.setItem('orderHistoryList', JSON.stringify(history));
+
+        alert(`สั่งซื้อสำเร็จ!\nเลขออเดอร์: #${orderInfo.orderNumber}\nทางร้านได้รับคำสั่งซื้อเรียบร้อยแล้วครับ`);
+
+        sessionStorage.removeItem('cartData');
+        localStorage.removeItem('cartData');
+        this.cartItems = [];
+
+        this.$router.push('/tracking');
+      } catch (error) {
+        console.error('บันทึกคำสั่งซื้อไม่สำเร็จ:', error);
+        const errMsg = error.response?.data?.message || 'เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ';
+        alert(`ไม่สามารถสั่งซื้อได้: ${Array.isArray(errMsg) ? errMsg.join(', ') : errMsg}`);
+      } finally {
+        this.isSubmitting = false;
+      }
     }
   }
 }
@@ -439,7 +499,8 @@ export default {
 .nav-item:hover { color: #557c61; }
 .nav-left-group { display: flex; align-items: center; gap: 30px; }
 
-/* CSS ส่วนของ Header ขวาบน (ปุ่มออกระบบและรูปโปรไฟล์) */
+.header-spacer { flex-grow: 1; }
+
 .header-actions { display: flex; align-items: center; gap: 15px; }
 .icon-btn { background: none; border: none; font-size: 16px; cursor: pointer; }
 .logout-btn { background: none; border: 1px solid #ff4d4f; color: #ff4d4f; padding: 4px 12px; border-radius: 15px; cursor: pointer; font-size: 13px; font-weight: 500; font-family: inherit; transition: 0.2s; }
@@ -465,7 +526,6 @@ export default {
 .edit-address-btn { background: white; border: 1px solid #557c61; color: #557c61; padding: 4px 14px; border-radius: 15px; font-size: 12px; font-weight: 500; cursor: pointer; align-self: flex-start; transition: 0.2s; font-family: inherit;}
 .edit-address-btn:hover { background: #f4faeb; }
 
-/* CSS สำหรับฟอร์มแก้ไขที่อยู่ */
 .edit-address-form { display: flex; flex-direction: column; gap: 10px; margin-top: 5px; }
 .edit-textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical; outline: none; transition: 0.2s; }
 .edit-textarea:focus { border-color: #557c61; box-shadow: 0 0 0 3px rgba(85, 124, 97, 0.1); }

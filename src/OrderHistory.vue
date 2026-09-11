@@ -38,11 +38,16 @@
 
       <div class="history-card-box">
         <div class="table-tabs">
-          <span class="tab active">รายการทั้งหมด</span>
-          <span class="tab">เฉพาะรายการที่ถูกยกเลิก</span>
+          <span class="tab" :class="{ active: currentTab === 'all' }" @click="currentTab = 'all'">รายการทั้งหมด</span>
+          <span class="tab" :class="{ active: currentTab === 'cancelled' }" @click="currentTab = 'cancelled'">เฉพาะรายการที่ถูกยกเลิก</span>
         </div>
 
-        <table class="history-table">
+        <div v-if="isLoading" class="loading-state">
+          <div class="spinner"></div>
+          <p>กำลังโหลดประวัติคำสั่งซื้อจากเซิร์ฟเวอร์...</p>
+        </div>
+
+        <table class="history-table" v-else-if="filteredOrders.length > 0">
           <thead>
             <tr>
               <th>วันเวลา</th>
@@ -54,7 +59,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(order, index) in orderHistory" :key="index">
+            <tr v-for="(order, index) in filteredOrders" :key="index">
               <td>{{ order.date }}</td>
               <td style="font-weight: 500;">#{{ order.orderNumber }}</td>
               <td>B{{ order.total }}</td>
@@ -66,7 +71,14 @@
                 </span>
               </td>
               <td>
-                <span class="status-badge" :class="{'success': order.status === 'ชำระเงินสำเร็จ', 'pending': order.status === 'กำลังดำเนินการ'}">
+                <span 
+                  class="status-badge" 
+                  :class="{
+                    'success': order.status === 'ชำระเงินสำเร็จ' || order.status === 'สำเร็จ', 
+                    'pending': order.status === 'กำลังดำเนินการ' || order.status === 'กำลังปรุงอาหาร',
+                    'cancelled': order.status === 'ยกเลิกแล้ว'
+                  }"
+                >
                   {{ order.status }}
                 </span>
               </td>
@@ -77,13 +89,13 @@
           </tbody>
         </table>
 
-        <div v-if="orderHistory.length === 0" style="text-align: center; padding: 60px; color: #888;">
+        <div v-else style="text-align: center; padding: 60px; color: #888;">
           <div style="font-size: 40px; margin-bottom: 10px;">🍽️</div>
           คุณยังไม่มีประวัติการสั่งซื้อ ไปสั่งของอร่อยกันเถอะ!
         </div>
 
-        <div class="pagination-row" v-if="orderHistory.length > 0">
-          <span>แสดง 1 ถึง {{ orderHistory.length }} จาก {{ orderHistory.length }} รายการ</span>
+        <div class="pagination-row" v-if="!isLoading && filteredOrders.length > 0">
+          <span>แสดง 1 ถึง {{ filteredOrders.length }} จาก {{ filteredOrders.length }} รายการ</span>
           <div class="pagination-btns">
             <button class="page-btn disabled">&lt;</button>
             <button class="page-btn active">1</button>
@@ -94,7 +106,7 @@
     </div>
 
     <!-- POP-UP ใบเสร็จแบบเต็ม -->
-    <div class="modal-overlay" v-if="showReceiptModal" @click.self="showReceiptModal = false">
+    <div class="modal-overlay" v-if="showReceiptModal && selectedOrder" @click.self="showReceiptModal = false">
       <div class="receipt-modal-content">
         <button class="close-modal-btn" @click="showReceiptModal = false">✕</button>
         <h2 class="receipt-title">รายละเอียดคำสั่งซื้อ</h2>
@@ -107,13 +119,9 @@
               <div class="r-item-name"><span class="r-qty">{{ item.qty }}x</span> {{ item.name }}</div>
               <div class="r-item-price">B{{ item.price * item.qty }}</div>
             </div>
-            <div class="r-item-sub">
-              <span v-if="item.dishType">🍽️ {{ item.dishType }}</span>
-              <span v-if="item.seafoodChoice">✔️ {{ item.seafoodChoice }}</span>
-              <span v-if="item.spiceLevel">🌶️ {{ item.spiceLevel }}</span>
-              <span v-for="addon in item.addons" :key="addon.name"> +{{ addon.name }}</span>
+            <div class="r-item-sub" v-if="item.options">
+              <span>{{ item.options }}</span>
             </div>
-            <div class="r-item-note" v-if="item.note">*หมายเหตุ: {{ item.note }}</div>
           </div>
         </div>
 
@@ -145,43 +153,40 @@
 </template>
 
 <script>
+import axios from 'axios';
+
 export default {
   data() {
     return {
       isLoggedIn: false,
-      showAddressDropdown: false,
       userProfile: { address: '', avatar: '' },
       showReceiptModal: false,
       selectedOrder: null,
-      orderHistory: []
+      orderHistory: [],
+      currentTab: 'all',
+      isLoading: false
     }
   },
   computed: {
-    displayAddress() {
-      if (!this.isLoggedIn) return 'ตลาดปากเกร็ด';
-      if (this.userProfile && this.userProfile.address) {
-        let addr = this.userProfile.address;
-        return addr.length > 20 ? addr.substring(0, 20) + '...' : addr;
+    filteredOrders() {
+      if (this.currentTab === 'cancelled') {
+        return this.orderHistory.filter(o => o.status === 'ยกเลิกแล้ว' || o.rawStatus === 'CANCELLED');
       }
-      return 'กรุณาเพิ่มที่อยู่';
+      return this.orderHistory;
     }
   },
   mounted() {
-    this.isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    this.isLoggedIn = !!localStorage.getItem('access_token') || localStorage.getItem('isLoggedIn') === 'true';
     const profileData = localStorage.getItem('userProfile');
     if (profileData) {
       this.userProfile = { ...this.userProfile, ...JSON.parse(profileData) };
-    } else if (this.isLoggedIn) {
-      this.userProfile.address = '35/369 หมู่ 1 ต.บ้านใหม่ อ.เมืองปทุมธานี จ.ปทุมธานี 12000';
     }
 
-    const savedHistory = localStorage.getItem('orderHistoryList');
-    if (savedHistory) {
-      this.orderHistory = JSON.parse(savedHistory);
-    }
+    this.fetchOrderHistory();
   },
   methods: {
     logout() {
+      localStorage.removeItem('access_token');
       localStorage.removeItem('isLoggedIn');
       this.isLoggedIn = false;
       this.$router.push('/');
@@ -189,6 +194,74 @@ export default {
     viewOrderDetails(order) {
       this.selectedOrder = order;
       this.showReceiptModal = true;
+    },
+    async fetchOrderHistory() {
+      const token = localStorage.getItem('access_token');
+      
+      // ถ้าไม่ได้เข้าสู่ระบบ ให้ดึงจาก LocalStorage ชั่วคราว
+      if (!token) {
+        const savedHistory = localStorage.getItem('orderHistoryList');
+        if (savedHistory) {
+          this.orderHistory = JSON.parse(savedHistory);
+        }
+        return;
+      }
+
+      this.isLoading = true;
+      try {
+        const res = await axios.get('http://localhost:5000/api/v1/orders/my-orders', {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        const statusMap = {
+          PENDING: 'กำลังดำเนินการ',
+          COOKING: 'กำลังปรุงอาหาร',
+          READY: 'พร้อมจัดส่ง',
+          COMPLETED: 'สำเร็จ',
+          PAID: 'ชำระเงินสำเร็จ',
+          CANCELLED: 'ยกเลิกแล้ว'
+        };
+
+        // แปลงข้อมูลจาก Database ให้ตรงกับที่ Template ใช้งาน
+        this.orderHistory = (res.data || []).map(order => {
+          const dateObj = new Date(order.created_at);
+          const formattedDate = !isNaN(dateObj.getTime())
+            ? dateObj.toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })
+            : '-';
+
+          const items = (order.order_items || []).map(oi => ({
+            name: oi.menu?.name || `เมนู #${oi.menu_id}`,
+            qty: Number(oi.quantity),
+            price: Number(oi.unit_price || oi.menu?.price || 0),
+            options: oi.customization || ''
+          }));
+
+          const subtotal = items.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
+
+          return {
+            orderNumber: String(order.order_id),
+            date: formattedDate,
+            total: Number(order.total_price),
+            subtotal: subtotal || Number(order.total_price),
+            shippingFee: Math.max(0, Number(order.total_price) - subtotal),
+            paymentMethod: order.payment_method || 'พร้อมเพย์',
+            status: statusMap[order.status] || order.status,
+            rawStatus: order.status,
+            items: items
+          };
+        });
+      } catch (err) {
+        console.error('โหลดประวัติคำสั่งซื้อไม่สำเร็จ:', err);
+        // หากเชื่อมต่อ Backend ไม่ได้ ให้ดึงประวัติเก่าจาก LocalStorage แทน
+        const savedHistory = localStorage.getItem('orderHistoryList');
+        if (savedHistory) {
+          this.orderHistory = JSON.parse(savedHistory);
+        }
+      } finally {
+        this.isLoading = false;
+      }
     }
   }
 }
@@ -200,26 +273,13 @@ export default {
 .page-container { background-color: #f7f6f0; min-height: 100vh; display: flex; flex-direction: column; }
 
 .navbar { display: flex; align-items: center; justify-content: space-between; padding: 15px 40px; background: #f7f6f0; border-bottom: 1px solid #e5e2d5; gap: 15px; }
-.logo-img { height: 40px; }
-.nav-menu { display: flex; gap: 20px; white-space: nowrap; }
+.nav-left-group { display: flex; align-items: center; gap: 30px; }
+.logo-img { height: 40px; cursor: pointer; display: block; }
+.nav-menu { display: flex; align-items: center; gap: 20px; white-space: nowrap; margin-top: 5px; }
 .nav-item { text-decoration: none; color: #444; font-size: 14px; font-weight: 500; }
 .nav-item.router-link-exact-active { color: #557c61; font-weight: 600; border-bottom: 2px solid #557c61; padding-bottom: 3px; }
 
 .header-spacer { flex-grow: 1; }
-
-.location-wrapper { position: relative; display: inline-block; z-index: 20; }
-.location-box { display: flex; align-items: center; gap: 5px; font-size: 13px; color: #444; background: #f1ede1; padding: 6px 12px; border-radius: 20px; cursor: pointer; white-space: nowrap; transition: 0.2s; border: 1px solid transparent; }
-.location-box:hover { background: #e8e4d5; border-color: #d6d2c4; }
-.loc-icon { color: #557c61; }
-.dropdown-arrow { font-size: 10px; color: #777; margin-left: 3px; transition: transform 0.3s ease; }
-.dropdown-arrow.arrow-up { transform: rotate(180deg); color: #557c61; }
-
-.address-dropdown-menu { position: absolute; top: calc(100% + 10px); left: 50%; transform: translateX(-50%); background: white; border: 1px solid #e5e2d5; border-radius: 16px; padding: 15px 20px; width: 260px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 100; cursor: default; }
-.address-dropdown-menu::before { content: ''; position: absolute; top: -6px; left: 50%; transform: translateX(-50%) rotate(45deg); width: 12px; height: 12px; background: white; border-left: 1px solid #e5e2d5; border-top: 1px solid #e5e2d5; }
-.addr-title { font-size: 13px; font-weight: 600; color: #557c61; margin-bottom: 6px; }
-.addr-full-text { font-size: 13px; color: #555; line-height: 1.5; margin-bottom: 12px; word-wrap: break-word; background: #faf9f5; padding: 10px; border-radius: 8px; }
-.addr-edit-btn { width: 100%; background: white; border: 1px solid #557c61; color: #557c61; padding: 8px; border-radius: 10px; font-size: 13px; font-weight: 500; cursor: pointer; transition: 0.2s; font-family: inherit; }
-.addr-edit-btn:hover { background: #f4faeb; }
 
 .header-actions { display: flex; align-items: center; gap: 15px; white-space: nowrap; }
 .icon-btn { background: none; border: none; font-size: 16px; cursor: pointer; }
@@ -236,7 +296,12 @@ export default {
 
 .history-card-box { background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); overflow: hidden; }
 .table-tabs { display: flex; gap: 25px; padding: 20px 30px; border-bottom: 1px solid #eee; font-size: 14px; color: #777; font-weight: 500; }
+.tab { cursor: pointer; }
 .tab.active { color: #557c61; font-weight: 600; border-bottom: 2px solid #557c61; padding-bottom: 4px; }
+
+.loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 50px; gap: 15px; color: #666; font-size: 14px; }
+.spinner { width: 32px; height: 32px; border: 3px solid #eee; border-top-color: #557c61; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .history-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
 .history-table th { padding: 16px 30px; color: #666; font-weight: 600; background: #faf9f5; border-bottom: 1px solid #eee; }
@@ -245,6 +310,7 @@ export default {
 .status-badge { padding: 5px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }
 .status-badge.success { background: #eef2ed; color: #557c61; }
 .status-badge.pending { background: #fef3c7; color: #d97706; }
+.status-badge.cancelled { background: #fee2e2; color: #dc2626; }
 .search-icon-btn { background: #fdfbf7; border: 1px solid #e0dfd5; border-radius: 8px; width: 32px; height: 32px; font-size: 14px; cursor: pointer; color: #555; transition: 0.2s; display: flex; justify-content: center; align-items: center;}
 .search-icon-btn:hover { background: #eef2ed; border-color: #557c61; }
 
@@ -266,14 +332,8 @@ export default {
 .r-item-main { display: flex; justify-content: space-between; font-size: 14px; font-weight: 500; color: #333; margin-bottom: 3px; }
 .r-qty { font-weight: 600; color: #557c61; margin-right: 8px; }
 .r-item-sub { font-size: 12px; color: #777; padding-left: 25px; display: flex; flex-wrap: wrap; gap: 5px; }
-.r-item-note { font-size: 11px; color: #999; padding-left: 25px; margin-top: 3px; font-style: italic; }
 .receipt-summary { display: flex; flex-direction: column; gap: 10px; padding-top: 10px; }
 .r-summary-row { display: flex; justify-content: space-between; font-size: 14px; color: #555; }
 .r-total-row { font-size: 18px; font-weight: 700; color: #557c61; margin-top: 5px; }
 .payment-info-box { background: #faf9f5; border: 1px solid #e0dfd5; padding: 12px; border-radius: 12px; margin-top: 20px; font-size: 13px; color: #555; display: flex; justify-content: space-between; }
-
-.navbar { display: flex; align-items: center; justify-content: space-between; padding: 15px 40px; background: #f7f6f0; border-bottom: 1px solid #e5e2d5; }
-.nav-left-group { display: flex; align-items: center; gap: 30px; } /* โค้ดสำคัญ: บังคับให้อยู่แถวเดียวกัน */
-.logo-img { height: 40px; cursor: pointer; display: block; }
-.nav-menu { display: flex; align-items: center; gap: 20px; white-space: nowrap; margin-top: 5px; }
 </style>

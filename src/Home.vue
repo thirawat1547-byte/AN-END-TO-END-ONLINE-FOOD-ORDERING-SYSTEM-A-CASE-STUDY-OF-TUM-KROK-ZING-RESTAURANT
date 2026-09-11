@@ -301,6 +301,8 @@
 </template>
 
 <script>
+import axios from 'axios';
+
 export default {
   data() {
     return {
@@ -320,6 +322,7 @@ export default {
       
       modalOptions: { dishType: null, spiceLevel: 'เผ็ดกลาง', seafoodChoice: 'รวม (หมึก+กุ้ง)', addons: [], note: '', qty: 1 },
 
+      // รายการเมนูพร้อม Path รูปที่ Vite โหลดได้สมบูรณ์
       menuItems: [
         { id: 1, name: 'กระเพราหมู', price: 40, category: ['เมนูอาหาร', 'ขายดีที่สุด'], desc: 'หอมฟุ้ง อร่อยเด็ดสะใจ!', img: new URL('./assets/kapaomu.jpg', import.meta.url).href, isPopular: true, isSpicy: true, calories: 550 },
         { id: 2, name: 'กระเพราทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'เผ็ดร้อน ถึงเครื่อง', img: new URL('./assets/kapaotaley.jpg', import.meta.url).href, isSpicy: true, isSeafood: true, calories: 450 },
@@ -360,7 +363,6 @@ export default {
     },
     canAddToCart() {
       if (!this.selectedItem) return false;
-      // ถ้าไม่ใช่เมนูที่ได้รับการยกเว้น จะต้องเลือก กับข้าว หรือ ราดข้าว ก่อนจึงจะสั่งได้
       if (!this.isExemptDishType(this.selectedItem)) {
         return !!this.modalOptions.dishType;
       }
@@ -422,7 +424,7 @@ export default {
       ];
     }
   },
-  mounted() {
+  async mounted() {
     this.isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
     const profileData = localStorage.getItem('userProfile');
     if (profileData) {
@@ -434,15 +436,44 @@ export default {
     if (savedCart) {
       this.cartItems = JSON.parse(savedCart);
     }
+
+    // ซิงก์ราคาและข้อมูลสดจาก Database Backend
+    await this.fetchMenus();
   },
   methods: {
-    // ฟังก์ชันตรวจสอบเมนูที่ได้รับการยกเว้นการเลือกกับข้าว/ราดข้าว
+    async fetchMenus() {
+      try {
+        const response = await axios.get('http://localhost:5000/api/v1/menus');
+        if (response.data && response.data.length > 0) {
+          // ดึงราคาและข้อมูลจากฐานข้อมูลมาอัปเดตลงในการ์ดอาหาร โดยยังคงรูปภาพเดิมไว้ครบ 100%
+          this.menuItems = this.menuItems.map(localItem => {
+            const dbItem = response.data.find(d => 
+              d.name === localItem.name || 
+              d.menu_id === localItem.id ||
+              (d.name && localItem.name.includes(d.name))
+            );
+
+            if (dbItem) {
+              return {
+                ...localItem,
+                id: dbItem.menu_id || localItem.id,
+                price: Number(dbItem.price) || localItem.price,
+                desc: dbItem.description || localItem.desc
+              };
+            }
+            return localItem;
+          });
+        }
+      } catch (error) {
+        console.warn('ใช้ข้อมูลเมนูจากหน้าบ้านชั่วคราว (ไม่สามารถต่อ Backend ได้):', error);
+      }
+    },
+
     isExemptDishType(item) {
       if (!item) return true;
       const name = item.name || item.menu_name || '';
       const cats = item.category || [];
 
-      // ยกเว้น: เมนูเครื่องดื่ม กับ ลาบ ไก่ทอด ส้มตำ ข้าวผัด ข้าวเปล่า ยำวุ้นเส้น ข้าวเหนียว
       if (cats.includes('เครื่องดื่ม') || name.includes('น้ำ') || name.includes('โค้ก') || name.includes('สไปรท์')) {
         return true;
       }
@@ -460,14 +491,12 @@ export default {
     openModalOrAdd(item) {
       if (!this.isLoggedIn) { this.showAuthModal = true; return; }
       
-      // เมนูเครื่องดื่ม, ไก่ทอด, ข้าวเปล่า, ข้าวเหนียว สั่งลงตะกร้าได้ทันที
       if (item.category.includes('เครื่องดื่ม') || item.name.includes('ไก่ทอด') || item.name === 'ข้าวเปล่า' || item.name === 'ข้าวเหนียว') {
         this.addDirectToCart(item);
       } else {
-        // เมนูอื่นๆ เปิด Pop-up เพื่อเลือกส่วนเสริมปกติ
         this.selectedItem = item;
         this.modalOptions = { 
-          dishType: null, // เมนูที่ไม่ได้รับการยกเว้น จะต้องเลือก กับข้าว หรือ ราดข้าว
+          dishType: null,
           spiceLevel: item.isSpicy ? 'เผ็ดกลาง' : null, 
           seafoodChoice: item.isSeafood ? 'รวม (หมึก+กุ้ง)' : null, 
           addons: [], 
