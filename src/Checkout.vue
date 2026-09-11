@@ -103,6 +103,7 @@
               <div class="item-info">
                 <div class="item-name">{{ item.name }}</div>
                 <div class="item-sub">
+                  <span v-if="item.dishType">🍽️ {{ item.dishType }}</span>
                   <span v-if="item.spiceLevel">🌶️ {{ item.spiceLevel }}</span>
                   <span v-for="addon in item.addons" :key="addon.name"> +{{ addon.name }}</span>
                 </div>
@@ -141,10 +142,108 @@
         </div>
       </aside>
     </div>
+
+    <!-- Popup QR Code สำหรับพร้อมเพย์ -->
+    <div v-if="showQrModal" class="qr-modal-backdrop" @click.self="closeQrModal">
+      <div class="qr-modal-card">
+        <!-- Modal Header -->
+        <div class="qr-modal-header">
+          <div class="qr-header-title-group">
+            <span class="qr-header-badge">พร้อมเพย์</span>
+            <h3 class="qr-modal-title">สแกนเพื่อชำระเงิน</h3>
+          </div>
+          <button class="qr-close-btn" @click="closeQrModal" title="ปิด">✕</button>
+        </div>
+
+        <!-- Thai QR Payment / PromptPay Header -->
+        <div class="thai-qr-header">
+          <div class="thai-qr-brand">
+            <span class="brand-thai">THAI QR</span>
+            <span class="brand-sub">PAYMENT</span>
+          </div>
+          <div class="promptpay-pill">PromptPay</div>
+        </div>
+
+        <!-- QR Code Image Section -->
+        <div class="qr-display-section">
+          <div class="qr-image-wrapper">
+            <img v-if="qrCodeUrl" :src="qrCodeUrl" alt="PromptPay QR Code" class="qr-image" />
+            <div v-else class="qr-loading">
+              <div class="spinner"></div>
+              <span>กำลังสร้าง QR Code...</span>
+            </div>
+          </div>
+          <p class="qr-scan-hint">ใช้แอปธนาคารใดก็ได้สแกนเพื่อจ่ายเงิน</p>
+        </div>
+
+        <!-- Payment Details -->
+        <div class="qr-payment-info">
+          <div class="qr-info-row">
+            <span class="info-label">ชื่อบัญชี</span>
+            <span class="info-value font-medium">{{ promptpayName }}</span>
+          </div>
+          <div class="qr-info-row">
+            <span class="info-label">เบอร์พร้อมเพย์</span>
+            <span class="info-value font-mono">{{ promptpayNumber }}</span>
+          </div>
+          <div class="qr-total-row">
+            <span>ยอดชำระ</span>
+            <span class="qr-total-amount">B{{ total }}</span>
+          </div>
+        </div>
+
+        <!-- Modal Actions -->
+        <div class="qr-modal-actions">
+          <button class="confirm-qr-btn" @click="confirmQrPayment">
+            <span>✓</span> ยืนยันการชำระเงิน
+          </button>
+          <button class="cancel-qr-btn" @click="closeQrModal">
+            ยกเลิก
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
+import QRCode from 'qrcode';
+import { adminStore } from './admin/store/adminData.js';
+
+// คำนวณรหัส CRC16 สำหรับ PromptPay EMVCo
+function crc16(data) {
+  let crc = 0xFFFF;
+  for (let i = 0; i < data.length; i++) {
+    let x = ((crc >> 8) ^ data.charCodeAt(i)) & 0xFF;
+    x ^= x >> 4;
+    crc = ((crc << 8) ^ (x << 12) ^ (x << 5) ^ x) & 0xFFFF;
+  }
+  return crc.toString(16).toUpperCase().padStart(4, '0');
+}
+
+// สร้างสตริง Payload PromptPay ตามมาตรฐาน EMVCo / ธนาคารแห่งประเทศไทย
+function generatePromptPayPayload(target, amount) {
+  const cleanTarget = String(target || '').replace(/[^0-9]/g, '');
+  const targetType = cleanTarget.length >= 13 ? '02' : '01';
+  let formattedTarget = cleanTarget;
+  if (targetType === '01') {
+    formattedTarget = '0066' + cleanTarget.replace(/^0/, '');
+  }
+  const targetTag = targetType + String(formattedTarget.length).padStart(2, '0') + formattedTarget;
+  const aid = '0016A000000677010111';
+  const merchantInfo = aid + targetTag;
+  const merchantTag = '29' + String(merchantInfo.length).padStart(2, '0') + merchantInfo;
+  
+  let payload = '000201' + '010212' + merchantTag + '5802TH' + '5303764';
+  if (amount !== undefined && amount !== null) {
+    const formattedAmount = Number(amount).toFixed(2);
+    payload += '54' + String(formattedAmount.length).padStart(2, '0') + formattedAmount;
+  }
+  payload += '6304';
+  payload += crc16(payload);
+  return payload;
+}
+
 export default {
   data() {
     return {
@@ -157,7 +256,11 @@ export default {
       cartItems: [],
       // เพิ่มตัวแปรสำหรับระบบแก้ไขที่อยู่
       isEditingAddress: false,
-      editAddressText: ''
+      editAddressText: '',
+      // ตัวแปรสำหรับ Popup PromptPay QR Code
+      showQrModal: false,
+      qrCodeUrl: '',
+      isGeneratingQr: false
     }
   },
   computed: {
@@ -177,6 +280,12 @@ export default {
       const address = this.userProfile.address || 'ตลาดปากเกร็ด นนทบุรี'; 
       const encodedAddress = encodeURIComponent(address);
       return `https://maps.google.com/maps?q=${encodedAddress}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+    },
+    promptpayNumber() {
+      return adminStore?.storeSettings?.promptpayNumber || '081-234-5678';
+    },
+    promptpayName() {
+      return adminStore?.storeSettings?.promptpayName || 'ร้านตำครกซิ่ง (นายธีรวัฒน์ แสนคำเฮียง)';
     }
   },
   mounted() {
@@ -227,6 +336,46 @@ export default {
       this.isEditingAddress = false;
     },
 
+    // เปิด Popup แสดง QR Code สำหรับพร้อมเพย์
+    async openQrModal() {
+      this.showQrModal = true;
+      await this.generateQrCode();
+    },
+
+    // ปิด Popup
+    closeQrModal() {
+      this.showQrModal = false;
+    },
+
+    // เจน QR Code ด้วย PromptPay Payload
+    async generateQrCode() {
+      this.isGeneratingQr = true;
+      try {
+        const payload = generatePromptPayPayload(this.promptpayNumber, this.total);
+        this.qrCodeUrl = await QRCode.toDataURL(payload, {
+          width: 240,
+          margin: 1,
+          color: {
+            dark: '#000000',
+            light: '#ffffff'
+          }
+        });
+      } catch (err) {
+        console.error('Error generating QR code:', err);
+        const cleanPhone = this.promptpayNumber.replace(/[^0-9]/g, '');
+        this.qrCodeUrl = `https://promptpay.io/${cleanPhone}/${this.total}.png`;
+      } finally {
+        this.isGeneratingQr = false;
+      }
+    },
+
+    // กดยืนยันการชำระเงินจากในป๊อปอัป QR
+    confirmQrPayment() {
+      this.showQrModal = false;
+      this.processOrderCompletion();
+    },
+
+    // ปุ่มชำระเงินหลัก
     confirmOrder() {
       if (this.cartItems.length === 0) {
         alert('กรุณาเลือกอาหารก่อนชำระเงินครับ!');
@@ -234,6 +383,17 @@ export default {
         return;
       }
 
+      // ถ้าเลือกชำระเงินด้วยพร้อมเพย์ ให้เปิดป๊อปอัปสแกน QR Code พร้อมปุ่มยืนยัน
+      if (this.selectedPayment === 'qr') {
+        this.openQrModal();
+      } else {
+        // ชำระด้วยเงินสด ดำเนินการเหมือนเดิมทันที
+        this.processOrderCompletion();
+      }
+    },
+
+    // ดำเนินการสั่งซื้อและบันทึกออเดอร์ (ตามโฟลว์เดิม)
+    processOrderCompletion() {
       const randomOrderNumber = 'TRX-' + Math.floor(1000 + Math.random() * 9000);
 
       const currentOrder = {
@@ -256,6 +416,7 @@ export default {
       history.unshift(currentOrder);
       localStorage.setItem('orderHistoryList', JSON.stringify(history));
 
+      // แสดง Popup แจ้งเตือนอันเดิม
       alert(`สั่งซื้อสำเร็จ!\nเลขออเดอร์: #${randomOrderNumber}\nขอบคุณคุณ ${this.userProfile.name} ระบบกำลังดำเนินการจัดส่งครับ`);
       
       sessionStorage.removeItem('cartData');
@@ -346,4 +507,293 @@ export default {
 .confirm-checkout-btn { background: #557c61; color: white; border: none; width: 100%; padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: 0.2s; text-align: center; font-family: inherit; }
 .confirm-checkout-btn:hover { background: #405e49; }
 .confirm-checkout-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+/* ================= PromptPay Modal Styles ================= */
+.qr-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+.qr-modal-card {
+  background: white;
+  width: 100%;
+  max-width: 380px;
+  border-radius: 20px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+  animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.qr-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  border-bottom: 1px solid #f0eee6;
+  background: #ffffff;
+}
+
+.qr-header-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.qr-header-badge {
+  background: #eef5f0;
+  color: #3e7654;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.qr-modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #222;
+}
+
+.qr-close-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #888;
+  cursor: pointer;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: 0.2s;
+}
+
+.qr-close-btn:hover {
+  background: #f5f5f5;
+  color: #333;
+}
+
+.thai-qr-header {
+  background: #003764;
+  color: white;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.thai-qr-brand {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+
+.brand-thai {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.brand-sub {
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  opacity: 0.85;
+}
+
+.promptpay-pill {
+  background: white;
+  color: #003764;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+
+.qr-display-section {
+  padding: 18px 20px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #fafaf8;
+}
+
+.qr-image-wrapper {
+  background: white;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid #e8e6dc;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  width: 220px;
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qr-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+}
+
+.qr-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #888;
+  font-size: 12px;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #e0dfd5;
+  border-top-color: #557c61;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.qr-scan-hint {
+  font-size: 12px;
+  color: #666;
+  margin-top: 10px;
+  font-weight: 400;
+}
+
+.qr-payment-info {
+  padding: 14px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid #f0eee6;
+  background: white;
+}
+
+.qr-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.info-label {
+  color: #777;
+}
+
+.info-value {
+  color: #222;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.font-mono {
+  font-family: monospace;
+  font-weight: 600;
+  color: #003764;
+}
+
+.qr-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1px dashed #e5e2d5;
+  font-size: 15px;
+  font-weight: 600;
+  color: #222;
+}
+
+.qr-total-amount {
+  color: #557c61;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.qr-modal-actions {
+  padding: 14px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: white;
+}
+
+.confirm-qr-btn {
+  background: #557c61;
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.confirm-qr-btn:hover {
+  background: #405e49;
+}
+
+.cancel-qr-btn {
+  background: #f7f6f0;
+  color: #666;
+  border: 1px solid #e0dfd5;
+  padding: 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: 0.2s;
+  text-align: center;
+}
+
+.cancel-qr-btn:hover {
+  background: #eae8df;
+  color: #333;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
 </style>

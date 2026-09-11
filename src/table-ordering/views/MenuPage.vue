@@ -70,7 +70,6 @@ const menuItems = [
   { id: 1, menu_name: 'กระเพราหมู', price: 40, category: ['เมนูอาหาร', 'ขายดีที่สุด'], desc: 'หอมฟุ้ง อร่อยเด็ดสะใจ!', image_url: '/images/kapaomu.jpg', isPopular: true, isSpicy: true },
   { id: 2, menu_name: 'กระเพราทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'เผ็ดร้อน ถึงเครื่อง', image_url: '/images/kapaotaley.jpg', isSpicy: true },
   { id: 3, menu_name: 'ข้าวผัดหมู', price: 40, category: ['เมนูอาหาร'], desc: 'ข้าวผัดหอมกรุ่น', image_url: '/images/khaopadmu.jpg', isSpicy: false },
-  { id: 4, menu_name: 'ข้าวผัดกุ้ง', price: 50, category: ['เมนูอาหาร', 'ขายดีที่สุด'], desc: 'กุ้งตัวโตเต็มคำ', image_url: '/images/khaopadkung.jpg', isSpicy: false },
   { id: 5, menu_name: 'ข้าวผัดทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'รวมมิตรทะเลผัด', image_url: '/images/khaopadtalay.jpg', isSpicy: false },
   { id: 6, menu_name: 'ผัดพริกแกงหมู', price: 40, category: ['เมนูอาหาร'], desc: 'พริกแกงเข้มข้น', image_url: '/images/pikkangmu.jpg', isSpicy: true },
   { id: 7, menu_name: 'ผัดพริกแกงทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'จัดจ้านถึงใจ', image_url: '/images/prikkangtalay.jpg', isSpicy: true },
@@ -88,7 +87,9 @@ const menuItems = [
   { id: 19, menu_name: 'น้ำเก๊กฮวย', price: 20, category: ['เครื่องดื่ม', 'ขายดีที่สุด'], desc: 'หวานเย็น ชื่นใจ', image_url: '/images/gek.jpg' },
   { id: 20, menu_name: 'โค้ก (Coke)', price: 20, category: ['เครื่องดื่ม'], desc: 'น้ำอัดลมซ่าสดชื่น', image_url: '/images/coke.jpg' },
   { id: 21, menu_name: 'สไปรท์ (Sprite)', price: 20, category: ['เครื่องดื่ม'], desc: 'ซ่า สดชื่น กลิ่นเลมอน', image_url: '/images/sprite.jpg' },
-  { id: 22, menu_name: 'น้ำเปล่า', price: 10, category: ['เครื่องดื่ม'], desc: 'น้ำดื่มบริสุทธิ์', image_url: '/images/water.jpg' }
+  { id: 22, menu_name: 'น้ำเปล่า', price: 10, category: ['เครื่องดื่ม'], desc: 'น้ำดื่มบริสุทธิ์', image_url: '/images/water.jpg' },
+  { id: 23, menu_name: 'ข้าวเปล่า', price: 10, category: ['เมนูอาหาร'], desc: 'ข้าวสวยหอมมะลิ ร้อนๆ นุ่มอร่อย', image_url: '/images/kao.jpg', isSpicy: false },
+  { id: 24, menu_name: 'ข้าวเหนียว', price: 10, category: ['เมนูอาหารอีสาน', 'เมนูอาหาร'], desc: 'ข้าวเหนียวนุ่ม ร้อนๆ หอมอร่อย', image_url: '/images/kaon.jpg', isSpicy: false }
 ]
 
 const filteredMenu = computed(() => {
@@ -101,13 +102,18 @@ const checkHasOptions = (item) => {
   const name = item.menu_name || '';
   const cats = item.category || [];
   
+  // ตรวจสอบว่าได้รับการยกเว้นกับข้าว/ราดข้าว หรือไม่
+  const isExempt = cats.includes('เครื่องดื่ม') || name.includes('น้ำ') || name.includes('โค้ก') || name.includes('สไปรท์') || name.includes('ลาบ') || name.includes('ไก่ทอด') || name.includes('ส้มตำ') || name.includes('ข้าวผัด') || name.includes('ข้าวเปล่า') || name.includes('ข้าวเหนียว') || name.includes('ยำ');
+
+  // ถ้าไม่ใช่เมนูที่ได้รับการยกเว้น แสดงว่าต้องเลือกกับข้าวหรือราดข้าว -> ต้องไปหน้า ItemDetailPage
+  if (!isExempt) return true;
+
   if (item.isSpicy) return true; // ถ้าเป็นเมนูรสจัดต้องเลือกความเผ็ด
   if (name.includes('ทะเล')) return true; // ถ้าเป็นทะเลต้องเลือกกุ้ง/หมึก
   
-  // เช็คว่าเป็นเมนูที่ถูกยกเว้นส่วนเสริมหรือไม่ (เช่น น้ำ, ไก่ทอด, ไข่เจียว)
-  const isNoAddonCategory = cats.includes('เครื่องดื่ม') || name.includes('ไก่ทอด') || name.includes('ไข่เจียว');
+  // เช็คว่าเป็นเมนูที่ถูกยกเว้นส่วนเสริมหรือไม่ (เช่น น้ำ, ไก่ทอด, ข้าวเปล่า, ข้าวเหนียว)
+  const isNoAddonCategory = cats.includes('เครื่องดื่ม') || name.includes('ไก่ทอด') || name.includes('ข้าวเปล่า') || name.includes('ข้าวเหนียว');
   
-  // ถ้าไม่ใช่หมวดที่ถูกยกเว้น ถือว่ามีส่วนเสริม (ไข่ดาว/ไข่เจียว)
   return !isNoAddonCategory;
 }
 

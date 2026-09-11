@@ -108,6 +108,7 @@
               <div class="cart-item-name">{{ item.name }}</div>
               
               <div class="cart-item-options">
+                <span v-if="item.dishType" class="opt-badge dish-badge">🍽️ {{ item.dishType }}</span>
                 <span v-if="item.seafoodChoice" class="opt-badge">✔️ {{ item.seafoodChoice }}</span>
                 <span v-if="item.spiceLevel" class="opt-badge">🌶️ {{ item.spiceLevel }}</span>
                 <span v-for="addon in item.addons" :key="addon.name" class="opt-badge">+ {{ addon.name }}</span>
@@ -169,6 +170,35 @@
 
           <div class="modal-scroll-area">
             
+            <!-- ส่วนเลือก กับข้าว หรือ ราดข้าว (ทุกเมนู ยกเว้น เครื่องดื่ม, ลาบ, ไก่ทอด, ส้มตำ, ข้าวผัด, ข้าวเปล่า) -->
+            <div class="option-group" v-if="!isExemptDishType(selectedItem)">
+              <div class="option-group-title">
+                <h3>เลือกรูปแบบอาหาร</h3>
+                <span class="req-badge">จำเป็น</span>
+              </div>
+              <div class="dish-type-grid">
+                <button 
+                  type="button"
+                  class="dish-type-btn" 
+                  :class="{ active: modalOptions.dishType === 'ราดข้าว' }"
+                  @click="modalOptions.dishType = 'ราดข้าว'"
+                >
+                  <span class="dish-icon">🍛</span>
+                  <span class="dish-label">ราดข้าว</span>
+                </button>
+                <button 
+                  type="button"
+                  class="dish-type-btn" 
+                  :class="{ active: modalOptions.dishType === 'กับข้าว' }"
+                  @click="modalOptions.dishType = 'กับข้าว'"
+                >
+                  <span class="dish-icon">🍲</span>
+                  <span class="dish-label">กับข้าว</span>
+                </button>
+              </div>
+              <p v-if="!modalOptions.dishType" class="dish-req-note">* กรุณาเลือกว่าเป็นกับข้าวหรือราดข้าว</p>
+            </div>
+
             <div class="option-group" v-if="selectedItem.isSeafood">
               <div class="option-group-title">
                 <h3>เลือกเนื้อสัตว์</h3>
@@ -209,7 +239,7 @@
               </div>
             </div>
 
-            <div class="option-group">
+            <div class="option-group" v-if="availableAddons.length > 0">
               <div class="option-group-title">
                 <h3>ส่วนเสริม</h3>
                 <span class="opt-badge-text">ไม่บังคับ</span>
@@ -239,8 +269,18 @@
               <span>{{ modalOptions.qty }}</span>
               <button @click="modalOptions.qty++">+</button>
             </div>
-            <button class="confirm-add-btn" @click="confirmAddToCart">
-              เพิ่มลงตะกร้า • B{{ calculatedModalPrice }}
+            <button 
+              class="confirm-add-btn" 
+              :class="{ disabled: !canAddToCart }"
+              :disabled="!canAddToCart"
+              @click="confirmAddToCart"
+            >
+              <template v-if="!canAddToCart && !isExemptDishType(selectedItem)">
+                กรุณาเลือกกับข้าวหรือราดข้าว
+              </template>
+              <template v-else>
+                เพิ่มลงตะกร้า • B{{ calculatedModalPrice }}
+              </template>
             </button>
           </div>
         </div>
@@ -278,17 +318,12 @@ export default {
       selectedItem: null,
       spiceLevels: ['เผ็ดน้อย', 'เผ็ดกลาง', 'เผ็ดมาก'],
       
-      availableAddons: [
-        { name: 'ไข่ดาว', price: 10, calories: 160 },
-        { name: 'ไข่เจียว', price: 10, calories: 220 }
-      ],
-      modalOptions: { spiceLevel: 'เผ็ดกลาง', seafoodChoice: 'รวม (หมึก+กุ้ง)', addons: [], note: '', qty: 1 },
+      modalOptions: { dishType: null, spiceLevel: 'เผ็ดกลาง', seafoodChoice: 'รวม (หมึก+กุ้ง)', addons: [], note: '', qty: 1 },
 
       menuItems: [
         { id: 1, name: 'กระเพราหมู', price: 40, category: ['เมนูอาหาร', 'ขายดีที่สุด'], desc: 'หอมฟุ้ง อร่อยเด็ดสะใจ!', img: new URL('./assets/kapaomu.jpg', import.meta.url).href, isPopular: true, isSpicy: true, calories: 550 },
         { id: 2, name: 'กระเพราทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'เผ็ดร้อน ถึงเครื่อง', img: new URL('./assets/kapaotaley.jpg', import.meta.url).href, isSpicy: true, isSeafood: true, calories: 450 },
         { id: 3, name: 'ข้าวผัดหมู', price: 40, category: ['เมนูอาหาร'], desc: 'ข้าวผัดหอมกรุ่น', img: new URL('./assets/khaopadmu.jpg', import.meta.url).href, isSpicy: false, calories: 550 },
-        { id: 4, name: 'ข้าวผัดกุ้ง', price: 50, category: ['เมนูอาหาร', 'ขายดีที่สุด'], desc: 'กุ้งตัวโตเต็มคำ', img: new URL('./assets/khaopadkung.jpg', import.meta.url).href, isSpicy: false, calories: 500 },
         { id: 5, name: 'ข้าวผัดทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'รวมมิตรทะเลผัด', img: new URL('./assets/khaopadtalay.jpg', import.meta.url).href, isSpicy: false, isSeafood: true, calories: 520 },
         { id: 6, name: 'ผัดพริกแกงหมู', price: 40, category: ['เมนูอาหาร'], desc: 'พริกแกงเข้มข้น', img: new URL('./assets/pikkangmu.jpg', import.meta.url).href, isSpicy: true, calories: 550 },
         { id: 7, name: 'ผัดพริกแกงทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'จัดจ้านถึงใจ', img: new URL('./assets/prikkangtalay.jpg', import.meta.url).href, isSpicy: true, isSeafood: true, calories: 480 },
@@ -308,7 +343,9 @@ export default {
         { id: 19, name: 'น้ำเก๊กฮวย', price: 20, category: ['เครื่องดื่ม', 'ขายดีที่สุด'], desc: 'หวานเย็น ชื่นใจ', img: new URL('./assets/gek.jpg', import.meta.url).href, calories: 120 },
         { id: 20, name: 'โค้ก (Coke)', price: 20, category: ['เครื่องดื่ม'], desc: 'น้ำอัดลมซ่าสดชื่น', img: new URL('./assets/coke.jpg', import.meta.url).href, calories: 140 },
         { id: 21, name: 'สไปรท์ (Sprite)', price: 20, category: ['เครื่องดื่ม'], desc: 'ซ่า สดชื่น กลิ่นเลมอน', img: new URL('./assets/sprite.jpg', import.meta.url).href, calories: 140 },
-        { id: 22, name: 'น้ำเปล่า', price: 10, category: ['เครื่องดื่ม'], desc: 'น้ำดื่มบริสุทธิ์', img: new URL('./assets/water.jpg', import.meta.url).href, calories: 0 }
+        { id: 22, name: 'น้ำเปล่า', price: 10, category: ['เครื่องดื่ม'], desc: 'น้ำดื่มบริสุทธิ์', img: new URL('./assets/water.jpg', import.meta.url).href, calories: 0 },
+        { id: 23, name: 'ข้าวเปล่า', price: 10, category: ['เมนูอาหาร'], desc: 'ข้าวสวยหอมมะลิ ร้อนๆ นุ่มอร่อย', img: new URL('./assets/kao.jpg', import.meta.url).href, isSpicy: false, calories: 150 },
+        { id: 24, name: 'ข้าวเหนียว', price: 10, category: ['เมนูอาหารอีสาน', 'เมนูอาหาร'], desc: 'ข้าวเหนียวนุ่ม ร้อนๆ หอมอร่อย', img: new URL('./assets/kaon.jpg', import.meta.url).href, isSpicy: false, calories: 150 }
       ]
     }
   },
@@ -320,6 +357,14 @@ export default {
         return this.menuItems.filter(item => item.name.toLowerCase().includes(searchWord));
       }
       return this.menuItems.filter(item => item.category.includes(this.currentCategory));
+    },
+    canAddToCart() {
+      if (!this.selectedItem) return false;
+      // ถ้าไม่ใช่เมนูที่ได้รับการยกเว้น จะต้องเลือก กับข้าว หรือ ราดข้าว ก่อนจึงจะสั่งได้
+      if (!this.isExemptDishType(this.selectedItem)) {
+        return !!this.modalOptions.dishType;
+      }
+      return true;
     },
     unitModalPrice() {
       if (!this.selectedItem) return 0;
@@ -341,6 +386,40 @@ export default {
         return addr.length > 20 ? addr.substring(0, 20) + '...' : addr;
       }
       return 'กรุณาเพิ่มที่อยู่';
+    },
+    availableAddons() {
+      if (!this.selectedItem) return [];
+      const name = this.selectedItem.name;
+      const cats = this.selectedItem.category || [];
+
+      if (cats.includes('เครื่องดื่ม') || name.includes('ไก่ทอด') || name.includes('ไข่เจียว') || name.includes('ข้าวเปล่า') || name.includes('ข้าวเหนียว')) {
+        return [];
+      }
+
+      if (name.includes('ส้มตำ')) {
+        return [
+          { name: 'เพิ่มปู', price: 10, calories: 30 },
+          { name: 'ขนมจีน', price: 10, calories: 80 }
+        ];
+      }
+
+      if (name.includes('ยำวุ้นเส้น') || name.includes('ยำ')) {
+        return [
+          { name: 'เพิ่มหมูยอ', price: 15, calories: 120 },
+          { name: 'เพิ่มไก่ยอ', price: 15, calories: 100 }
+        ];
+      }
+
+      if (name.includes('ลาบ')) {
+        return [
+          { name: 'เพิ่มผักเคียง', price: 10, calories: 20 }
+        ];
+      }
+
+      return [
+        { name: 'ไข่ดาว', price: 10, calories: 160 },
+        { name: 'ไข่เจียว', price: 10, calories: 220 }
+      ];
     }
   },
   mounted() {
@@ -357,16 +436,38 @@ export default {
     }
   },
   methods: {
+    // ฟังก์ชันตรวจสอบเมนูที่ได้รับการยกเว้นการเลือกกับข้าว/ราดข้าว
+    isExemptDishType(item) {
+      if (!item) return true;
+      const name = item.name || item.menu_name || '';
+      const cats = item.category || [];
+
+      // ยกเว้น: เมนูเครื่องดื่ม กับ ลาบ ไก่ทอด ส้มตำ ข้าวผัด ข้าวเปล่า ยำวุ้นเส้น ข้าวเหนียว
+      if (cats.includes('เครื่องดื่ม') || name.includes('น้ำ') || name.includes('โค้ก') || name.includes('สไปรท์')) {
+        return true;
+      }
+      if (name.includes('ลาบ')) return true;
+      if (name.includes('ไก่ทอด')) return true;
+      if (name.includes('ส้มตำ')) return true;
+      if (name.includes('ข้าวผัด')) return true;
+      if (name.includes('ข้าวเปล่า')) return true;
+      if (name.includes('ข้าวเหนียว')) return true;
+      if (name.includes('ยำ')) return true;
+
+      return false;
+    },
+
     openModalOrAdd(item) {
       if (!this.isLoggedIn) { this.showAuthModal = true; return; }
       
-      // 🟢 เพิ่มเงื่อนไข: ถ้าเป็นเครื่องดื่ม หรือ ชื่อเมนูมีคำว่า "ไก่ทอด" ให้ลงตะกร้าทันที
-      if (item.category.includes('เครื่องดื่ม') || item.name.includes('ไก่ทอด')) {
+      // เมนูเครื่องดื่ม, ไก่ทอด, ข้าวเปล่า, ข้าวเหนียว สั่งลงตะกร้าได้ทันที
+      if (item.category.includes('เครื่องดื่ม') || item.name.includes('ไก่ทอด') || item.name === 'ข้าวเปล่า' || item.name === 'ข้าวเหนียว') {
         this.addDirectToCart(item);
       } else {
         // เมนูอื่นๆ เปิด Pop-up เพื่อเลือกส่วนเสริมปกติ
         this.selectedItem = item;
         this.modalOptions = { 
+          dishType: null, // เมนูที่ไม่ได้รับการยกเว้น จะต้องเลือก กับข้าว หรือ ราดข้าว
           spiceLevel: item.isSpicy ? 'เผ็ดกลาง' : null, 
           seafoodChoice: item.isSeafood ? 'รวม (หมึก+กุ้ง)' : null, 
           addons: [], 
@@ -378,10 +479,16 @@ export default {
     },
     closeItemModal() { this.showItemModal = false; this.selectedItem = null; },
     confirmAddToCart() {
+      if (!this.canAddToCart) {
+        alert('กรุณาเลือกว่าต้องการเป็น "กับข้าว" หรือ "ราดข้าว" ก่อนเพิ่มลงในตะกร้าครับ');
+        return;
+      }
+
       this.cartItems.push({
         name: this.selectedItem.name, 
         price: this.unitModalPrice,
         qty: this.modalOptions.qty,
+        dishType: this.isExemptDishType(this.selectedItem) ? null : this.modalOptions.dishType,
         spiceLevel: this.modalOptions.spiceLevel, 
         seafoodChoice: this.modalOptions.seafoodChoice, 
         addons: [...this.modalOptions.addons], 
@@ -390,8 +497,8 @@ export default {
       this.closeItemModal();
     },
     addDirectToCart(item) {
-      let found = this.cartItems.find(i => i.name === item.name && !i.spiceLevel && !i.seafoodChoice && i.addons?.length === 0);
-      if (found) { found.qty++; } else { this.cartItems.push({ name: item.name, price: item.price, qty: 1, spiceLevel: null, seafoodChoice: null, addons: [] }); }
+      let found = this.cartItems.find(i => i.name === item.name && !i.dishType && !i.spiceLevel && !i.seafoodChoice && (!i.addons || i.addons.length === 0));
+      if (found) { found.qty++; } else { this.cartItems.push({ name: item.name, price: item.price, qty: 1, dishType: null, spiceLevel: null, seafoodChoice: null, addons: [] }); }
     },
     updateQty(index, change) {
       if (change === -1 && this.cartItems[index].qty <= 1) return;
@@ -561,4 +668,53 @@ export default {
 .auth-btn.primary:hover { background: #405e49; }
 .auth-btn.secondary { background: white; color: #557c61; border: 1px solid #557c61; }
 .auth-btn.secondary:hover { background: #f7f6f0; }
+
+/* Dish Type Selection Styles */
+.dish-type-grid { display: flex; gap: 12px; }
+.dish-type-btn {
+  flex: 1;
+  border: 1.5px solid #e0dfd5;
+  background: white;
+  padding: 12px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: 0.2s all;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+}
+.dish-type-btn:hover {
+  border-color: #557c61;
+  background: #fbfbf9;
+}
+.dish-type-btn.active {
+  border-color: #557c61;
+  background: #f4faeb;
+  color: #557c61;
+  font-weight: 600;
+  box-shadow: 0 0 0 2px rgba(85, 124, 97, 0.2);
+}
+.dish-icon { font-size: 24px; }
+.dish-label { font-size: 14px; font-weight: 500; }
+.dish-req-note {
+  font-size: 12px;
+  color: #e53935;
+  margin-top: 8px;
+  font-weight: 500;
+}
+.dish-badge {
+  background: #e8f5e9 !important;
+  color: #2e7d32 !important;
+  font-weight: 600 !important;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+.confirm-add-btn.disabled, .confirm-add-btn:disabled {
+  background: #b0bec5 !important;
+  cursor: not-allowed !important;
+  opacity: 0.85;
+  box-shadow: none !important;
+}
 </style>

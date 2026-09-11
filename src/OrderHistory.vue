@@ -108,6 +108,7 @@
               <div class="r-item-price">B{{ item.price * item.qty }}</div>
             </div>
             <div class="r-item-sub">
+              <span v-if="item.dishType">🍽️ {{ item.dishType }}</span>
               <span v-if="item.seafoodChoice">✔️ {{ item.seafoodChoice }}</span>
               <span v-if="item.spiceLevel">🌶️ {{ item.spiceLevel }}</span>
               <span v-for="addon in item.addons" :key="addon.name"> +{{ addon.name }}</span>
