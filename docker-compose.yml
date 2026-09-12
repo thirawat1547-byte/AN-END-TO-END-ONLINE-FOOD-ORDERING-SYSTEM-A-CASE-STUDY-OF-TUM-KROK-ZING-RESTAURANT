@@ -5,6 +5,11 @@ services:
     container_name: tumkrokzing_db
     hostname: mysql-server
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
       MYSQL_DATABASE: tum_krok_zing
@@ -20,6 +25,11 @@ services:
       dockerfile: dockerfile # อิงตามชื่อไฟล์ของคุณที่ใช้ d พิมพ์เล็ก
     container_name: tumkrokzing_backend
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     ports:
       - "3000:3000"
     environment:
@@ -36,6 +46,11 @@ services:
       dockerfile: dockerfile # อิงตามชื่อไฟล์ของคุณที่ใช้ d พิมพ์เล็ก
     container_name: tumkrokzing_frontend
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     ports:
       - "80:80"
     depends_on:

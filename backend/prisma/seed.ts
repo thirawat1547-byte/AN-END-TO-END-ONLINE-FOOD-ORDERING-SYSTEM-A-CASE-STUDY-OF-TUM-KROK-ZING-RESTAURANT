@@ -66,35 +66,59 @@ async function main() {
     })
 
     // 7. เมนูอาหาร (Menus)
-    const menuSomtum = await prisma.menu.create({
-        data: { category_id: catIsan.category_id, menu_name: 'ส้มตำปูปลาร้า', description: 'เผ็ดจัดจ้าน นัวปลาร้า', price: 40.00, image_url: '/images/somtum.jpg', calories: 200, is_available: true }
-    })
-    const menuChicken = await prisma.menu.create({
-        data: { category_id: catIsan.category_id, menu_name: 'ไก่ทอด(สะโพก)', description: 'กรอบนอกนุ่มใน', price: 50.00, image_url: '/images/chicken.jpg', calories: 350, is_available: true }
-    })
-    const menuKaprao = await prisma.menu.create({
-        data: { category_id: catMain.category_id, menu_name: 'กะเพราทะเล', description: 'หมึกและกุ้งสดใหม่', price: 60.00, image_url: '/images/kaprao_seafood.jpg', calories: 450, is_available: true }
-    })
-    const menuCoke = await prisma.menu.create({
-        data: { category_id: catDrink.category_id, menu_name: 'โค้ก', description: 'สดชื่น ดับกระหาย', price: 20.00, image_url: '/images/coke.jpg', calories: 140, is_available: true }
-    })
+    // สร้างเมนูทั้งหมด 22 รายการ อิงจาก Home.vue
+    const menuData = [
+        { menu_name: 'กระเพราหมู', price: 40.00, description: 'หอมฟุ้ง อร่อยเด็ดสะใจ!', image_url: 'https://images.unsplash.com/photo-1606854426282-358c9735d64a?q=80&w=500', category_id: catMain.category_id, is_available: true },
+        { menu_name: 'กระเพราทะเล/หมึก/กุ้ง', price: 60.00, description: 'เผ็ดร้อน ถึงเครื่อง', image_url: 'https://images.unsplash.com/photo-1559314809-0d155014e29e?q=80&w=500', category_id: catMain.category_id, is_available: true },
+        { menu_name: 'ข้าวผัดหมู', price: 40.00, description: 'ข้าวผัดหอมกรุ่น', image_url: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?q=80&w=500', category_id: catMain.category_id, is_available: true },
+        { menu_name: 'ข้าวผัดกุ้ง', price: 50.00, description: 'กุ้งตัวโตเต็มคำ', image_url: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?q=80&w=500', category_id: catMain.category_id, is_available: true },
+        { menu_name: 'ข้าวผัดทะเล/หมึก/กุ้ง', price: 60.00, description: 'รวมมิตรทะเลผัด', image_url: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?q=80&w=500', category_id: catMain.category_id, is_available: true },
+        { menu_name: 'ผัดพริกแกงหมู', price: 40.00, description: 'พริกแกงเข้มข้น', image_url: 'https://images.unsplash.com/photo-1633504581786-316c8002b1b9?q=80&w=500', category_id: catMain.category_id, is_available: true },
+        { menu_name: 'ผัดพริกแกงทะเล/หมึก/กุ้ง', price: 60.00, description: 'จัดจ้านถึงใจ', image_url: 'https://images.unsplash.com/photo-1633504581786-316c8002b1b9?q=80&w=500', category_id: catMain.category_id, is_available: true },
+        { menu_name: 'ผัดคะน้าหมู', price: 40.00, description: 'ผักกรอบ หมูนุ่ม', image_url: 'https://images.unsplash.com/photo-1606854426282-358c9735d64a?q=80&w=500', category_id: catMain.category_id, is_available: true },
+        { menu_name: 'ผัดคะน้าทะเล/หมึก/กุ้ง', price: 60.00, description: 'คะน้ากรอบกับซีฟู้ด', image_url: 'https://images.unsplash.com/photo-1559314809-0d155014e29e?q=80&w=500', category_id: catMain.category_id, is_available: true },
+        { menu_name: 'ข้าวหมูกระเทียม', price: 40.00, description: 'หอมกระเทียมพริกไทย', image_url: 'https://images.unsplash.com/photo-1606854426282-358c9735d64a?q=80&w=500', category_id: catMain.category_id, is_available: true },
+        { menu_name: 'ข้าวไข่เจียวหมูสับ', price: 40.00, description: 'ไข่เจียวฟูๆ หมูสับแน่นๆ', image_url: 'https://images.unsplash.com/photo-1614361556983-dbbb962de97e?q=80&w=500', category_id: catMain.category_id, is_available: true },
+        { menu_name: 'ข้าวไข่เจียวกุ้ง', price: 50.00, description: 'ไข่เจียวฟูกับกุ้ง', image_url: 'https://images.unsplash.com/photo-1614361556983-dbbb962de97e?q=80&w=500', category_id: catMain.category_id, is_available: true },
+        { menu_name: 'ยำวุ้นเส้นทะเล', price: 70.00, description: 'เปรี้ยวเผ็ดแซ่บ', image_url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=500', category_id: catYum.category_id, is_available: true }, // เปลี่ยนจาก catMain เป็น catYum ถ้าจำเป็น
+
+        { menu_name: 'ส้มตำปูปลาร้า', price: 40.00, description: 'เส้นมะละกอดิบ มะเขือเทศ และพริก', image_url: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?q=80&w=500', category_id: catIsan.category_id, is_available: true },
+        { menu_name: 'ส้มตำไทย', price: 40.00, description: 'เปรี้ยวหวาน สามรส', image_url: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?q=80&w=500', category_id: catIsan.category_id, is_available: true },
+        { menu_name: 'ลาบหมู', price: 60.00, description: 'หอมข้าวคั่ว แซ่บถึงใจ', image_url: 'https://images.unsplash.com/photo-1544378730-8b5afcb62b88?q=80&w=500', category_id: catIsan.category_id, is_available: true },
+        { menu_name: 'ไก่ทอด (ปีก)', price: 20.00, description: 'กรอบนอกนุ่มใน', image_url: 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?q=80&w=500', category_id: catIsan.category_id, is_available: true },
+        { menu_name: 'ไก่ทอด (สะโพก)', price: 50.00, description: 'เนื้อฉ่ำๆ ชิ้นใหญ่', image_url: 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?q=80&w=500', category_id: catIsan.category_id, is_available: true },
+
+        { menu_name: 'น้ำเก๊กฮวย', price: 20.00, description: 'หวานเย็น ชื่นใจ', image_url: 'https://images.unsplash.com/photo-1622760814917-76b9dfa38a7c?q=80&w=500', category_id: catDrink.category_id, is_available: true },
+        { menu_name: 'โค้ก (Coke)', price: 20.00, description: 'น้ำอัดลมซ่าสดชื่น', image_url: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?q=80&w=500', category_id: catDrink.category_id, is_available: true },
+        { menu_name: 'สไปรท์ (Sprite)', price: 20.00, description: 'ซ่า สดชื่น กลิ่นเลมอน', image_url: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?q=80&w=500', category_id: catDrink.category_id, is_available: true },
+        { menu_name: 'น้ำเปล่า', price: 10.00, description: 'น้ำดื่มบริสุทธิ์', image_url: 'https://images.unsplash.com/photo-1548839140-29a749e1bc4c?q=80&w=500', category_id: catDrink.category_id, is_available: true },
+    ]
+
+    await prisma.menu.createMany({ data: menuData })
+
+    // ดึงข้อมูลเมนูบางส่วนเพื่อใช้ผูก Relations
+    const menuSomtum = await prisma.menu.findFirst({ where: { menu_name: 'ส้มตำปูปลาร้า' } })
+    const menuChicken = await prisma.menu.findFirst({ where: { menu_name: 'ไก่ทอด (สะโพก)' } })
+    const menuKaprao = await prisma.menu.findFirst({ where: { menu_name: 'กระเพราทะเล/หมึก/กุ้ง' } })
 
     // 8. ผูกสูตรอาหาร (Menu_Ingredients) และ สารก่อภูมิแพ้ (Menu_Allergens)
-    await prisma.menuIngredient.createMany({
-        data: [
-            { menu_id: menuSomtum.menu_id, ingredient_id: papaya.ingredient_id, quantity_used: 0.15 },
-            { menu_id: menuSomtum.menu_id, ingredient_id: crab.ingredient_id, quantity_used: 1.0 },
-            { menu_id: menuChicken.menu_id, ingredient_id: chicken.ingredient_id, quantity_used: 0.2 },
-            { menu_id: menuKaprao.menu_id, ingredient_id: seafood.ingredient_id, quantity_used: 0.15 },
-        ],
-    })
-    await prisma.menuAllergen.createMany({
-        data: [
-            { menu_id: menuSomtum.menu_id, allergen_id: allgShrimp.allergen_id },
-            { menu_id: menuSomtum.menu_id, allergen_id: allgPeanut.allergen_id },
-            { menu_id: menuKaprao.menu_id, allergen_id: allgShrimp.allergen_id },
-        ],
-    })
+    if (menuSomtum && menuChicken && menuKaprao) {
+        await prisma.menuIngredient.createMany({
+            data: [
+                { menu_id: menuSomtum.menu_id, ingredient_id: papaya.ingredient_id, quantity_used: 0.15 },
+                { menu_id: menuSomtum.menu_id, ingredient_id: crab.ingredient_id, quantity_used: 1.0 },
+                { menu_id: menuChicken.menu_id, ingredient_id: chicken.ingredient_id, quantity_used: 0.2 },
+                { menu_id: menuKaprao.menu_id, ingredient_id: seafood.ingredient_id, quantity_used: 0.15 },
+            ],
+        })
+        await prisma.menuAllergen.createMany({
+            data: [
+                { menu_id: menuSomtum.menu_id, allergen_id: allgShrimp.allergen_id },
+                { menu_id: menuSomtum.menu_id, allergen_id: allgPeanut.allergen_id },
+                { menu_id: menuKaprao.menu_id, allergen_id: allgShrimp.allergen_id },
+            ],
+        })
+    }
 
     // 9. จำลองข้อมูลคำสั่งซื้อ (Order & OrderItems) สำหรับให้ Admin ดูยอดขาย
     const order1 = await prisma.order.create({
@@ -107,13 +131,15 @@ async function main() {
         }
     })
 
-    await prisma.orderItem.createMany({
-        data: [
-            { order_id: order1.order_id, menu_id: menuSomtum.menu_id, quantity: 1, customization: { spiciness: "เผ็ดมาก", note: "ไม่ใส่ผงชูรส" }, subtotal: 40.00 },
-            { order_id: order1.order_id, menu_id: menuChicken.menu_id, quantity: 1, customization: null, subtotal: 50.00 },
-            { order_id: order1.order_id, menu_id: menuKaprao.menu_id, quantity: 1, customization: null, subtotal: 60.00 },
-        ]
-    })
+    if (menuSomtum && menuChicken && menuKaprao) {
+        await prisma.orderItem.createMany({
+            data: [
+                { order_id: order1.order_id, menu_id: menuSomtum.menu_id, quantity: 1, customization: { spiciness: "เผ็ดมาก", note: "ไม่ใส่ผงชูรส" }, subtotal: 40.00 },
+                { order_id: order1.order_id, menu_id: menuChicken.menu_id, quantity: 1, customization: null, subtotal: 50.00 },
+                { order_id: order1.order_id, menu_id: menuKaprao.menu_id, quantity: 1, customization: null, subtotal: 60.00 },
+            ]
+        })
+    }
 
     // 10. จำลองข้อมูลการชำระเงิน (Transaction)
     await prisma.transaction.create({

@@ -8,6 +8,8 @@ RUN npm run build
 
 # ขั้นตอนที่ 2: นำไฟล์ที่ Build เสร็จไปรันบน Nginx
 FROM nginx:alpine
+# คัดลอกไฟล์คอนฟิก Nginx ที่เราปรับแต่งไว้ (ทำ Cache ภาพ)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 # คัดลอกไฟล์จากโฟลเดอร์ dist (หรือ build) ไปวางใน Nginx
 COPY --from=builder /app/dist /usr/share/nginx/html
 
