@@ -1,4 +1,7 @@
 import { reactive } from 'vue'
+
+// ===== Backend API Configuration =====
+const API_BASE = 'http://localhost:5000/api/v1'
 import imgChick from '../../assets/chick.jpg'
 import imgCoke from '../../assets/coke.jpg'
 import imgGek from '../../assets/gek.jpg'
@@ -589,30 +592,140 @@ export const adminStore = reactive({
     soundAlertKDS: true
   },
 
-  toggleMenuAvailability(menuId) {
-    const item = this.menus.find(m => m.menu_id === menuId)
-    if (item) item.is_available = !item.is_available
-  },
+  // ===== Menu API Functions (เชื่อม Backend จริง) =====
 
-  addMenuItem(newMenu) {
-    const id = this.menus.length > 0 ? Math.max(...this.menus.map(m => m.menu_id)) + 1 : 1
-    this.menus.push({
-      menu_id: id,
-      total_sold: 0,
-      is_available: true,
-      ...newMenu
-    })
-  },
-
-  updateMenuItem(updatedMenu) {
-    const index = this.menus.findIndex(m => m.menu_id === updatedMenu.menu_id)
-    if (index !== -1) {
-      this.menus[index] = { ...this.menus[index], ...updatedMenu }
+  async fetchMenusFromAPI() {
+    try {
+      const res = await fetch(`${API_BASE}/menus`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      // แปลงข้อมูลจาก API ให้ตรงกับ format ที่ Frontend ใช้
+      this.menus = data.map(m => ({
+        menu_id: m.menu_id,
+        category_id: m.category_id,
+        menu_name: m.menu_name,
+        description: m.description || '',
+        price: Number(m.price),
+        calories: m.calories || 0,
+        is_available: m.is_available,
+        image_url: m.image_url || 'https://images.unsplash.com/photo-1569562211093-4ed0d0758f12?w=500&auto=format&fit=crop&q=80',
+        allergen_ids: m.allergens ? m.allergens.map(a => a.allergen_id || a.allergen?.allergen_id) : [],
+        total_sold: m.total_sold || 0
+      }))
+      console.log(`✅ โหลดเมนูจาก API สำเร็จ: ${this.menus.length} รายการ`)
+      return true
+    } catch (err) {
+      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API ได้ ใช้ข้อมูล Mock แทน:', err.message)
+      return false
     }
   },
 
-  deleteMenuItem(menuId) {
-    this.menus = this.menus.filter(m => m.menu_id !== menuId)
+  async toggleMenuAvailability(menuId) {
+    const item = this.menus.find(m => m.menu_id === menuId)
+    if (!item) return
+
+    const newStatus = !item.is_available
+
+    // อัปเดต UI ก่อน (Optimistic Update)
+    item.is_available = newStatus
+
+    try {
+      const res = await fetch(`${API_BASE}/menus/${menuId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_available: newStatus })
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      console.log(`✅ เปลี่ยนสถานะเมนู #${menuId} เป็น ${newStatus ? 'พร้อมขาย' : 'ปิดการขาย'}`)
+    } catch (err) {
+      // ถ้า API พัง → ย้อนสถานะกลับ
+      item.is_available = !newStatus
+      console.error('❌ เปลี่ยนสถานะเมนูไม่สำเร็จ:', err.message)
+      alert('ไม่สามารถเปลี่ยนสถานะเมนูได้ กรุณาตรวจสอบการเชื่อมต่อ Backend')
+    }
+  },
+
+  async addMenuItem(newMenu) {
+    try {
+      const res = await fetch(`${API_BASE}/menus`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category_id: newMenu.category_id,
+          menu_name: newMenu.menu_name,
+          description: newMenu.description || '',
+          price: Number(newMenu.price),
+          image_url: newMenu.image_url || '',
+          calories: Number(newMenu.calories) || 0,
+          is_available: newMenu.is_available !== false
+        })
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const created = await res.json()
+      // เพิ่มเข้า local store
+      this.menus.push({
+        menu_id: created.menu_id,
+        category_id: created.category_id,
+        menu_name: created.menu_name,
+        description: created.description || '',
+        price: Number(created.price),
+        calories: created.calories || 0,
+        is_available: created.is_available,
+        image_url: created.image_url || newMenu.image_url,
+        allergen_ids: newMenu.allergen_ids || [],
+        total_sold: 0
+      })
+      console.log(`✅ เพิ่มเมนูใหม่สำเร็จ: ${created.menu_name} (ID: ${created.menu_id})`)
+    } catch (err) {
+      // Fallback: เพิ่มแบบ local
+      const id = this.menus.length > 0 ? Math.max(...this.menus.map(m => m.menu_id)) + 1 : 1
+      this.menus.push({ menu_id: id, total_sold: 0, is_available: true, ...newMenu })
+      console.warn('⚠️ เพิ่มเมนูแบบ offline:', err.message)
+    }
+  },
+
+  async updateMenuItem(updatedMenu) {
+    const index = this.menus.findIndex(m => m.menu_id === updatedMenu.menu_id)
+    if (index === -1) return
+
+    try {
+      const res = await fetch(`${API_BASE}/menus/${updatedMenu.menu_id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category_id: updatedMenu.category_id,
+          menu_name: updatedMenu.menu_name,
+          description: updatedMenu.description || '',
+          price: Number(updatedMenu.price),
+          image_url: updatedMenu.image_url || '',
+          calories: Number(updatedMenu.calories) || 0,
+          is_available: updatedMenu.is_available
+        })
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      // อัปเดต local store
+      this.menus[index] = { ...this.menus[index], ...updatedMenu }
+      console.log(`✅ แก้ไขเมนู #${updatedMenu.menu_id} สำเร็จ`)
+    } catch (err) {
+      // Fallback: แก้ไขแบบ local
+      this.menus[index] = { ...this.menus[index], ...updatedMenu }
+      console.warn('⚠️ แก้ไขเมนูแบบ offline:', err.message)
+    }
+  },
+
+  async deleteMenuItem(menuId) {
+    try {
+      const res = await fetch(`${API_BASE}/menus/${menuId}`, {
+        method: 'DELETE'
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      this.menus = this.menus.filter(m => m.menu_id !== menuId)
+      console.log(`✅ ลบเมนู #${menuId} สำเร็จ`)
+    } catch (err) {
+      // Fallback: ลบแบบ local
+      this.menus = this.menus.filter(m => m.menu_id !== menuId)
+      console.warn('⚠️ ลบเมนูแบบ offline:', err.message)
+    }
   },
 
   updateStock(ingredientId, newQty) {

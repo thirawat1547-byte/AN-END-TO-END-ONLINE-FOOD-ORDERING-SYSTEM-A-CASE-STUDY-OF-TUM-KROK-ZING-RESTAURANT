@@ -10,8 +10,8 @@ export declare class MenusService {
             category_name: string;
         };
     } & {
-        description: string | null;
         menu_name: string;
+        description: string | null;
         price: import("@prisma/client/runtime/library").Decimal;
         image_url: string | null;
         calories: number | null;
@@ -35,8 +35,8 @@ export declare class MenusService {
             allergen_id: number;
         })[];
     } & {
-        description: string | null;
         menu_name: string;
+        description: string | null;
         price: import("@prisma/client/runtime/library").Decimal;
         image_url: string | null;
         calories: number | null;
@@ -62,12 +62,12 @@ export declare class MenusService {
         ingredients: ({
             ingredient: {
                 name: string;
-                created_at: Date;
-                updated_at: Date;
-                quantity: number;
                 ingredient_id: number;
+                quantity: number;
                 unit: string;
                 min_quantity: number;
+                created_at: Date;
+                updated_at: Date;
             };
         } & {
             menu_id: number;
@@ -75,8 +75,8 @@ export declare class MenusService {
             quantity_used: import("@prisma/client/runtime/library").Decimal;
         })[];
     } & {
-        description: string | null;
         menu_name: string;
+        description: string | null;
         price: import("@prisma/client/runtime/library").Decimal;
         image_url: string | null;
         calories: number | null;
@@ -90,8 +90,8 @@ export declare class MenusService {
             category_name: string;
         };
     } & {
-        description: string | null;
         menu_name: string;
+        description: string | null;
         price: import("@prisma/client/runtime/library").Decimal;
         image_url: string | null;
         calories: number | null;
@@ -100,8 +100,8 @@ export declare class MenusService {
         category_id: number;
     }>;
     remove(id: number): Promise<{
-        description: string | null;
         menu_name: string;
+        description: string | null;
         price: import("@prisma/client/runtime/library").Decimal;
         image_url: string | null;
         calories: number | null;
