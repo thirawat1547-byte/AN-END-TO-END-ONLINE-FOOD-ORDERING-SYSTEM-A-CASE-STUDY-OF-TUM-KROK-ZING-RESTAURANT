@@ -29,6 +29,7 @@ function viewSlip(url) {
 
 function viewOrderDetails(order) {
   selectedOrder.value = order
+  console.log("📦 ข้อมูลออเดอร์ทั้งหมด:", order) // <-- เช็กใน Console ของเบราว์เซอร์ (F12)
 }
 </script>
 
@@ -195,18 +196,24 @@ function viewOrderDetails(order) {
         </div>
 
         <div class="space-y-2 max-h-60 overflow-y-auto">
+          <!-- แสดงรายการอาหารที่มีอยู่จริง -->
           <div 
-            v-for="item in selectedOrder.items" 
-            :key="item.menu_id"
+            v-for="(item, idx) in (selectedOrder.items || selectedOrder.cart_items || selectedOrder.products || [])" 
+            :key="idx"
             class="flex items-center justify-between p-2 rounded-lg bg-slate-50"
           >
             <div>
-              <p class="font-bold text-slate-800">{{ item.menu_name }} x{{ item.quantity }}</p>
-              <p v-if="item.customization?.spicy" class="text-[10px] text-amber-700">
-                • {{ item.customization.spicy }} {{ item.customization.no_msg ? '• ไม่ใส่ชูรส' : '' }}
+              <p class="font-bold text-slate-800">
+                {{ item.menu_name || item.name || item.title || item.food_name || 'เมนูอาหาร' }} x{{ item.quantity || item.qty || 1 }}
               </p>
             </div>
-            <span class="font-bold text-slate-900">฿{{ item.subtotal }}</span>
+            <span class="font-bold text-slate-900">฿{{ item.subtotal || ((item.price || 0) * (item.quantity || item.qty || 1)) }}</span>
+          </div>
+
+          <!-- กรณีออเดอร์ไม่มีข้อมูลรายการอาหารส่งมา ให้แสดงรายการจำลองตามยอดรวมสุทธิ -->
+          <div v-if="!(selectedOrder.items || selectedOrder.cart_items || selectedOrder.products)?.length" class="p-3 rounded-lg bg-slate-50 text-center text-slate-500">
+            <p class="font-bold">🍽️ ออเดอร์ทั่วไป (รายการรวม)</p>
+            <p class="text-[10px] text-slate-400 mt-0.5">ยอดชำระสุทธิเต็มจำนวนตามบิล</p>
           </div>
         </div>
 

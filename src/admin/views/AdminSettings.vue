@@ -1,10 +1,32 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { adminStore } from '../store/adminData'
 
 const savedNotice = ref(false)
 
+// โหลดข้อมูลตั้งค่าที่เคยบันทึกไว้ทันทีเมื่อเปิดหน้าเว็บ
+onMounted(() => {
+  try {
+    const saved = localStorage.getItem('tumkrok_store_settings')
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      // อัปเดตค่าลงใน store
+      adminStore.storeSettings = { ...adminStore.storeSettings, ...parsed }
+    }
+  } catch (err) {
+    console.warn('ไม่สามารถโหลดข้อมูลตั้งค่าจาก localStorage ได้', err)
+  }
+})
+
 function saveSettings() {
+  // บันทึกข้อมูลลงใน localStorage
+  try {
+    localStorage.setItem('tumkrok_store_settings', JSON.stringify(adminStore.storeSettings))
+  } catch (err) {
+    console.warn('ไม่สามารถบันทึกลง localStorage ได้', err)
+  }
+
+  // แสดงแถบแจ้งเตือนความสำเร็จ
   savedNotice.value = true
   setTimeout(() => {
     savedNotice.value = false
