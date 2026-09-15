@@ -1,13 +1,11 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { adminStore } from '../store/adminData'
 
 const selectedCategory = ref(0) // 0 = all
 const searchQuery = ref('')
 const isModalOpen = ref(false)
 const isEditing = ref(false)
-const isLoading = ref(false)
-const apiConnected = ref(false)
 
 const form = ref({
   menu_id: null,
@@ -19,13 +17,6 @@ const form = ref({
   image_url: 'https://images.unsplash.com/photo-1569562211093-4ed0d0758f12?w=500&auto=format&fit=crop&q=80',
   allergen_ids: [],
   is_available: true
-})
-
-// ===== โหลดเมนูจาก API ตอนเปิดหน้า =====
-onMounted(async () => {
-  isLoading.value = true
-  apiConnected.value = await adminStore.fetchMenusFromAPI()
-  isLoading.value = false
 })
 
 const filteredMenus = computed(() => {
@@ -55,26 +46,26 @@ function openAddModal() {
 
 function openEditModal(menu) {
   isEditing.value = true
-  form.value = { ...menu, allergen_ids: [...(menu.allergen_ids || [])] }
+  form.value = { ...menu, allergen_ids: [...menu.allergen_ids] }
   isModalOpen.value = true
 }
 
-async function saveMenu() {
+function saveMenu() {
   if (!form.value.menu_name || !form.value.price) {
     alert('กรุณากรอกชื่อเมนูและราคาอาหาร')
     return
   }
   if (isEditing.value) {
-    await adminStore.updateMenuItem(form.value)
+    adminStore.updateMenuItem(form.value)
   } else {
-    await adminStore.addMenuItem(form.value)
+    adminStore.addMenuItem(form.value)
   }
   isModalOpen.value = false
 }
 
-async function confirmDelete(menu) {
+function confirmDelete(menu) {
   if (confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบเมนู "${menu.menu_name}"?`)) {
-    await adminStore.deleteMenuItem(menu.menu_id)
+    adminStore.deleteMenuItem(menu.menu_id)
   }
 }
 
@@ -88,7 +79,6 @@ function getAllergenNames(ids) {
   return adminStore.allergens.filter(a => ids.includes(a.allergen_id))
 }
 </script>
-
 
 <template>
   <div class="space-y-6">
@@ -104,24 +94,6 @@ function getAllergenNames(ids) {
       >
         <span>➕ เพิ่มเมนูใหม่</span>
       </button>
-    </div>
-
-    <!-- API Connection Status -->
-    <div v-if="!isLoading" :class="[
-      'px-4 py-2 rounded-xl text-xs font-medium flex items-center gap-2',
-      apiConnected 
-        ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' 
-        : 'bg-amber-50 border border-amber-200 text-amber-700'
-    ]">
-      <span>{{ apiConnected ? '🟢 เชื่อมต่อ Backend API สำเร็จ — ข้อมูลเมนูเป็นข้อมูลจริงจากฐานข้อมูล' : '🟡 ไม่สามารถเชื่อมต่อ Backend ได้ — กำลังใช้ข้อมูล Mock (ออฟไลน์)' }}</span>
-    </div>
-
-    <!-- Loading State -->
-    <div v-if="isLoading" class="flex items-center justify-center py-20">
-      <div class="text-center space-y-3">
-        <div class="w-10 h-10 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mx-auto"></div>
-        <p class="text-sm text-slate-500 font-medium">กำลังโหลดข้อมูลเมนูจาก Backend API...</p>
-      </div>
     </div>
 
     <!-- Filter & Search Controls -->

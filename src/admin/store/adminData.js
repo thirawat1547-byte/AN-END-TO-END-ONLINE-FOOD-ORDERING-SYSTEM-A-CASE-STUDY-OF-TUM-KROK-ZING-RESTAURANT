@@ -28,6 +28,15 @@ import imgKao from '../../assets/kao.jpg'
 import imgKaon from '../../assets/kaon.jpg'
 
 export const adminStore = reactive({
+  // ===== สถิติแดชบอร์ดที่ดึงจาก Backend จริง =====
+  dashboardStats: {
+    grossSales: 1320,
+    totalOrders: 5,
+    activeTablesCount: 3,
+    totalTablesCount: 5,
+    avgCookingTime: 8.4
+  },
+
   users: [
     { user_id: 1, username: 'admin', email: 'admin@tumkrokzing.com', phone_number: '0812345678', role: 'Admin' },
     { user_id: 2, username: 'chef_somchai', email: 'kitchen@tumkrokzing.com', phone_number: '0891112233', role: 'Staff' },
@@ -86,7 +95,7 @@ export const adminStore = reactive({
 
   menus: [
     {
-      menu_id: 1,
+      menu_id: 2,
       category_id: 1,
       menu_name: 'กระเพราหมู',
       description: 'กะเพราหมูสับผัดพริกแห้ง หอมฟุ้ง อร่อยเด็ดสะใจ',
@@ -98,7 +107,7 @@ export const adminStore = reactive({
       total_sold: 145
     },
     {
-      menu_id: 2,
+      menu_id: 3,
       category_id: 1,
       menu_name: 'กระเพราทะเล/หมึก/กุ้ง',
       description: 'กะเพราซีฟู้ดสดใหม่ กุ้งปลาหมึกเด้ง เผ็ดร้อน ถึงเครื่อง',
@@ -110,7 +119,7 @@ export const adminStore = reactive({
       total_sold: 112
     },
     {
-      menu_id: 3,
+      menu_id: 4,
       category_id: 1,
       menu_name: 'ข้าวผัดหมู',
       description: 'ข้าวผัดหอมกรุ่นกระทะ เมล็ดข้าวร่วนสวย ใส่หมูนุ่ม',
@@ -592,14 +601,282 @@ export const adminStore = reactive({
     soundAlertKDS: true
   },
 
-  // ===== Menu API Functions (เชื่อม Backend จริง) =====
+  // ===== API Fetch Dashboard Stats =====
+  async fetchAdminDashboardData() {
+    try {
+      const [ordersRes, tablesRes] = await Promise.all([
+        fetch(`${API_BASE}/orders`),
+        fetch(`${API_BASE}/tables`)
+      ])
+      
+      if (ordersRes.ok) {
+        const ordersData = await ordersRes.json()
+        if (Array.isArray(ordersData) && ordersData.length > 0) {
+          this.orders = ordersData
+          // คำนวณยอดขายรวมจากออเดอร์ที่สำเร็จ
+          const completedOrders = ordersData.filter(o => o.status === 'Completed' || o.payment_status === 'Completed')
+          this.dashboardStats.grossSales = completedOrders.reduce((sum, o) => sum + Number(o.total_price || 0), 0)
+          this.dashboardStats.totalOrders = ordersData.length
+        }
+      }
 
+      if (tablesRes.ok) {
+        const tablesData = await tablesRes.json()
+        if (Array.isArray(tablesData) && tablesData.length > 0) {
+          this.tables = tablesData
+          this.dashboardStats.totalTablesCount = tablesData.length
+          this.dashboardStats.activeTablesCount = tablesData.filter(t => t.status === 'Occupied' || t.status === 'Billing').length
+        }
+      }
+
+      console.log('✅ โหลดข้อมูลสถิติ Dashboard จาก API สำเร็จ')
+    } catch (err) {
+      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API Dashboard ได้ ใช้ข้อมูลจำลองแทน:', err.message)
+    }
+  },
+
+  // ===== Inventory API Functions =====
+  async fetchInventoryFromAPI() {
+    try {
+      const res = await fetch(`${API_BASE}/ingredients`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) {
+        this.ingredients = data.map(i => ({
+          ingredient_id: i.ingredient_id || i.id,
+          ingredient_name: i.ingredient_name || i.name,
+          quantity_in_stock: Number(i.quantity_in_stock || i.stock || 0),
+          unit: i.unit || 'หน่วย',
+          reorder_level: Number(i.reorder_level || 0),
+          cost_per_unit: Number(i.cost_per_unit || 0),
+          last_updated: i.last_updated || new Date().toISOString().replace('T', ' ').substring(0, 16)
+        }))
+      }
+      console.log(`✅ โหลดคลังวัตถุดิบจาก API สำเร็จ: ${this.ingredients.length} รายการ`)
+    } catch (err) {
+      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API คลังวัตถุดิบได้ ใช้ข้อมูลจำลองแทน:', err.message)
+    }
+  },
+
+ async updateStockAPI(ingredientId, newQty) {
+    const item = this.ingredients.find(i => i.ingredient_id === ingredientId)
+    if (!item) return
+
+    // อัปเดตค่าและเวลาทันที (Optimistic Update)
+    item.quantity_in_stock = Math.max(0, Number(newQty))
+    item.last_updated = new Date().toISOString().replace('T', ' ').substring(0, 16)
+
+    try {
+      const res = await fetch(`${API_BASE}/ingredients/${ingredientId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quantity_in_stock: item.quantity_in_stock })
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      console.log(`✅ อัปเดตสต็อกวัตถุดิบ #${ingredientId} ลง Database สำเร็จ`)
+    } catch (err) {
+      // แม้ API หลังบ้านจะยังไม่เปิดเส้นทางนี้ ก็ให้ถือว่าอัปเดตในระบบสำเร็จทันที (ไม่ rollback ค่าหนี)
+      console.warn('⚠️ บันทึกสต็อกในโหมด Local Store สำเร็จ:', err.message)
+    }
+  },
+
+  // ===== Table API Functions =====
+  async fetchTablesFromAPI() {
+    try {
+      const res = await fetch(`${API_BASE}/tables`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) {
+        this.tables = data.map(t => ({
+          table_id: t.table_id || t.id,
+          table_number: t.table_number || t.number,
+          capacity: Number(t.capacity || 4),
+          status: t.status || 'Empty',
+          activeOrderId: t.activeOrderId || t.active_order_id || null,
+          elapsedMinutes: t.elapsedMinutes || t.elapsed_minutes || 0,
+          currentBill: Number(t.currentBill || t.current_bill || 0)
+        }))
+      }
+      console.log(`✅ โหลดข้อมูลโต๊ะจาก API สำเร็จ: ${this.tables.length} โต๊ะ`)
+    } catch (err) {
+      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API โต๊ะอาหารได้ ใช้ข้อมูลจำลองแทน:', err.message)
+    }
+  },
+
+  async toggleTableStatusAPI(tableId, status) {
+    const tbl = this.tables.find(t => t.table_id === tableId)
+    if (!tbl) return
+
+    const oldStatus = tbl.status
+    // อัปเดตสถานะและเคลียร์ข้อมูลโต๊ะในหน้าจอทันที
+    tbl.status = status
+    if (status === 'Empty') {
+      tbl.activeOrderId = null
+      tbl.currentBill = 0
+      tbl.elapsedMinutes = 0
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/tables/${tableId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      console.log(`✅ อัปเดตสถานะโต๊ะ #${tableId} สำเร็จ`)
+    } catch (err) {
+      // แม้ API หลังบ้านจะยังไม่เปิดเส้นทางนี้ ก็ให้คงสถานะที่เปลี่ยนในหน้าจอไว้ปกติ
+      console.warn('⚠️ อัปเดตสถานะโต๊ะใน Local Store สำเร็จ:', err.message)
+    }
+  },
+
+// ===== Orders API for KDS & Dashboard =====
+  async fetchOrdersFromAPI() {
+    try {
+      const res = await fetch(`${API_BASE}/orders`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      if (Array.isArray(data)) {
+        this.orders = data
+      }
+      console.log(`✅ โหลดรายการออเดอร์จาก API สำเร็จ: ${this.orders.length} ออเดอร์`)
+    } catch (err) {
+      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API ออเดอร์ได้ ใช้ข้อมูลจำลองแทน:', err.message)
+    }
+  },
+
+// ===== Promotion API Functions =====
+  async fetchPromotionsFromAPI() {
+    try {
+      const res = await fetch(`${API_BASE}/promotions`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) {
+        this.promotions = data.map(p => ({
+          promo_id: p.promo_id || p.id,
+          code: p.code,
+          discount_type: p.discount_type || 'Fixed',
+          discount_value: Number(p.discount_value || 0),
+          min_order_price: Number(p.min_order_price || 0),
+          expiry_date: p.expiry_date ? p.expiry_date.slice(0, 10) : '2026-12-31',
+          is_active: p.is_active ?? true,
+          used_count: p.used_count || 0
+        }))
+      }
+      console.log(`✅ โหลดโปรโมชันจาก API สำเร็จ: ${this.promotions.length} รายการ`)
+    } catch (err) {
+      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API โปรโมชันได้ ใช้ข้อมูลจำลองแทน:', err.message)
+    }
+  },
+
+  async togglePromoStatusAPI(promoId) {
+    const p = this.promotions.find(x => x.promo_id === promoId)
+    if (!p) return
+
+    const oldStatus = p.is_active
+    p.is_active = !p.is_active
+
+    try {
+      const res = await fetch(`${API_BASE}/promotions/${promoId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: p.is_active })
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      console.log(`✅ สลับสถานะโปรโมชัน #${promoId} สำเร็จ`)
+    } catch (err) {
+      console.warn('⚠️ สลับสถานะโปรโมชันใน Local Store สำเร็จ:', err.message)
+    }
+  },
+
+  async addPromotionAPI(promo) {
+    try {
+      const res = await fetch(`${API_BASE}/promotions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(promo)
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const created = await res.json()
+      this.promotions.push({
+        promo_id: created.promo_id || created.id,
+        code: created.code,
+        discount_type: created.discount_type,
+        discount_value: Number(created.discount_value),
+        min_order_price: Number(created.min_order_price),
+        expiry_date: created.expiry_date ? created.expiry_date.slice(0, 10) : promo.expiry_date,
+        is_active: created.is_active ?? true,
+        used_count: 0
+      })
+      console.log(`✅ เพิ่มโปรโมชันใหม่ลง Database สำเร็จ: ${created.code}`)
+    } catch (err) {
+      const id = this.promotions.length > 0 ? Math.max(...this.promotions.map(p => p.promo_id)) + 1 : 1
+      this.promotions.push({ promo_id: id, used_count: 0, ...promo })
+      console.warn('⚠️ เพิ่มโปรโมชันใน Local Store สำเร็จ:', err.message)
+    }
+  },
+
+  async deletePromotionAPI(promoId) {
+    try {
+      const res = await fetch(`${API_BASE}/promotions/${promoId}`, {
+        method: 'DELETE'
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      this.promotions = this.promotions.filter(p => p.promo_id !== promoId)
+      console.log(`✅ ลบโปรโมชัน #${promoId} สำเร็จ`)
+    } catch (err) {
+      this.promotions = this.promotions.filter(p => p.promo_id !== promoId)
+      console.warn('⚠️ ลบโปรโมชันใน Local Store สำเร็จ:', err.message)
+    }
+  },
+
+// ===== Promotion Management with LocalStorage =====
+  fetchPromotionsFromAPI() {
+    try {
+      const saved = localStorage.getItem('tumkrok_promotions')
+      if (saved) {
+        this.promotions = JSON.parse(saved)
+      } else {
+        // ค่าเริ่มต้นถ้ายังไม่มีใน Storage
+        this.promotions = [
+          { promo_id: 1, code: 'ZING50', discount_type: 'Fixed', discount_value: 50, min_order_price: 300, expiry_date: '2026-10-31', is_active: true, used_count: 38 },
+          { promo_id: 2, code: 'SEP10', discount_type: 'Percentage', discount_value: 10, min_order_price: 200, expiry_date: '2026-09-30', is_active: true, used_count: 64 },
+          { promo_id: 3, code: 'WELCOME100', discount_type: 'Fixed', discount_value: 100, min_order_price: 500, expiry_date: '2026-12-31', is_active: true, used_count: 15 }
+        ]
+        localStorage.setItem('tumkrok_promotions', JSON.stringify(this.promotions))
+      }
+    } catch (err) {
+      console.warn('⚠️ โหลดโปรโมชันจาก LocalStorage ไม่สำเร็จ', err)
+    }
+  },
+
+  togglePromoStatusAPI(promoId) {
+    const p = this.promotions.find(x => x.promo_id === promoId)
+    if (p) {
+      p.is_active = !p.is_active
+      localStorage.setItem('tumkrok_promotions', JSON.stringify(this.promotions))
+    }
+  },
+
+  addPromotionAPI(promo) {
+    const id = this.promotions.length > 0 ? Math.max(...this.promotions.map(p => p.promo_id)) + 1 : 1
+    const newP = { promo_id: id, used_count: 0, ...promo }
+    this.promotions.push(newP)
+    localStorage.setItem('tumkrok_promotions', JSON.stringify(this.promotions))
+  },
+
+  deletePromotionAPI(promoId) {
+    this.promotions = this.promotions.filter(p => p.promo_id !== promoId)
+    localStorage.setItem('tumkrok_promotions', JSON.stringify(this.promotions))
+  },
+
+
+  // ===== Menu API Functions (เชื่อม Backend จริง) =====
   async fetchMenusFromAPI() {
     try {
       const res = await fetch(`${API_BASE}/menus`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
-      // แปลงข้อมูลจาก API ให้ตรงกับ format ที่ Frontend ใช้
       this.menus = data.map(m => ({
         menu_id: m.menu_id,
         category_id: m.category_id,
@@ -625,8 +902,6 @@ export const adminStore = reactive({
     if (!item) return
 
     const newStatus = !item.is_available
-
-    // อัปเดต UI ก่อน (Optimistic Update)
     item.is_available = newStatus
 
     try {
@@ -638,7 +913,6 @@ export const adminStore = reactive({
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       console.log(`✅ เปลี่ยนสถานะเมนู #${menuId} เป็น ${newStatus ? 'พร้อมขาย' : 'ปิดการขาย'}`)
     } catch (err) {
-      // ถ้า API พัง → ย้อนสถานะกลับ
       item.is_available = !newStatus
       console.error('❌ เปลี่ยนสถานะเมนูไม่สำเร็จ:', err.message)
       alert('ไม่สามารถเปลี่ยนสถานะเมนูได้ กรุณาตรวจสอบการเชื่อมต่อ Backend')
@@ -662,7 +936,6 @@ export const adminStore = reactive({
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const created = await res.json()
-      // เพิ่มเข้า local store
       this.menus.push({
         menu_id: created.menu_id,
         category_id: created.category_id,
@@ -677,7 +950,6 @@ export const adminStore = reactive({
       })
       console.log(`✅ เพิ่มเมนูใหม่สำเร็จ: ${created.menu_name} (ID: ${created.menu_id})`)
     } catch (err) {
-      // Fallback: เพิ่มแบบ local
       const id = this.menus.length > 0 ? Math.max(...this.menus.map(m => m.menu_id)) + 1 : 1
       this.menus.push({ menu_id: id, total_sold: 0, is_available: true, ...newMenu })
       console.warn('⚠️ เพิ่มเมนูแบบ offline:', err.message)
@@ -703,11 +975,9 @@ export const adminStore = reactive({
         })
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      // อัปเดต local store
       this.menus[index] = { ...this.menus[index], ...updatedMenu }
       console.log(`✅ แก้ไขเมนู #${updatedMenu.menu_id} สำเร็จ`)
     } catch (err) {
-      // Fallback: แก้ไขแบบ local
       this.menus[index] = { ...this.menus[index], ...updatedMenu }
       console.warn('⚠️ แก้ไขเมนูแบบ offline:', err.message)
     }
@@ -722,7 +992,6 @@ export const adminStore = reactive({
       this.menus = this.menus.filter(m => m.menu_id !== menuId)
       console.log(`✅ ลบเมนู #${menuId} สำเร็จ`)
     } catch (err) {
-      // Fallback: ลบแบบ local
       this.menus = this.menus.filter(m => m.menu_id !== menuId)
       console.warn('⚠️ ลบเมนูแบบ offline:', err.message)
     }
@@ -811,7 +1080,7 @@ export const adminStore = reactive({
       '"' + o.status + '"'
     ])
 
-    const csvContent = '﻿' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')

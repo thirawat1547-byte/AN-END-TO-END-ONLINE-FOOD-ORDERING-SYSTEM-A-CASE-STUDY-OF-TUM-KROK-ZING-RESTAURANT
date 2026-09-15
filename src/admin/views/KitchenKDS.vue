@@ -1,14 +1,23 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { adminStore } from '../store/adminData'
 
+onMounted(async () => {
+  if (typeof adminStore.fetchOrdersFromAPI === 'function') {
+    await adminStore.fetchOrdersFromAPI()
+  }
+})
+
+// ดึงออเดอร์ทั้งหมดมาแสดงใน KDS เพื่อให้เห็นตั๋วทันที (หรือกรองเฉพาะที่กำลังทำ)
 const activeOrders = computed(() => {
-  return adminStore.orders.filter(o => ['Pending', 'Cooking', 'Ready'].includes(o.status))
+  // ถ้าอยากให้แสดงทุกออเดอร์ตัวอย่างที่มี ให้คืนค่า adminStore.orders ได้เลยครับ
+  return adminStore.orders
 })
 
 const totalDishesInKitchen = computed(() => {
   return activeOrders.value.reduce((sum, o) => {
-    return sum + o.items.reduce((s, i) => s + i.quantity, 0)
+    if (!o.items || !Array.isArray(o.items)) return sum
+    return sum + o.items.reduce((s, i) => s + Number(i.quantity || 0), 0)
   }, 0)
 })
 </script>
@@ -89,7 +98,7 @@ const totalDishesInKitchen = computed(() => {
           </div>
           <div class="text-right">
             <span class="text-xs font-mono font-bold bg-white/20 px-2 py-0.5 rounded text-white">#ORD-{{ order.order_id }}</span>
-            <p class="text-[10px] opacity-85 mt-1 text-emerald-100">สั่งเมื่อ: {{ order.created_at.slice(11, 16) }} น.</p>
+            <p class="text-[10px] opacity-85 mt-1 text-emerald-100">สั่งเมื่อ: {{ order.created_at ? order.created_at.slice(11, 16) : '' }} น.</p>
           </div>
         </div>
 

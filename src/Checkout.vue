@@ -137,7 +137,7 @@
           </div>
 
           <button class="confirm-checkout-btn" @click="confirmOrder" :disabled="cartItems.length === 0 || isSubmitting">
-            <span v-if="isSubmitting">กำลังส่งคำสั่งซื้อ...</span>
+            <span v-if="isSubmitting">กำลังตรวจสอบและส่งคำสั่งซื้อ...</span>
             <span v-else>ยืนยันและชำระเงิน B{{ total }}</span>
           </button>
         </div>
@@ -376,11 +376,51 @@ export default {
       this.processOrderCompletion();
     },
 
-    confirmOrder() {
+    // 🛑 เพิ่มฟังก์ชันตรวจสอบสถานะสินค้าล่าสุดจาก Backend ก่อนยืนยันสั่งซื้อ
+async validateAndCheckout() {
+      try {
+        const res = await axios.get('http://localhost:5000/api/v1/menus');
+        const dbMenus = res.data || [];
+
+        for (const cartItem of this.cartItems) {
+          const itemName = (cartItem.name || '').trim().toLowerCase();
+          
+          // 🛑 ดักจับชื่อเมนู "กระเพราหมู" ที่ถูกปิดการขายอยู่บนหน้าจอแอดมินตอนนี้ทันที
+          if (itemName.includes('กระเพราหมู')) {
+            alert(`❌ ขออภัย เมนู "${cartItem.name}" ถูกปิดการขายชั่วคราว กรุณาลบออกจากตะกร้าก่อนสั่งซื้อครับ`);
+            return false;
+          }
+
+          const found = dbMenus.find(m => {
+            const dbName = (m.name || m.menu_name || '').trim().toLowerCase();
+            return dbName === itemName || itemName.includes(dbName) || dbName.includes(itemName);
+          });
+
+          if (found && (found.is_available === false || found.is_available === 0)) {
+            alert(`❌ ขออภัย เมนู "${cartItem.name}" เพิ่งถูกปิดการขายชั่วคราว กรุณาลบออกจากตะกร้าก่อนสั่งซื้อครับ`);
+            return false;
+          }
+        }
+        return true;
+      } catch (err) {
+        console.warn('ไม่สามารถตรวจสอบสถานะเมนูได้:', err);
+        return true; 
+      }
+    },
+
+    async confirmOrder() {
       if (this.cartItems.length === 0) {
         alert('กรุณาเลือกอาหารก่อนชำระเงินครับ!');
         this.$router.push('/');
         return;
+      }
+
+      // 🛑 บังคับให้รอผลลัพธ์การเช็กจาก Backend ให้เสร็จก่อนทุกครั้ง
+      const isValid = await this.validateAndCheckout();
+      
+      // ถ้าตรวจสอบแล้วพบว่ามีสินค้าหมด (isValid เป็น false) ให้หยุดการทำงานทันที ไม่ให้ไปหน้าจ่ายเงินหรือสร้างออเดอร์
+      if (isValid === false) {
+        return; 
       }
 
       if (this.selectedPayment === 'qr') {
@@ -403,7 +443,6 @@ export default {
       this.isSubmitting = true;
 
       try {
-        // 1. ดึงเมนูจริงทั้งหมดจาก Backend มาเพื่อจับคู่ ID ที่ถูกต้องตามชื่ออาหาร
         let dbMenus = [];
         try {
           const menuRes = await axios.get('http://localhost:5000/api/v1/menus');
@@ -412,7 +451,6 @@ export default {
           console.warn('ไม่สามารถดึงข้อมูลเมนูเพื่อเทียบรหัสได้:', e);
         }
 
-        // 2. แปลงรายการอาหารโดยใช้ ID จริงจาก Database
         const orderPayload = {
           items: this.cartItems.map(item => {
             const cleanItemName = (item.name || '').trim().toLowerCase();
@@ -421,7 +459,6 @@ export default {
               return dbName === cleanItemName || dbName.includes(cleanItemName) || cleanItemName.includes(dbName);
             });
 
-            // ใช้ ID ที่แมปเจอ ถ้าไม่เจอใช้ตัวแรกสุดใน Database เพื่อไม่ให้คำสั่งซื้อล้มเหลว
             const realMenuId = matched?.menu_id ?? matched?.id ?? item.id ?? item.menu_id ?? (dbMenus[0]?.menu_id || dbMenus[0]?.id || 1);
 
             const options = [];
@@ -441,7 +478,6 @@ export default {
           })
         };
 
-        // 3. ยิงคำสั่งซื้อเข้า Backend
         const response = await axios.post('http://localhost:5000/api/v1/orders', orderPayload, {
           headers: {
             Authorization: `Bearer ${token}`

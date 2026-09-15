@@ -1,17 +1,23 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { adminStore } from '../store/adminData'
 
-// Metrics calculations
+// ดึงข้อมูลสถิติและออเดอร์ล่าสุดจาก Backend ทันทีที่เปิดหน้าแดชบอร์ด
+onMounted(async () => {
+  await adminStore.fetchAdminDashboardData()
+})
+
+// Metrics calculations (ใช้ข้อมูลจริงจาก adminStore ที่อัปเดตจาก API แล้ว)
 const totalGrossSales = computed(() => {
-  return adminStore.orders.reduce((sum, o) => sum + (o.payment_status === 'Completed' ? o.total_price : 0), 0)
+  return adminStore.orders.reduce((sum, o) => sum + Number(o.total_price || 0), 0)
 })
 
 const totalOrdersCount = computed(() => adminStore.orders.length)
 
 const totalItemsSold = computed(() => {
   return adminStore.orders.reduce((sum, o) => {
-    return sum + o.items.reduce((s, i) => s + i.quantity, 0)
+    if (!o.items || !Array.isArray(o.items)) return sum
+    return sum + o.items.reduce((s, i) => s + Number(i.quantity || 0), 0)
   }, 0)
 })
 
@@ -121,7 +127,7 @@ const hourlySales = [
         <div class="mt-3">
           <div class="text-2xl font-black text-slate-900">{{ occupiedTablesCount }} / {{ adminStore.tables.length }} <span class="text-sm font-normal text-slate-500">โต๊ะ</span></div>
           <div class="flex items-center gap-1.5 mt-1 text-xs text-orange-600 font-medium">
-            <span>{{ Math.round((occupiedTablesCount / adminStore.tables.length) * 100) }}%</span>
+            <span>{{ adminStore.tables.length ? Math.round((occupiedTablesCount / adminStore.tables.length) * 100) : 0 }}%</span>
             <span class="text-slate-400 font-normal">อัตราการครองโต๊ะ</span>
           </div>
         </div>
@@ -139,7 +145,7 @@ const hourlySales = [
           <div class="text-2xl font-black text-slate-900">8.4 <span class="text-sm font-normal text-slate-500">นาที</span></div>
           <div class="flex items-center gap-1.5 mt-1 text-xs text-emerald-600 font-medium">
             <span>⚡ เร็วตามมาตรฐาน</span>
-            <span class="text-slate-400 font-normal">(< 12 นาที)</span>
+            <span class="text-slate-400 font-normal">(&lt; 12 นาที)</span>
           </div>
         </div>
       </div>
@@ -304,12 +310,12 @@ const hourlySales = [
                   {{ order.status === 'Cooking' ? '🍳 กำลังปรุง' : order.status === 'Pending' ? '⏳ รอคิว' : order.status === 'Served' ? '🍽️ เสิร์ฟแล้ว' : '✅ สำเร็จ' }}
                 </span>
               </div>
-              <p class="text-[11px] text-slate-500 mt-0.5">{{ order.customer_name }} • {{ order.items.length }} รายการ</p>
+              <p class="text-[11px] text-slate-500 mt-0.5">{{ order.customer_name }} • {{ order.items ? order.items.length : 0 }} รายการ</p>
             </div>
 
             <div class="text-right">
               <p class="font-bold text-xs text-slate-900">฿{{ order.total_price }}</p>
-              <p class="text-[10px] text-slate-400">{{ order.created_at.slice(11, 16) }} น. ({{ order.payment_method }})</p>
+              <p class="text-[10px] text-slate-400">{{ order.created_at ? order.created_at.slice(11, 16) : '' }} น. ({{ order.payment_method }})</p>
             </div>
           </div>
         </div>

@@ -1,6 +1,13 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { adminStore } from '../store/adminData'
+
+// โหลดโปรโมชันจริงจาก Backend ทันทีที่เปิดหน้าเว็บ
+onMounted(async () => {
+  if (typeof adminStore.fetchPromotionsFromAPI === 'function') {
+    await adminStore.fetchPromotionsFromAPI()
+  }
+})
 
 const isModalOpen = ref(false)
 const simBillAmount = ref(450)
@@ -8,26 +15,42 @@ const simCode = ref('ZING50')
 
 const newPromo = ref({
   code: '',
-  discount_type: 'Fixed', // Fixed or Percentage
+  discount_type: 'Fixed',
   discount_value: 50,
   min_order_price: 300,
   expiry_date: '2026-10-31',
   is_active: true
 })
 
-function savePromo() {
+async function savePromo() {
   if (!newPromo.value.code || !newPromo.value.discount_value) {
     alert('กรุณากรอกรหัสโปรโมชันและมูลค่าส่วนลด')
     return
   }
-  adminStore.addPromotion({ ...newPromo.value })
+  if (typeof adminStore.addPromotionAPI === 'function') {
+    await adminStore.addPromotionAPI({ ...newPromo.value })
+  } else {
+    adminStore.addPromotion({ ...newPromo.value })
+  }
   isModalOpen.value = false
   newPromo.value = { code: '', discount_type: 'Fixed', discount_value: 50, min_order_price: 300, expiry_date: '2026-10-31', is_active: true }
 }
 
-function deletePromo(id) {
+async function deletePromo(id) {
   if (confirm('คุณต้องการลบโปรโมชันนี้ใช่หรือไม่?')) {
-    adminStore.deletePromotion(id)
+    if (typeof adminStore.deletePromotionAPI === 'function') {
+      await adminStore.deletePromotionAPI(id)
+    } else {
+      adminStore.deletePromotion(id)
+    }
+  }
+}
+
+async function togglePromo(promoId) {
+  if (typeof adminStore.togglePromoStatusAPI === 'function') {
+    await adminStore.togglePromoStatusAPI(promoId)
+  } else {
+    adminStore.togglePromoStatus(promoId)
   }
 }
 
@@ -122,7 +145,7 @@ const simResult = computed(() => {
             <input 
               type="checkbox" 
               :checked="promo.is_active" 
-              @change="adminStore.togglePromoStatus(promo.promo_id)"
+              @change="togglePromo(promo.promo_id)"
               class="sr-only peer"
             >
             <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>

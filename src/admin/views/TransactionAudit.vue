@@ -1,6 +1,13 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { adminStore } from '../store/adminData'
+
+// ดึงข้อมูลออเดอร์ล่าสุดทันทีที่เปิดหน้าเว็บ
+onMounted(async () => {
+  if (typeof adminStore.fetchOrdersFromAPI === 'function') {
+    await adminStore.fetchOrdersFromAPI()
+  }
+})
 
 const selectedStatus = ref('All')
 const searchQuery = ref('')
