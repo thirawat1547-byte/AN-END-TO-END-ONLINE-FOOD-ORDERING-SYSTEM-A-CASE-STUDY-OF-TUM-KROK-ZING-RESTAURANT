@@ -51,6 +51,7 @@
 
 <script>
 import axios from 'axios';
+import { API_BASE } from './config/api';
 
 export default {
   data() {
@@ -68,7 +69,7 @@ export default {
 
       try {
         // ส่งเฉพาะ username และ password (ห้ามใส่ email เด็ดขาด)
-        const response = await axios.post('http://localhost:5000/api/v1/auth/login', {
+        const response = await axios.post(`${API_BASE}/auth/login`, {
           username: this.emailOrPhone,
           password: this.password
         });
@@ -81,7 +82,7 @@ export default {
 
           // ดึงข้อมูลโปรไฟล์ผู้ใช้จริงมาเก็บไว้
           try {
-            const profileRes = await axios.get('http://localhost:5000/api/v1/auth/profile', {
+            const profileRes = await axios.get(`${API_BASE}/auth/profile`, {
               headers: { Authorization: `Bearer ${token}` }
             });
             localStorage.setItem('userProfile', JSON.stringify(profileRes.data));

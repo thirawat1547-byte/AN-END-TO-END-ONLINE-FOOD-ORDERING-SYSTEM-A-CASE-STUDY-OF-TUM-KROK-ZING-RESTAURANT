@@ -15,9 +15,9 @@ export declare class TransactionsController {
         order: {
             table: {
                 table_id: number;
-                status: string;
                 table_number: string;
                 capacity: number;
+                status: string;
             };
             order_items: ({
                 menu: {
@@ -31,22 +31,22 @@ export declare class TransactionsController {
                     is_available: boolean;
                 };
             } & {
-                order_id: number;
                 created_at: Date;
+                quantity: number;
+                order_id: number;
                 order_item_id: number;
                 menu_id: number;
-                quantity: number;
                 unit_price: number;
             })[];
         } & {
+            promo_id: number | null;
+            created_at: Date;
+            table_id: number | null;
+            status: string;
             order_id: number;
             user_id: number | null;
-            table_id: number | null;
-            promo_id: number | null;
             order_type: string;
-            status: string;
             total_price: import("@prisma/client/runtime/library").Decimal;
-            created_at: Date;
         };
     } & {
         amount: import("@prisma/client/runtime/library").Decimal;
@@ -63,13 +63,13 @@ export declare class TransactionsController {
         currency: string;
     }>;
     confirmStripeTest(orderId: number): Promise<{
+        promo_id: number | null;
+        created_at: Date;
+        table_id: number | null;
+        status: string;
         order_id: number;
         user_id: number | null;
-        table_id: number | null;
-        promo_id: number | null;
         order_type: string;
-        status: string;
         total_price: import("@prisma/client/runtime/library").Decimal;
-        created_at: Date;
     }>;
 }

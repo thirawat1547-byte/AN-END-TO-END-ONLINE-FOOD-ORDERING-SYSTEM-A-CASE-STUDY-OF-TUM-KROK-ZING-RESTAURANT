@@ -206,6 +206,7 @@
 import axios from 'axios';
 import QRCode from 'qrcode';
 import { adminStore } from './admin/store/adminData.js';
+import { API_BASE } from './config/api';
 
 // คำนวณรหัส CRC16 สำหรับ PromptPay EMVCo
 function crc16(data) {
@@ -333,7 +334,7 @@ export default {
       const token = localStorage.getItem('access_token');
       if (token) {
         try {
-          await axios.patch('http://localhost:5000/api/v1/auth/profile', {
+          await axios.patch(`${API_BASE}/auth/profile`, {
             address: this.editAddressText
           }, {
             headers: { Authorization: `Bearer ${token}` }
@@ -406,7 +407,7 @@ export default {
         // 1. ดึงเมนูจริงทั้งหมดจาก Backend มาเพื่อจับคู่ ID ที่ถูกต้องตามชื่ออาหาร
         let dbMenus = [];
         try {
-          const menuRes = await axios.get('http://localhost:5000/api/v1/menus');
+          const menuRes = await axios.get(`${API_BASE}/menus`);
           dbMenus = menuRes.data || [];
         } catch (e) {
           console.warn('ไม่สามารถดึงข้อมูลเมนูเพื่อเทียบรหัสได้:', e);
@@ -442,7 +443,7 @@ export default {
         };
 
         // 3. ยิงคำสั่งซื้อเข้า Backend
-        const response = await axios.post('http://localhost:5000/api/v1/orders', orderPayload, {
+        const response = await axios.post(`${API_BASE}/orders`, orderPayload, {
           headers: {
             Authorization: `Bearer ${token}`
           }

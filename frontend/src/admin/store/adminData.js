@@ -1,7 +1,7 @@
 import { reactive } from 'vue'
 
 // ===== Backend API Configuration =====
-const API_BASE = 'http://localhost:5000/api/v1'
+import { API_BASE } from '../../config/api'
 import imgChick from '../../assets/chick.jpg'
 import imgCoke from '../../assets/coke.jpg'
 import imgGek from '../../assets/gek.jpg'

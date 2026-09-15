@@ -302,6 +302,7 @@
 
 <script>
 import axios from 'axios';
+import { API_BASE } from './config/api';
 
 export default {
   data() {
@@ -443,7 +444,7 @@ export default {
   methods: {
     async fetchMenus() {
       try {
-        const response = await axios.get('http://localhost:5000/api/v1/menus');
+        const response = await axios.get(`${API_BASE}/menus`);
         if (response.data && response.data.length > 0) {
           // ดึงราคาและข้อมูลจากฐานข้อมูลมาอัปเดตลงในการ์ดอาหาร โดยยังคงรูปภาพเดิมไว้ครบ 100%
           this.menuItems = this.menuItems.map(localItem => {

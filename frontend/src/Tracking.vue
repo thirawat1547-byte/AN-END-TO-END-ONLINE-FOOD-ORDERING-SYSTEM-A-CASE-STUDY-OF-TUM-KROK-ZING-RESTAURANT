@@ -208,6 +208,7 @@
 
 <script>
 import axios from 'axios';
+import { API_BASE } from './config/api';
 
 export default {
   data() {
@@ -316,7 +317,7 @@ export default {
       }
 
       try {
-        const res = await axios.get('http://localhost:5000/api/v1/orders/my-orders', {
+        const res = await axios.get(`${API_BASE}/orders/my-orders`, {
           headers: { Authorization: `Bearer ${token}` }
         });
 

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import axios from 'axios'
+import { API_BASE } from '../../config/api'
 
 const activeTab = ref('incoming')
 const incomingOrders = ref([])
@@ -43,7 +44,7 @@ const formatOrder = (order) => {
 // 1. ดึงข้อมูลรายการคำสั่งซื้อทั้งหมดจาก Backend
 const fetchOrders = async () => {
   try {
-    const res = await axios.get('http://localhost:5000/api/v1/orders')
+    const res = await axios.get(`${API_BASE}/orders`)
     const allOrders = res.data || []
 
     const incoming = []
@@ -68,7 +69,7 @@ const fetchOrders = async () => {
 // 2. ปรับสถานะเป็นทำเสร็จแล้ว (Serve / Ready)
 const serveOrder = async (orderId) => {
   try {
-    await axios.patch(`http://localhost:5000/api/v1/orders/${orderId}/status`, {
+    await axios.patch(`${API_BASE}/orders/${orderId}/status`, {
       status: 'COMPLETED'
     })
     await fetchOrders()
@@ -81,7 +82,7 @@ const serveOrder = async (orderId) => {
 // 3. ดึงออเดอร์กลับไปปรุงใหม่ (Pending)
 const recallOrder = async (orderId) => {
   try {
-    await axios.patch(`http://localhost:5000/api/v1/orders/${orderId}/status`, {
+    await axios.patch(`${API_BASE}/orders/${orderId}/status`, {
       status: 'PENDING'
     })
     await fetchOrders()
