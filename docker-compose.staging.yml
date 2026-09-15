@@ -42,7 +42,7 @@ services:
   # 3. บริการส่วนของ Frontend (Vue.js) สำหรับ Staging
   frontend-staging:
     build:
-      context: .
+      context: ./frontend
       dockerfile: Dockerfile
     container_name: tumkrokzing_frontend_staging
     restart: always
