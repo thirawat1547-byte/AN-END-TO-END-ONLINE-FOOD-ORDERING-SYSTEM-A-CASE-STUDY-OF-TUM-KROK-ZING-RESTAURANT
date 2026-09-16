@@ -19,6 +19,7 @@ const passport_1 = require("@nestjs/passport");
 const orders_service_1 = require("./orders.service");
 const create_order_dto_1 = require("./dto/create-order.dto");
 const update_order_status_dto_1 = require("./dto/update-order-status.dto");
+const optional_jwt_auth_guard_1 = require("../auth/guards/optional-jwt-auth.guard");
 let OrdersController = class OrdersController {
     constructor(ordersService) {
         this.ordersService = ordersService;
@@ -47,9 +48,9 @@ let OrdersController = class OrdersController {
 exports.OrdersController = OrdersController;
 __decorate([
     (0, common_1.Post)(),
-    (0, common_1.UseGuards)((0, passport_1.AuthGuard)('jwt')),
+    (0, common_1.UseGuards)(optional_jwt_auth_guard_1.OptionalJwtAuthGuard),
     (0, swagger_1.ApiBearerAuth)(),
-    (0, swagger_1.ApiOperation)({ summary: 'สร้างคำสั่งซื้อใหม่ (Order)' }),
+    (0, swagger_1.ApiOperation)({ summary: 'สร้างคำสั่งซื้อใหม่ (Order) - รองรับทั้งสั่งออนไลน์และสั่งที่โต๊ะ' }),
     (0, swagger_1.ApiResponse)({ status: 201, description: 'สร้างคำสั่งซื้อสำเร็จ' }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, common_1.Req)()),

@@ -1,6 +1,13 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { adminStore } from '../store/adminData'
+
+// โหลดข้อมูลโต๊ะจริงจาก Backend ทันทีที่เปิดหน้าเว็บ
+onMounted(async () => {
+  if (typeof adminStore.fetchTablesFromAPI === 'function') {
+    await adminStore.fetchTablesFromAPI()
+  }
+})
 
 const selectedTable = ref(null)
 
@@ -13,16 +20,24 @@ function openTableModal(table) {
   selectedTable.value = table
 }
 
-function changeStatus(table, newStatus) {
-  adminStore.toggleTableStatus(table.table_id, newStatus)
+async function changeStatus(table, newStatus) {
+  if (typeof adminStore.toggleTableStatusAPI === 'function') {
+    await adminStore.toggleTableStatusAPI(table.table_id, newStatus)
+  } else {
+    adminStore.toggleTableStatus(table.table_id, newStatus)
+  }
 }
 
-function clearTable(table) {
+async function clearTable(table) {
   if (confirm(`คุณต้องการเช็คบิลและเคลียร์โต๊ะ ${table.table_number} หรือไม่?`)) {
     if (table.activeOrderId) {
       adminStore.updateOrderStatus(table.activeOrderId, 'Completed')
     }
-    adminStore.toggleTableStatus(table.table_id, 'Empty')
+    if (typeof adminStore.toggleTableStatusAPI === 'function') {
+      await adminStore.toggleTableStatusAPI(table.table_id, 'Empty')
+    } else {
+      adminStore.toggleTableStatus(table.table_id, 'Empty')
+    }
     selectedTable.value = null
   }
 }

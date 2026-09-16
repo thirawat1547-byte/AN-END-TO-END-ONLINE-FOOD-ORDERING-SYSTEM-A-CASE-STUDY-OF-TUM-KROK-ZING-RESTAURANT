@@ -8,10 +8,10 @@ export class RegisterDto {
   @IsNotEmpty({ message: 'กรุณากรอก Username' })
   username: string;
 
-  @ApiProperty({ example: 'password1234', description: 'รหัสผ่านอย่างน้อย 6 ตัวอักษร' })
+  @ApiProperty({ example: 'password1234', description: 'รหัสผ่านอย่างน้อย 4 ตัวอักษร' })
   @IsString()
   @IsNotEmpty({ message: 'กรุณากรอกรหัสผ่าน' })
-  @MinLength(6, { message: 'รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร' })
+  @MinLength(4, { message: 'รหัสผ่านต้องมีความยาวอย่างน้อย 4 ตัวอักษร' })
   password: string;
 
   @ApiPropertyOptional({ example: 'somchai@example.com', description: 'อีเมลผู้ใช้งาน' })

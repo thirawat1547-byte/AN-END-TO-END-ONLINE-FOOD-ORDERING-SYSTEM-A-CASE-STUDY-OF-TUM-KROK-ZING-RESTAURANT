@@ -44,14 +44,18 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import axios from 'axios'
 import OrderHeader from '../components/OrderHeader.vue'
 import CartItemCard from '../components/CartItemCard.vue'
 import { useCart } from '../composables/useCart'
+import { API_BASE } from '../../config/api'
 
 const route = useRoute()
 const router = useRouter()
 const tableId = route.params.tableId || '1'
+const isSubmitting = ref(false)
 
 const { cart, updateQuantity, cartTotal, cartItemCount, placeOrderToHistory, removeFromCart } = useCart()
 
@@ -59,12 +63,47 @@ const goToMenu = () => {
   router.push(`/table/${tableId}`)
 }
 
-const placeOrder = () => {
-  const finalTotal = cartTotal.value;
-  setTimeout(() => {
+const placeOrder = async () => {
+  if (cart.value.length === 0 || isSubmitting.value) return
+  isSubmitting.value = true
+  const finalTotal = cartTotal.value
+
+  try {
+    const token = localStorage.getItem('access_token')
+    const headers = token ? { Authorization: `Bearer ${token}` } : {}
+
+    const orderPayload = {
+      table_id: Number(tableId) || 1,
+      order_type: 'DINE_IN',
+      items: cart.value.map(item => {
+        const notesList = []
+        if (item.spicyLevel) notesList.push(`เผ็ด: ${item.spicyLevel}`)
+        if (item.specialInstructions) notesList.push(item.specialInstructions)
+        if (item.addons && item.addons.length > 0) {
+          notesList.push('เพิ่ม: ' + item.addons.map(a => a.name).join(', '))
+        }
+
+        return {
+          menu_id: Number(item.id || item.menu_id || 1),
+          quantity: Number(item.quantity || 1),
+          notes: notesList.join(' | ') || undefined
+        }
+      })
+    }
+
+    // ส่งคำสั่งซื้อเข้า Backend เพื่อส่งต่อไปยังห้องครัว (Kitchen KDS) ทันที
+    await axios.post(`${API_BASE}/orders`, orderPayload, { headers })
+
     placeOrderToHistory()
     router.push({ path: `/table/${tableId}/success`, query: { total: finalTotal } })
-  }, 500)
+  } catch (err) {
+    console.warn('ส่งออเดอร์เข้า Backend ไม่สำเร็จ กำลังบันทึกในระบบท้องถิ่น:', err)
+    // Fallback: บันทึกเข้าประวัติท้องถิ่น
+    placeOrderToHistory()
+    router.push({ path: `/table/${tableId}/success`, query: { total: finalTotal } })
+  } finally {
+    isSubmitting.value = false
+  }
 }
 </script>
 

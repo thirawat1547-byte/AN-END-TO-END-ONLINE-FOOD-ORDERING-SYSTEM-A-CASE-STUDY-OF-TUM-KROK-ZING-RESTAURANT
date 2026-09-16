@@ -105,6 +105,9 @@
 </template>
 
 <script>
+import axios from 'axios';
+import { API_BASE } from './config/api';
+
 export default {
   data() {
     return {
@@ -112,11 +115,12 @@ export default {
       showAddressDropdown: false,
       isEditing: false,
       userProfile: {
-        name: 'คมชาญ หล่อวัน',
-        phone: '091-020-7256',
-        email: '6610122115057@pnru.ac.th',
-        address: '35/369 หมู่ 1 ต.บ้านใหม่ อ.เมืองปทุมธานี จ.ปทุมธานี 12000',
-        avatar: '' // กำหนดตัวแปรสำหรับเก็บรูป
+        username: '',
+        name: 'ลูกค้าทั่วไป',
+        phone: '',
+        email: '',
+        address: '',
+        avatar: ''
       },
       editForm: {}
     }
@@ -131,17 +135,48 @@ export default {
       return 'กรุณาเพิ่มที่อยู่';
     }
   },
-  mounted() {
+  async mounted() {
     this.isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-    const saved = localStorage.getItem('userProfile');
-    if (saved) {
-      this.userProfile = { ...this.userProfile, ...JSON.parse(saved) };
+    const token = localStorage.getItem('access_token');
+
+    // 1. ดึงข้อมูลโปรไฟล์จริงจาก Database ถ้ามี Token
+    if (token) {
+      try {
+        const res = await axios.get(`${API_BASE}/auth/profile`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.data) {
+          const dbUser = res.data;
+          this.userProfile = {
+            username: dbUser.username || '',
+            name: dbUser.username || 'ลูกค้าทั่วไป',
+            phone: dbUser.phone_number || '',
+            email: dbUser.email || '',
+            address: dbUser.address || '',
+            avatar: ''
+          };
+          localStorage.setItem('userProfile', JSON.stringify(this.userProfile));
+        }
+      } catch (err) {
+        console.warn('ดึงโปรไฟล์จาก Backend ไม่สำเร็จ:', err);
+      }
     }
+
+    // 2. ถ้าไม่มีข้อมูลจาก API ให้อ่านจาก localStorage
+    if (!this.userProfile.username) {
+      const saved = localStorage.getItem('userProfile');
+      if (saved) {
+        this.userProfile = { ...this.userProfile, ...JSON.parse(saved) };
+      }
+    }
+
     this.editForm = { ...this.userProfile };
   },
   methods: {
     logout() {
+      localStorage.removeItem('access_token');
       localStorage.removeItem('isLoggedIn');
+      localStorage.removeItem('userProfile');
       this.isLoggedIn = false;
       this.$router.push('/');
     },
@@ -153,11 +188,22 @@ export default {
       this.isEditing = false;
       this.editForm = { ...this.userProfile }; 
     },
-    saveProfile() {
-      if (!this.editForm.name || !this.editForm.phone || !this.editForm.address) {
-        alert('กรุณากรอกข้อมูลให้ครบถ้วนด้วยครับ');
-        return;
+    async saveProfile() {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        try {
+          await axios.patch(`${API_BASE}/auth/profile`, {
+            phone_number: this.editForm.phone,
+            address: this.editForm.address,
+            email: this.editForm.email
+          }, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        } catch (err) {
+          console.warn('บันทึกลงฐานข้อมูลไม่สำเร็จ:', err);
+        }
       }
+
       this.userProfile = { ...this.editForm };
       localStorage.setItem('userProfile', JSON.stringify(this.userProfile));
       this.isEditing = false;

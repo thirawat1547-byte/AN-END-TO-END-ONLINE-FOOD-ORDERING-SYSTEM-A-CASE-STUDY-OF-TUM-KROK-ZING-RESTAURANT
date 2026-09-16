@@ -17,15 +17,17 @@ import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+
 @ApiTags('Orders')
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'สร้างคำสั่งซื้อใหม่ (Order)' })
+  @ApiOperation({ summary: 'สร้างคำสั่งซื้อใหม่ (Order) - รองรับทั้งสั่งออนไลน์และสั่งที่โต๊ะ' })
   @ApiResponse({ status: 201, description: 'สร้างคำสั่งซื้อสำเร็จ' })
   create(@Body() createOrderDto: CreateOrderDto, @Req() req: any) {
     const userId = req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub;

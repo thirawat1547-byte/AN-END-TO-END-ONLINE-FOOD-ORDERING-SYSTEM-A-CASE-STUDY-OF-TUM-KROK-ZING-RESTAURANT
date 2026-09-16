@@ -1,6 +1,13 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { adminStore } from '../store/adminData'
+
+// ดึงข้อมูลคลังวัตถุดิบจาก Backend ทันทีที่เปิดหน้าเว็บ
+onMounted(async () => {
+  if (typeof adminStore.fetchInventoryFromAPI === 'function') {
+    await adminStore.fetchInventoryFromAPI()
+  }
+})
 
 const activeTab = ref('stock') // 'stock' or 'recipes'
 const searchQuery = ref('')
@@ -32,15 +39,24 @@ function openAdjust(item) {
   isAdjustModalOpen.value = true
 }
 
-function saveAdjust() {
+async function saveAdjust() {
   if (selectedItem.value) {
-    adminStore.updateStock(selectedItem.value.ingredient_id, adjustQty.value)
+    if (typeof adminStore.updateStockAPI === 'function') {
+      await adminStore.updateStockAPI(selectedItem.value.ingredient_id, adjustQty.value)
+    } else {
+      adminStore.updateStock(selectedItem.value.ingredient_id, adjustQty.value)
+    }
   }
   isAdjustModalOpen.value = false
 }
 
-function quickAdd(item, amount) {
-  adminStore.updateStock(item.ingredient_id, Number(item.quantity_in_stock) + amount)
+async function quickAdd(item, amount) {
+  const newQty = Number(item.quantity_in_stock) + amount
+  if (typeof adminStore.updateStockAPI === 'function') {
+    await adminStore.updateStockAPI(item.ingredient_id, newQty)
+  } else {
+    adminStore.updateStock(item.ingredient_id, newQty)
+  }
 }
 
 function saveNewIngredient() {
