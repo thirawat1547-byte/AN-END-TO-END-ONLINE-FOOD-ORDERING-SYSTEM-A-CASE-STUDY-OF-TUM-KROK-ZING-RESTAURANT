@@ -30,11 +30,12 @@ export class OrdersService {
         const unitPrice = Number(menu.price);
         totalAmount += unitPrice * item.quantity;
 
-        // บันทึกเฉพาะ 3 ฟิลด์หลักที่มีจริงใน schema.prisma (menu_id, quantity, unit_price)
+        // บันทึกข้อมูลรายการอาหาร พร้อมหมายเหตุตัวเลือกที่ลูกค้าเลือก (notes)
         orderItemsData.push({
           menu_id: item.menu_id,
           quantity: item.quantity,
           unit_price: unitPrice,
+          notes: item.notes || null,
         });
       }
 

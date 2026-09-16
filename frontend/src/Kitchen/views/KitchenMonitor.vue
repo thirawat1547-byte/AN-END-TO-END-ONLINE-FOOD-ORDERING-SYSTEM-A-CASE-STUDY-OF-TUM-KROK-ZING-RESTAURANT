@@ -9,6 +9,32 @@ const completedOrders = ref([])
 const isLoading = ref(false)
 let pollingTimer = null
 
+// ฟังก์ชันดึงรายละเอียด/หมายเหตุที่ลูกค้าเลือก (ความเผ็ด, ไม่ใส่ผัก, โน้ตเพิ่มเติม)
+const extractNote = (oi) => {
+  if (oi.notes && typeof oi.notes === 'string' && oi.notes.trim()) {
+    return oi.notes.trim()
+  }
+  if (oi.customization) {
+    if (typeof oi.customization === 'string' && oi.customization.trim()) {
+      return oi.customization.trim()
+    }
+    if (typeof oi.customization === 'object') {
+      const parts = []
+      if (oi.customization.spicy && oi.customization.spicy !== '-') {
+        parts.push(`🔥 เผ็ด: ${oi.customization.spicy}`)
+      }
+      if (oi.customization.no_msg) {
+        parts.push('🌿 ไม่ใส่ชูรส')
+      }
+      if (oi.customization.note) {
+        parts.push(`💬 โน้ต: ${oi.customization.note}`)
+      }
+      return parts.join(' | ')
+    }
+  }
+  return ''
+}
+
 // แปลงรูปแบบออเดอร์จาก Backend เข้า Component
 const formatOrder = (order) => {
   const createdDate = new Date(order.created_at)
@@ -23,10 +49,10 @@ const formatOrder = (order) => {
     timeStatus = 'warning'
   }
 
-  const items = (order.order_items || []).map((oi) => ({
+  const items = (order.order_items || order.items || []).map((oi) => ({
     qty: oi.quantity,
-    name: oi.menu?.name || `เมนู #${oi.menu_id}`,
-    note: oi.customization || ''
+    name: oi.menu?.menu_name || oi.menu?.name || oi.menu_name || `เมนู #${oi.menu_id}`,
+    note: extractNote(oi)
   }))
 
   return {
@@ -212,13 +238,14 @@ onBeforeUnmount(() => {
                     {{ item.qty }}x
                   </span>
                   
-                  <div>
-                    <div style="font-size: 16px; font-weight: 500; color: #332D27; line-height: 1.3;">
+                  <div style="flex: 1;">
+                    <div style="font-size: 16px; font-weight: 700; color: #2B2621; line-height: 1.35;">
                       {{ item.name }}
                     </div>
                     <div v-if="item.note" style="margin-top: 6px;">
-                      <span style="background-color: #FFFFFF; color: #B55A5A; font-size: 12px; padding: 3px 12px; border-radius: 9999px; border: 1px solid #FEE2E2; display: inline-block; font-weight: 500;">
-                        {{ item.note }}
+                      <span style="background-color: #FEF3C7; color: #92400E; font-size: 12px; padding: 4px 10px; border-radius: 8px; border: 1px solid #FDE68A; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; line-height: 1.3;">
+                        <span>📌</span>
+                        <span>{{ item.note }}</span>
                       </span>
                     </div>
                   </div>
@@ -261,9 +288,14 @@ onBeforeUnmount(() => {
               <div style="display: flex; flex-direction: column; gap: 14px;">
                 <div v-for="(item, i) in order.items" :key="i" style="display: flex; align-items: flex-start; gap: 10px;">
                   <span style="font-size: 16px; font-weight: 700; color: #70A584; min-width: 28px;">{{ item.qty }}x</span>
-                  <div>
-                    <div style="font-size: 14px; color: #332D27;">{{ item.name }}</div>
-                    <div v-if="item.note" style="font-size: 11px; color: #9CA3AF;">({{ item.note }})</div>
+                  <div style="flex: 1;">
+                    <div style="font-size: 15px; font-weight: 600; color: #332D27;">{{ item.name }}</div>
+                    <div v-if="item.note" style="margin-top: 4px;">
+                      <span style="font-size: 11px; color: #78350F; background-color: #FEF3C7; padding: 2px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 3px; font-weight: 500;">
+                        <span>📌</span>
+                        <span>{{ item.note }}</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

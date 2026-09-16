@@ -232,12 +232,25 @@ export default {
             ? dateObj.toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })
             : '-';
 
-          const items = (order.order_items || []).map(oi => ({
-            name: oi.menu?.name || `เมนู #${oi.menu_id}`,
-            qty: Number(oi.quantity),
-            price: Number(oi.unit_price || oi.menu?.price || 0),
-            options: oi.customization || ''
-          }));
+          const items = (order.order_items || []).map(oi => {
+            let noteStr = oi.notes || '';
+            if (!noteStr && oi.customization) {
+              if (typeof oi.customization === 'string') noteStr = oi.customization;
+              else if (typeof oi.customization === 'object') {
+                const p = [];
+                if (oi.customization.spicy && oi.customization.spicy !== '-') p.push(`เผ็ด: ${oi.customization.spicy}`);
+                if (oi.customization.no_msg) p.push('ไม่ใส่ชูรส');
+                if (oi.customization.note) p.push(oi.customization.note);
+                noteStr = p.join(', ');
+              }
+            }
+            return {
+              name: oi.menu?.menu_name || oi.menu?.name || oi.menu_name || `เมนู #${oi.menu_id}`,
+              qty: Number(oi.quantity),
+              price: Number(oi.unit_price || oi.menu?.price || 0),
+              options: noteStr
+            };
+          });
 
           const subtotal = items.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
 

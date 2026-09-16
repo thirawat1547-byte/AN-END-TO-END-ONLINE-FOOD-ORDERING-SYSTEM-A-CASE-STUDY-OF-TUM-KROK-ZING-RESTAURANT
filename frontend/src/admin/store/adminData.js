@@ -736,8 +736,24 @@ export const adminStore = reactive({
       const res = await fetch(`${API_BASE}/orders`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
-      if (Array.isArray(data)) {
-        this.orders = data
+      if (Array.isArray(data) && data.length > 0) {
+        this.orders = data.map(o => ({
+          ...o,
+          customer_name: o.user?.username || (o.table ? `โต๊ะ ${o.table.table_number}` : `ลูกค้า #${o.order_id}`),
+          items: (o.order_items || o.items || []).map(oi => {
+            let cust = oi.customization;
+            if (!cust && oi.notes) {
+              cust = { note: oi.notes };
+            }
+            return {
+              menu_id: oi.menu_id,
+              menu_name: oi.menu?.menu_name || oi.menu?.name || oi.menu_name || `เมนู #${oi.menu_id}`,
+              quantity: oi.quantity,
+              price: oi.unit_price || oi.price,
+              customization: cust
+            };
+          })
+        }))
       }
       console.log(`✅ โหลดรายการออเดอร์จาก API สำเร็จ: ${this.orders.length} ออเดอร์`)
     } catch (err) {

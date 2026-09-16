@@ -128,6 +128,7 @@ model OrderItem {
   menu_id       Int
   quantity      Int
   unit_price    Float
+  notes         String?  @db.Text
   created_at    DateTime @default(now())
 
   order Order @relation(fields: [order_id], references: [order_id], onDelete: Cascade)
