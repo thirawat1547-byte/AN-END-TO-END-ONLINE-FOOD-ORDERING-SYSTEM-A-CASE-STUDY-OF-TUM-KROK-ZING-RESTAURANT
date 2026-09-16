@@ -5,20 +5,20 @@ export declare class TransactionsService {
     private stripe;
     constructor(prisma: PrismaService);
     create(createTransactionDto: CreateTransactionDto): Promise<{
+        order_id: number;
         amount: import("@prisma/client/runtime/library").Decimal;
         payment_method: string;
         payment_status: string;
         payment_slip_url: string | null;
         transaction_id: number;
-        order_id: number;
     }>;
     findAll(): Promise<({
         order: {
             table: {
+                status: string;
                 table_id: number;
                 table_number: string;
                 capacity: number;
-                status: string;
             };
             order_items: ({
                 menu: {
@@ -33,29 +33,29 @@ export declare class TransactionsService {
                 };
             } & {
                 created_at: Date;
-                quantity: number;
                 order_id: number;
+                quantity: number;
+                unit_price: number;
                 order_item_id: number;
                 menu_id: number;
-                unit_price: number;
             })[];
         } & {
-            promo_id: number | null;
-            created_at: Date;
-            table_id: number | null;
+            order_type: string;
             status: string;
+            total_price: import("@prisma/client/runtime/library").Decimal;
+            created_at: Date;
             order_id: number;
             user_id: number | null;
-            order_type: string;
-            total_price: import("@prisma/client/runtime/library").Decimal;
+            table_id: number | null;
+            promo_id: number | null;
         };
     } & {
+        order_id: number;
         amount: import("@prisma/client/runtime/library").Decimal;
         payment_method: string;
         payment_status: string;
         payment_slip_url: string | null;
         transaction_id: number;
-        order_id: number;
     })[]>;
     createStripeIntent(orderId: number): Promise<{
         clientSecret: any;
@@ -64,13 +64,13 @@ export declare class TransactionsService {
         currency: string;
     }>;
     confirmStripePaymentTest(orderId: number): Promise<{
-        promo_id: number | null;
-        created_at: Date;
-        table_id: number | null;
+        order_type: string;
         status: string;
+        total_price: import("@prisma/client/runtime/library").Decimal;
+        created_at: Date;
         order_id: number;
         user_id: number | null;
-        order_type: string;
-        total_price: import("@prisma/client/runtime/library").Decimal;
+        table_id: number | null;
+        promo_id: number | null;
     }>;
 }

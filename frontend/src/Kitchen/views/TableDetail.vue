@@ -22,6 +22,45 @@ const tableData = ref({
 const orders = ref([])
 const activeOrderIds = ref([])
 const qrCodeDataUrl = ref('')
+const paymentQrDataUrl = ref('')
+const stripePaymentIntent = ref(null)
+const qrTab = ref('payment') // 'payment' | 'order'
+const promptpayNumber = ref('081-234-5678')
+const promptpayName = ref('ร้านตำครกซิ่ง (นายธีรวัฒน์ แสนคำเฮียง)')
+
+// คำนวณรหัส CRC16 สำหรับ PromptPay EMVCo
+function crc16(data) {
+  let crc = 0xFFFF;
+  for (let i = 0; i < data.length; i++) {
+    let x = ((crc >> 8) ^ data.charCodeAt(i)) & 0xFF;
+    x ^= x >> 4;
+    crc = ((crc << 8) ^ (x << 12) ^ (x << 5) ^ x) & 0xFFFF;
+  }
+  return crc.toString(16).toUpperCase().padStart(4, '0');
+}
+
+// สร้างสตริง Payload PromptPay ตามมาตรฐาน EMVCo / ธนาคารแห่งประเทศไทย
+function generatePromptPayPayload(target, amount) {
+  const cleanTarget = String(target || '0812345678').replace(/[^0-9]/g, '');
+  const targetType = cleanTarget.length >= 13 ? '02' : '01';
+  let formattedTarget = cleanTarget;
+  if (targetType === '01') {
+    formattedTarget = '0066' + cleanTarget.replace(/^0/, '');
+  }
+  const targetTag = targetType + String(formattedTarget.length).padStart(2, '0') + formattedTarget;
+  const aid = '0016A000000677010111';
+  const merchantInfo = aid + targetTag;
+  const merchantTag = '29' + String(merchantInfo.length).padStart(2, '0') + merchantInfo;
+  
+  let payload = '000201' + '010212' + merchantTag + '5802TH' + '5303764';
+  if (amount !== undefined && amount !== null && Number(amount) > 0) {
+    const formattedAmount = Number(amount).toFixed(2);
+    payload += '54' + String(formattedAmount.length).padStart(2, '0') + formattedAmount;
+  }
+  payload += '6304';
+  payload += crc16(payload);
+  return payload;
+}
 
 // หา tableId ตัวเลขสำหรับหน้าสั่งอาหารของลูกค้า (เช่น T-01 -> 1, T-02 -> 2)
 const numericTableId = computed(() => {
@@ -48,6 +87,38 @@ const generateQr = async () => {
     })
   } catch (err) {
     console.error('สร้าง QR Code ไม่สำเร็จ:', err)
+  }
+}
+
+// ฟังก์ชันสร้าง QR Code ชำระเงิน (PromptPay / Stripe Payment)
+const generatePaymentQr = async () => {
+  if (netTotal.value <= 0) {
+    paymentQrDataUrl.value = ''
+    return
+  }
+  try {
+    // 1. เรียกสร้าง Stripe Intent ฝั่ง Backend (ถ้ามี orderId)
+    if (activeOrderIds.value.length > 0) {
+      const orderId = activeOrderIds.value[0]
+      axios.post(`${API_BASE}/transactions/stripe/create-intent/${orderId}`)
+        .then(res => {
+          stripePaymentIntent.value = res.data
+        })
+        .catch(() => {})
+    }
+
+    // 2. สร้าง PromptPay QR Code ตามมาตรฐาน EMVCo พร้อมระบุยอดเงินสุทธิ
+    const payload = generatePromptPayPayload(promptpayNumber.value, netTotal.value)
+    paymentQrDataUrl.value = await QRCode.toDataURL(payload, {
+      width: 280,
+      margin: 2,
+      color: {
+        dark: '#003B70', // สีน้ำเงินพร้อมเพย์มาตรฐาน
+        light: '#FFFFFF'
+      }
+    })
+  } catch (err) {
+    console.error('สร้าง QR ชำระเงินไม่สำเร็จ:', err)
   }
 }
 
@@ -118,11 +189,17 @@ const fetchTableDetail = async () => {
           })
         })
         orders.value = itemsList
+        await generatePaymentQr()
+        if (netTotal.value > 0) {
+          qrTab.value = 'payment'
+        }
       } else {
         tableData.value.status = 'ว่าง (AVAILABLE)'
         tableData.value.time = '-'
         tableData.value.customers = 0
         orders.value = []
+        paymentQrDataUrl.value = ''
+        qrTab.value = 'order'
       }
     }
   } catch (err) {
@@ -153,18 +230,131 @@ const confirmPayment = async () => {
   if (confirm(`ยืนยันการชำระเงินโต๊ะ ${tableData.value.id} ยอดรวม ฿${netTotal.value.toLocaleString()}?`)) {
     try {
       for (const orderId of activeOrderIds.value) {
-        await axios.patch(`${API_BASE}/orders/${orderId}/status`, { status: 'COMPLETED' })
+        // ยืนยันการชำระเงินผ่าน Stripe Confirm Test API
+        await axios.post(`${API_BASE}/transactions/stripe/confirm-test/${orderId}`).catch(() => {
+          return axios.patch(`${API_BASE}/orders/${orderId}/status`, { status: 'COMPLETED' })
+        })
       }
       if (tableData.value.table_id) {
         await axios.patch(`${API_BASE}/tables/${tableData.value.table_id}/status`, { status: 'AVAILABLE' }).catch(() => {})
       }
-      alert(`ชำระเงินโต๊ะ ${tableData.value.id} เรียบร้อยแล้ว`)
+      alert(`ชำระเงินโต๊ะ ${tableData.value.id} สำเร็จเรียบร้อยแล้ว`)
       router.push('/kitchen/tables')
     } catch (err) {
       console.error('ชำระเงินไม่สำเร็จ:', err)
       alert('เกิดข้อผิดพลาดในการชำระเงิน')
     }
   }
+}
+
+const printPaymentBillSlip = () => {
+  if (orders.value.length === 0) {
+    alert('โต๊ะนี้ยังไม่มีรายการอาหารค้างชำระครับ')
+    return
+  }
+
+  const printWindow = window.open('', '_blank', 'width=450,height=760')
+  if (!printWindow) return
+
+  const itemsRows = orders.value.map(item => `
+    <tr>
+      <td style="text-align: left; padding: 4px 0; font-size: 12px;">
+        <div style="font-weight: 600; color: #111827;">${item.name}</div>
+        ${item.note && item.note !== '-' ? `<small style="color: #6b7280; font-size: 11px;">(${item.note})</small>` : ''}
+      </td>
+      <td style="text-align: center; padding: 4px 6px; font-weight: 600; font-size: 12px;">${item.qty}</td>
+      <td style="text-align: right; padding: 4px 0; font-weight: 600; font-size: 12px;">฿${(item.price * item.qty).toLocaleString()}</td>
+    </tr>
+  `).join('')
+
+  const nowStr = new Date().toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) + ' น.'
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8" />
+      <title>ใบแจ้งยอดชำระเงิน - โต๊ะ ${tableData.value.id}</title>
+      <style>
+        @page { size: 80mm auto; margin: 4mm; }
+        body {
+          font-family: 'Sarabun', 'Prompt', -apple-system, BlinkMacSystemFont, sans-serif;
+          text-align: center;
+          padding: 14px 10px;
+          margin: 0;
+          color: #111827;
+          background: #fff;
+        }
+        .brand { font-size: 20px; font-weight: 900; color: #336846; }
+        .sub { font-size: 10px; color: #6b7280; text-transform: uppercase; margin-top: 2px; }
+        .bill-title { font-size: 18px; font-weight: 800; color: #111827; margin: 8px 0 4px 0; }
+        .meta { display: flex; justify-content: space-between; font-size: 11px; margin: 6px 0; border-bottom: 1px dashed #d1d5db; padding-bottom: 6px; color: #4b5563; }
+        .item-table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+        .item-table th { border-bottom: 1px solid #111827; padding: 4px 0; font-size: 11px; }
+        .divider { border-top: 1px dashed #9ca3af; margin: 8px 0; }
+        .total-row { display: flex; justify-content: space-between; font-size: 18px; font-weight: 900; color: #111827; padding: 6px 0; }
+        .qr-card { margin-top: 10px; padding: 12px; border: 2px solid #003B70; border-radius: 14px; background: #fafafa; }
+        .badge-row { display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 6px; }
+        .promptpay-badge { background: #003B70; color: white; padding: 3px 12px; border-radius: 9999px; font-weight: 800; font-size: 11px; }
+        .stripe-badge { background: #635bff; color: white; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 10px; }
+        .qr-img { width: 190px; height: 190px; display: block; margin: 6px auto; border: 1px solid #e5e7eb; border-radius: 8px; }
+        .footer { font-size: 10px; color: #6b7280; margin-top: 12px; border-top: 1px dashed #d1d5db; padding-top: 8px; line-height: 1.4; }
+      </style>
+    </head>
+    <body>
+      <div class="brand">🌶️ ร้านตำครกซิ่ง</div>
+      <div class="sub">TUMKROKZING RESTAURANT</div>
+      <div class="bill-title">ใบแจ้งยอดชำระเงิน (โต๊ะ ${tableData.value.id})</div>
+      <div class="meta">
+        <span>วันที่: ${nowStr}</span>
+        <span>พนักงาน: ${tableData.value.staff}</span>
+      </div>
+      <table class="item-table">
+        <thead>
+          <tr>
+            <th style="text-align: left;">รายการ</th>
+            <th style="text-align: center; width: 30px;">จน.</th>
+            <th style="text-align: right; width: 65px;">รวม</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsRows}
+        </tbody>
+      </table>
+      <div class="divider"></div>
+      <div style="display: flex; justify-content: space-between; font-size: 12px; color: #4b5563;">
+        <span>ยอดรวม (Subtotal)</span>
+        <span>฿${subtotal.value.toLocaleString()}</span>
+      </div>
+      <div class="total-row">
+        <span>ยอดสุทธิ (Total)</span>
+        <span>฿${netTotal.value.toLocaleString()}</span>
+      </div>
+      <div class="qr-card">
+        <div class="badge-row">
+          <span class="promptpay-badge">พร้อมเพย์ PromptPay</span>
+          <span class="stripe-badge">Stripe</span>
+        </div>
+        <div style="font-size: 11px; color: #374151; font-weight: 600;">สแกนเพื่อชำระเงินยอด ฿${netTotal.value.toLocaleString()}</div>
+        <img class="qr-img" src="${paymentQrDataUrl.value || qrCodeDataUrl.value}" alt="Payment QR" />
+        <div style="font-size: 11px; color: #1f2937; font-weight: 700; margin-top: 4px;">
+          ${promptpayName.value}<br/>
+          <span style="font-family: monospace; font-size: 12px; color: #003B70;">พร้อมเพย์: ${promptpayNumber.value}</span>
+        </div>
+      </div>
+      <div class="footer">
+        สแกนผ่านแอปธนาคารได้ทุกธนาคาร (SCB, KBank, BBL, KTB ฯลฯ)<br/>
+        ขอบคุณที่ใช้บริการร้านตำครกซิ่งครับ / ค่ะ
+      </div>
+      <script>
+        window.onload = function() {
+          setTimeout(function() { window.print(); }, 200);
+        };
+      <\/script>
+    </body>
+    </html>
+  `)
+  printWindow.document.close()
 }
 
 const forceClear = async () => {
@@ -305,11 +495,18 @@ const goBack = () => {
           </div>
 
           <!-- Action Header Buttons -->
-          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <button 
+              @click="printPaymentBillSlip" 
+              style="display: flex; align-items: center; gap: 6px; background-color: #003B70; color: white; padding: 10px 16px; border-radius: 12px; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: none; transition: all 0.2s;"
+              title="พิมพ์ใบเรียกเก็บเงินพร้อมเพย์ & Stripe"
+            >
+              <span>🧾</span> พิมพ์ QR จ่ายเงิน (บิล)
+            </button>
             <button @click="printQrSlip" style="display: flex; align-items: center; gap: 6px; background-color: white; border: 1.5px solid #48785A; color: #48785A; padding: 10px 16px; border-radius: 12px; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: all 0.2s;">
               <span>📱</span> พิมพ์ QR สั่งอาหาร
             </button>
-            <button @click="confirmPayment" style="display: flex; align-items: center; gap: 8px; background-color: #48785A; color: white; padding: 10px 16px; border-radius: 12px; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: background-color 0.2s;">
+            <button @click="confirmPayment" style="display: flex; align-items: center; gap: 8px; background-color: #48785A; color: white; padding: 10px 16px; border-radius: 12px; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); border: none; transition: background-color 0.2s;">
               <span>💳</span> ยืนยันการชำระเงิน
             </button>
           </div>
@@ -427,8 +624,71 @@ const goBack = () => {
                   <span style="font-family: serif; font-weight: 700; font-size: 24px; color: #336846;">฿{{ netTotal.toLocaleString() }}</span>
                 </div>
 
-                <!-- Real Scannable QR Code Section -->
-                <div style="display: flex; flex-direction: column; align-items: center; padding-top: 16px; border-top: 1px dashed rgba(209,213,219,0.8);">
+                <!-- Tabs: Switch between Payment QR (PromptPay/Stripe) and Order QR -->
+                <div style="display: flex; background: #E5E7EB; border-radius: 12px; padding: 3px; margin-top: 14px; gap: 4px;">
+                  <button
+                    type="button"
+                    @click="qrTab = 'payment'"
+                    :style="qrTab === 'payment' ? 'background: #003B70; color: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1);' : 'background: transparent; color: #4B5563;'"
+                    style="flex: 1; padding: 7px 4px; border: none; border-radius: 9px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 4px;"
+                  >
+                    <span>🧾</span> QR ชำระเงิน (Stripe/พร้อมเพย์)
+                  </button>
+                  <button
+                    type="button"
+                    @click="qrTab = 'order'"
+                    :style="qrTab === 'order' ? 'background: #48785A; color: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1);' : 'background: transparent; color: #4B5563;'"
+                    style="flex: 1; padding: 7px 4px; border: none; border-radius: 9px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 4px;"
+                  >
+                    <span>📱</span> QR สั่งอาหาร
+                  </button>
+                </div>
+
+                <!-- 1. Payment QR Tab (Stripe / PromptPay) -->
+                <div v-if="qrTab === 'payment'" style="display: flex; flex-direction: column; align-items: center; padding-top: 14px;">
+                  <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                    <span style="background: #003B70; color: white; padding: 3px 10px; border-radius: 9999px; font-weight: 800; font-size: 11px;">PromptPay</span>
+                    <span style="background: #635bff; color: white; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 10px;">Stripe</span>
+                  </div>
+
+                  <div style="font-size: 12px; font-weight: 700; color: #1F2937; margin-bottom: 8px;">
+                    ยอดที่ต้องชำระ: <span style="color: #003B70; font-size: 16px;">฿{{ netTotal.toLocaleString() }}</span>
+                  </div>
+
+                  <div style="padding: 10px; background-color: white; border-radius: 16px; border: 2px solid #003B70; box-shadow: 0 4px 12px rgba(0,59,112,0.08); display: flex; justify-content: center; align-items: center;">
+                    <img v-if="paymentQrDataUrl" :src="paymentQrDataUrl" :alt="`QR ชำระเงิน โต๊ะ ${tableData.id}`" style="width: 160px; height: 160px; display: block;" />
+                    <div v-else style="width: 160px; height: 160px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #9CA3AF; font-size: 11px; padding: 8px; text-align: center;">
+                      <span>ยังไม่มียอดค้างชำระ</span>
+                      <small style="margin-top: 4px;">เมื่อมีรายการสั่งอาหารจะแสดง QR สำหรับชำระเงินทันที</small>
+                    </div>
+                  </div>
+
+                  <div style="font-size: 11px; color: #4B5563; text-align: center; margin-top: 8px; line-height: 1.3;">
+                    <div style="font-weight: 600;">{{ promptpayName }}</div>
+                    <span style="font-family: monospace; color: #003B70; font-weight: 700;">พร้อมเพย์: {{ promptpayNumber }}</span>
+                  </div>
+
+                  <div style="display: grid; grid-template-columns: 1fr; gap: 8px; width: 100%; margin-top: 12px;">
+                    <button 
+                      @click="printPaymentBillSlip"
+                      type="button"
+                      style="padding: 10px 8px; background-color: #003B70; border: none; border-radius: 10px; font-size: 12px; font-weight: 700; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: background-color 0.2s;"
+                      title="พิมพ์ใบเรียกเก็บเงินพร้อม QR ให้ลูกค้านำไปสแกนจ่าย"
+                    >
+                      <span>🖨️</span> พิมพ์ใบแจ้งหนี้ / QR จ่ายเงิน
+                    </button>
+                    <button 
+                      @click="confirmPayment"
+                      type="button"
+                      style="padding: 9px 8px; background-color: white; border: 1.5px solid #48785A; border-radius: 10px; font-size: 12px; font-weight: 700; color: #48785A; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: background-color 0.2s;"
+                    >
+                      <span>💳</span> ยืนยันรับเงิน (ปิดบิล)
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 2. Ordering QR Tab -->
+                <div v-else style="display: flex; flex-direction: column; align-items: center; padding-top: 14px;">
                   <div style="font-size: 13px; font-weight: 700; color: #1F2937; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
                     <span>📱</span> QR สแกนสั่งอาหาร (โต๊ะ {{ tableData.id }})
                   </div>
@@ -473,12 +733,13 @@ const goBack = () => {
                 </div>
               </div>
 
-              <!-- Print QR Slip Main Button -->
+              <!-- Print Action Button at Bottom -->
               <button 
-                @click="printQrSlip"
-                style="width: 100%; padding: 12px; background-color: #48785A; color: white; font-weight: 600; font-size: 13px; border-radius: 12px; border: none; cursor: pointer; transition: background-color 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); margin-top: 16px; display: flex; align-items: center; justify-content: center; gap: 8px;"
+                @click="qrTab === 'payment' ? printPaymentBillSlip() : printQrSlip()"
+                :style="qrTab === 'payment' ? 'background-color: #003B70;' : 'background-color: #48785A;'"
+                style="width: 100%; padding: 12px; color: white; font-weight: 700; font-size: 13px; border-radius: 12px; border: none; cursor: pointer; transition: background-color 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 16px; display: flex; align-items: center; justify-content: center; gap: 8px;"
               >
-                <span>🖨️</span> พิมพ์ใบเปิดโต๊ะ / QR สั่งอาหาร
+                <span>{{ qrTab === 'payment' ? '🧾 พิมพ์ใบแจ้งหนี้ / QR จ่ายเงิน' : '🖨️ พิมพ์ใบเปิดโต๊ะ / QR สั่งอาหาร' }}</span>
               </button>
 
             </div>

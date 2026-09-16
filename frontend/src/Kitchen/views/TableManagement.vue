@@ -103,11 +103,159 @@ const goToTableDetail = (tableId) => {
 
 import QRCode from 'qrcode'
 
+// คำนวณรหัส CRC16 สำหรับ PromptPay EMVCo
+function crc16(data) {
+  let crc = 0xFFFF;
+  for (let i = 0; i < data.length; i++) {
+    let x = ((crc >> 8) ^ data.charCodeAt(i)) & 0xFF;
+    x ^= x >> 4;
+    crc = ((crc << 8) ^ (x << 12) ^ (x << 5) ^ x) & 0xFFFF;
+  }
+  return crc.toString(16).toUpperCase().padStart(4, '0');
+}
+
+function generatePromptPayPayload(target, amount) {
+  const cleanTarget = String(target || '0812345678').replace(/[^0-9]/g, '');
+  const targetType = cleanTarget.length >= 13 ? '02' : '01';
+  let formattedTarget = cleanTarget;
+  if (targetType === '01') {
+    formattedTarget = '0066' + cleanTarget.replace(/^0/, '');
+  }
+  const targetTag = targetType + String(formattedTarget.length).padStart(2, '0') + formattedTarget;
+  const aid = '0016A000000677010111';
+  const merchantInfo = aid + targetTag;
+  const merchantTag = '29' + String(merchantInfo.length).padStart(2, '0') + merchantInfo;
+  
+  let payload = '000201' + '010212' + merchantTag + '5802TH' + '5303764';
+  if (amount !== undefined && amount !== null && Number(amount) > 0) {
+    const formattedAmount = Number(amount).toFixed(2);
+    payload += '54' + String(formattedAmount.length).padStart(2, '0') + formattedAmount;
+  }
+  payload += '6304';
+  payload += crc16(payload);
+  return payload;
+}
+
 // ข้อมูลสำหรับ Modal แสดง QR โต๊ะเดี่ยว
 const selectedQrTable = ref(null)
 const selectedQrUrl = ref('')
 const selectedQrDataUrl = ref('')
 const isQrModalOpen = ref(false)
+
+// ข้อมูลสำหรับ Modal ชำระเงิน / เช็คบิล
+const selectedPayTable = ref(null)
+const payQrDataUrl = ref('')
+const isPaymentModalOpen = ref(false)
+const isPaying = ref(false)
+
+const openPaymentModal = async (table) => {
+  selectedPayTable.value = table
+  const amount = table.total || 0
+  if (amount <= 0) {
+    alert('โต๊ะนี้ยังไม่มียอดค้างชำระครับ')
+    return
+  }
+
+  try {
+    const payload = generatePromptPayPayload('081-234-5678', amount)
+    payQrDataUrl.value = await QRCode.toDataURL(payload, {
+      width: 260,
+      margin: 2,
+      color: { dark: '#003B70', light: '#FFFFFF' }
+    })
+    isPaymentModalOpen.value = true
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+const printTablePaymentSlip = () => {
+  if (!selectedPayTable.value) return
+  const t = selectedPayTable.value
+  const printWindow = window.open('', '_blank', 'width=450,height=720')
+  if (!printWindow) return
+
+  const nowStr = new Date().toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) + ' น.'
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8" />
+      <title>ใบแจ้งยอดชำระเงิน - โต๊ะ ${t.id}</title>
+      <style>
+        @page { size: 80mm auto; margin: 4mm; }
+        body { font-family: 'Sarabun', 'Prompt', sans-serif; text-align: center; padding: 16px 12px; margin: 0; color: #111827; background: #fff; }
+        .brand { font-size: 20px; font-weight: 800; color: #336846; }
+        .sub { font-size: 11px; color: #6b7280; text-transform: uppercase; margin-top: 2px; }
+        .table-box { border: 2px solid #111827; background: #f9fafb; border-radius: 12px; padding: 8px 18px; display: inline-block; font-size: 24px; font-weight: 900; margin: 12px 0 6px 0; }
+        .instruction { font-size: 13px; font-weight: 700; color: #374151; margin-bottom: 6px; }
+        .qr-img { width: 200px; height: 200px; display: block; margin: 0 auto; border: 2px solid #003B70; border-radius: 12px; }
+        .amount { font-size: 26px; font-weight: 900; color: #003B70; margin: 8px 0; }
+        .divider { border-top: 1px dashed #9ca3af; margin: 14px 0 10px 0; }
+        .footer { font-size: 11px; color: #6b7280; line-height: 1.4; }
+      </style>
+    </head>
+    <body>
+      <div class="brand">🌶️ ร้านตำครกซิ่ง</div>
+      <div class="sub">TUMKROKZING RESTAURANT</div>
+      <div class="table-box">ใบแจ้งยอดชำระเงิน (โต๊ะ ${t.id})</div>
+      <div>วันที่: ${nowStr}</div>
+      <div class="amount">ยอดสุทธิ ฿${t.total.toLocaleString()}</div>
+      <div class="instruction">📱 สแกน QR ผ่าน Mobile Banking หรือ Stripe เพื่อชำระเงิน</div>
+      <img class="qr-img" src="${payQrDataUrl.value}" alt="QR Code" />
+      <div style="font-size: 11px; color: #4b5563; margin-top: 8px;">
+        ร้านตำครกซิ่ง | พร้อมเพย์: 081-234-5678
+      </div>
+      <div class="divider"></div>
+      <div class="footer">
+        สแกนผ่านแอปธนาคารทุกธนาคารเพื่อชำระเงินได้ทันที<br/>
+        ขอบคุณที่ใช้บริการครับ / ค่ะ
+      </div>
+      <script>
+        window.onload = function() {
+          setTimeout(function() { window.print(); }, 200);
+        };
+      <\/script>
+    </body>
+    </html>
+  `)
+  printWindow.document.close()
+}
+
+const confirmTablePaymentFromModal = async () => {
+  if (!selectedPayTable.value || isPaying.value) return
+  isPaying.value = true
+  const t = selectedPayTable.value
+
+  try {
+    const ordersRes = await axios.get(`${API_BASE}/orders`)
+    const allOrders = ordersRes.data || []
+    const activeOrders = allOrders.filter(o => 
+      (o.table_id === t.table_id || o.table?.table_number === t.id) &&
+      ['PENDING', 'COOKING', 'READY', 'PAID'].includes((o.status || '').toUpperCase())
+    )
+
+    for (const ord of activeOrders) {
+      await axios.post(`${API_BASE}/transactions/stripe/confirm-test/${ord.order_id}`).catch(() => {
+        return axios.patch(`${API_BASE}/orders/${ord.order_id}/status`, { status: 'COMPLETED' })
+      })
+    }
+
+    if (t.table_id) {
+      await axios.patch(`${API_BASE}/tables/${t.table_id}/status`, { status: 'AVAILABLE' }).catch(() => {})
+    }
+
+    alert(`ชำระเงินโต๊ะ ${t.id} สำเร็จเรียบร้อยแล้ว`)
+    isPaymentModalOpen.value = false
+    await fetchTablesData()
+  } catch (err) {
+    console.error('ชำระเงินไม่สำเร็จ:', err)
+    alert('เกิดข้อผิดพลาดในการชำระเงิน')
+  } finally {
+    isPaying.value = false
+  }
+}
 
 const openQrModal = async (table) => {
   selectedQrTable.value = table
@@ -379,8 +527,16 @@ const handleAddTable = async () => {
                 <span>{{ table.seats }}/{{ table.capacity }} ที่นั่ง</span>
               </div>
 
-              <!-- QR Code Quick Button & Total Amount -->
-              <div style="display: flex; align-items: center; gap: 8px;">
+              <!-- QR Code Quick Button, Payment Button & Total Amount -->
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <button
+                  v-if="table.total > 0"
+                  @click.stop="openPaymentModal(table)"
+                  style="padding: 3px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; background: #003B70; color: white; border: none; cursor: pointer; display: flex; align-items: center; gap: 3px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: background-color 0.2s;"
+                  title="พิมพ์ใบเรียกเก็บเงินและ QR ชำระเงิน"
+                >
+                  <span>🧾</span> จ่ายเงิน
+                </button>
                 <button
                   @click.stop="openQrModal(table)"
                   style="padding: 3px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; background: white; border: 1px solid #D1D5DB; color: #374151; cursor: pointer; display: flex; align-items: center; gap: 3px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); transition: background-color 0.2s;"
@@ -488,6 +644,52 @@ const handleAddTable = async () => {
         >
           🌐 ทดลองเปิดสั่งอาหารในแท็บใหม่
         </a>
+      </div>
+    </div>
+
+    <!-- Modal ชำระเงิน / เช็คบิล (PromptPay & Stripe Payment) -->
+    <div v-if="isPaymentModalOpen && selectedPayTable" style="position: fixed; inset: 0; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 65;">
+      <div style="background-color: white; border-radius: 24px; max-width: 400px; width: 100%; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px;">
+        <div style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="background: #003B70; color: white; padding: 2px 10px; border-radius: 9999px; font-weight: 800; font-size: 11px;">PromptPay</span>
+            <span style="background: #635bff; color: white; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 10px;">Stripe</span>
+          </div>
+          <button @click="isPaymentModalOpen = false" style="background: none; border: none; font-size: 20px; color: #9CA3AF; cursor: pointer; padding: 4px;">✕</button>
+        </div>
+
+        <div style="background: #FAF9F5; border: 1.5px solid #E5E7EB; border-radius: 12px; padding: 6px 18px; font-size: 18px; font-weight: 800; color: #1F2937;">
+          เช็คบิล โต๊ะ {{ selectedPayTable.id }}
+        </div>
+
+        <div style="font-size: 13px; color: #374151; font-weight: 600;">
+          ยอดสุทธิที่ต้องชำระ: <span style="font-size: 22px; font-weight: 900; color: #003B70;">฿{{ selectedPayTable.total.toLocaleString() }}</span>
+        </div>
+
+        <div style="padding: 10px; background: white; border-radius: 16px; border: 2px solid #003B70; box-shadow: 0 4px 12px rgba(0,59,112,0.1);">
+          <img :src="payQrDataUrl" :alt="`QR ชำระเงิน โต๊ะ ${selectedPayTable.id}`" style="width: 200px; height: 200px; display: block;" />
+        </div>
+
+        <div style="font-size: 11px; color: #4B5563; line-height: 1.3;">
+          ร้านตำครกซิ่ง (นายธีรวัฒน์ แสนคำเฮียง)<br/>
+          <span style="font-family: monospace; color: #003B70; font-weight: 700;">พร้อมเพย์: 081-234-5678</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-top: 6px;">
+          <button 
+            @click="printTablePaymentSlip"
+            style="padding: 10px; background-color: #003B70; color: white; border: none; border-radius: 12px; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);"
+          >
+            <span>🖨️</span> พิมพ์ใบแจ้งหนี้
+          </button>
+          <button 
+            @click="confirmTablePaymentFromModal"
+            :disabled="isPaying"
+            style="padding: 10px; background-color: #48785A; color: white; border: none; border-radius: 12px; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);"
+          >
+            <span>💳</span> {{ isPaying ? 'กำลังบันทึก...' : 'รับเงินสำเร็จ (ปิดบิล)' }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
