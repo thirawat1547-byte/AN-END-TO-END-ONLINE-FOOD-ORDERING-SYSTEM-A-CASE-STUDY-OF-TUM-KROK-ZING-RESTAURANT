@@ -140,9 +140,28 @@ export class TransactionsService {
       data: { payment_status: 'COMPLETED' },
     });
 
-    return this.prisma.order.update({
+    const updated = await this.prisma.order.update({
       where: { order_id: orderId },
       data: { status: 'PAID' },
     });
+
+    // ถ้าออเดอร์มีโต๊ะ ให้เช็คว่าเหลือออเดอร์อื่นค้างอยู่หรือไม่ ถ้าไม่เหลือให้ปรับโต๊ะเป็น AVAILABLE (ว่าง)
+    if (order.table_id) {
+      const remainingUnpaid = await this.prisma.order.count({
+        where: {
+          table_id: order.table_id,
+          status: { in: ['PENDING', 'COOKING', 'READY', 'SERVED'] },
+          order_id: { not: orderId },
+        },
+      });
+      if (remainingUnpaid === 0) {
+        await this.prisma.table.update({
+          where: { table_id: order.table_id },
+          data: { status: 'AVAILABLE' },
+        }).catch(() => {});
+      }
+    }
+
+    return updated;
   }
 }

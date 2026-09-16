@@ -133,13 +133,13 @@ const fetchTableDetail = async () => {
     const dbTables = tablesRes.data || []
     const allOrders = ordersRes.data || []
 
-    const currentParam = String(paramValue.value).trim()
-    const targetTable = dbTables.find(t => 
-      String(t.table_number).toUpperCase() === currentParam.toUpperCase() ||
-      String(t.table_id) === currentParam ||
-      `T-0${t.table_id}`.toUpperCase() === currentParam.toUpperCase() ||
-      `T-${t.table_id}`.toUpperCase() === currentParam.toUpperCase()
-    ) || dbTables[0]
+    const currentParam = String(paramValue.value || '').trim()
+    const cleanParam = currentParam.replace(/[\s_\-]/g, '').toUpperCase()
+    const targetTable = dbTables.find(t => {
+      const cleanNum = String(t.table_number || '').replace(/[\s_\-]/g, '').toUpperCase()
+      const cleanId = String(t.table_id || '').toUpperCase()
+      return cleanNum === cleanParam || cleanId === cleanParam || `T${cleanId}` === cleanParam || `T0${cleanId}` === cleanParam
+    }) || dbTables[0]
 
     if (targetTable) {
       tableData.value.id = targetTable.table_number || `T-0${targetTable.table_id}`
@@ -221,29 +221,58 @@ const changeCustomers = (delta) => {
   tableData.value.customers = Math.max(0, tableData.value.customers + delta)
 }
 
-const confirmPayment = async () => {
-  if (orders.value.length === 0) {
-    alert('โต๊ะนี้ยังไม่มีรายการอาหารค้างชำระครับ')
-    return
-  }
+const isPaying = ref(false)
 
-  if (confirm(`ยืนยันการชำระเงินโต๊ะ ${tableData.value.id} ยอดรวม ฿${netTotal.value.toLocaleString()}?`)) {
-    try {
-      for (const orderId of activeOrderIds.value) {
-        // ยืนยันการชำระเงินผ่าน Stripe Confirm Test API หรือปรับสถานะเป็น PAID
-        await axios.post(`${API_BASE}/transactions/stripe/confirm-test/${orderId}`).catch(() => {
-          return axios.patch(`${API_BASE}/orders/${orderId}/status`, { status: 'PAID' })
-        })
-      }
-      if (tableData.value.table_id) {
-        await axios.patch(`${API_BASE}/tables/${tableData.value.table_id}/status`, { status: 'AVAILABLE' }).catch(() => {})
-      }
-      alert(`ชำระเงินโต๊ะ ${tableData.value.id} สำเร็จเรียบร้อยแล้ว`)
-      router.push('/kitchen/tables')
-    } catch (err) {
-      console.error('ชำระเงินไม่สำเร็จ:', err)
-      alert('เกิดข้อผิดพลาดในการชำระเงิน')
+const confirmPayment = async () => {
+  if (isPaying.value) return
+  isPaying.value = true
+
+  try {
+    const targetTableId = tableData.value.table_id
+
+    // ดึงรายการออเดอร์ทั้งหมดเพื่อปิดบิลให้ครบถ้วน
+    const ordersRes = await axios.get(`${API_BASE}/orders`).catch(() => ({ data: [] }))
+    const allOrders = ordersRes.data || []
+
+    const currentParam = String(paramValue.value || '').trim()
+    const cleanParam = currentParam.replace(/[\s_\-]/g, '').toUpperCase()
+
+    const targetOrders = allOrders.filter(o => {
+      const matchId = targetTableId && (o.table_id === targetTableId || o.table?.table_id === targetTableId)
+      const matchNum = o.table?.table_number && (String(o.table.table_number).replace(/[\s_\-]/g, '').toUpperCase() === cleanParam)
+      return (matchId || matchNum) && (o.status || '').toUpperCase() !== 'CANCELLED'
+    })
+
+    const orderIdsToPay = targetOrders.length > 0 
+      ? targetOrders.map(o => o.order_id)
+      : activeOrderIds.value
+
+    for (const orderId of orderIdsToPay) {
+      // ปรับสถานะ Transaction เป็น COMPLETED และ Order เป็น PAID
+      await axios.post(`${API_BASE}/transactions/stripe/confirm-test/${orderId}`).catch(() => {
+        return axios.patch(`${API_BASE}/orders/${orderId}/status`, { status: 'PAID' })
+      })
     }
+
+    // ปรับสถานะโต๊ะเป็น AVAILABLE (ว่าง) เพื่อจบบริการ
+    if (targetTableId) {
+      await axios.patch(`${API_BASE}/tables/${targetTableId}/status`, { status: 'AVAILABLE' }).catch(() => {})
+    }
+
+    tableData.value.status = 'ว่าง (AVAILABLE)'
+    orders.value = []
+    activeOrderIds.value = []
+
+    // นำทางกลับหน้าผังโต๊ะอาหาร
+    router.push('/kitchen/manage')
+  } catch (err) {
+    console.error('ชำระเงินไม่สำเร็จ:', err)
+    if (tableData.value.table_id) {
+      await axios.patch(`${API_BASE}/tables/${tableData.value.table_id}/status`, { status: 'AVAILABLE' }).catch(() => {})
+    }
+    router.push('/kitchen/manage')
+  } finally {
+    isPaying.value = false
   }
 }
 
@@ -361,14 +390,17 @@ const forceClear = async () => {
   if (confirm(`ยืนยันการบังคับปิดโต๊ะ ${tableData.value.id}? ออเดอร์ของโต๊ะนี้จะถูกเสร็จสิ้น`)) {
     try {
       for (const orderId of activeOrderIds.value) {
-        await axios.patch(`${API_BASE}/orders/${orderId}/status`, { status: 'PAID' })
+        await axios.patch(`${API_BASE}/orders/${orderId}/status`, { status: 'PAID' }).catch(() => {})
       }
       if (tableData.value.table_id) {
         await axios.patch(`${API_BASE}/tables/${tableData.value.table_id}/status`, { status: 'AVAILABLE' }).catch(() => {})
       }
-      router.push('/kitchen/tables')
+      tableData.value.status = 'ว่าง (AVAILABLE)'
+      orders.value = []
+      activeOrderIds.value = []
+      router.push('/kitchen/manage')
     } catch (e) {
-      router.push('/kitchen/tables')
+      router.push('/kitchen/manage')
     }
   }
 }
@@ -668,21 +700,22 @@ const goBack = () => {
                     <span style="font-family: monospace; color: #003B70; font-weight: 700;">พร้อมเพย์: {{ promptpayNumber }}</span>
                   </div>
 
-                  <div style="display: grid; grid-template-columns: 1fr; gap: 8px; width: 100%; margin-top: 12px;">
+                  <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 14px;">
+                    <button 
+                      @click="confirmPayment"
+                      :disabled="isPaying"
+                      type="button"
+                      style="width: 100%; padding: 13px 16px; background-color: #336846; border: none; border-radius: 12px; font-size: 14px; font-weight: 700; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 2px 6px rgba(51,104,70,0.3); transition: all 0.2s;"
+                    >
+                      <span>💳</span> {{ isPaying ? 'กำลังบันทึกชำระเงิน...' : 'ยืนยันรับเงิน & ปิดโต๊ะ (จบบริการ)' }}
+                    </button>
                     <button 
                       @click="printPaymentBillSlip"
                       type="button"
-                      style="padding: 10px 8px; background-color: #003B70; border: none; border-radius: 10px; font-size: 12px; font-weight: 700; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: background-color 0.2s;"
+                      style="width: 100%; padding: 10px 8px; background-color: #003B70; border: none; border-radius: 10px; font-size: 12px; font-weight: 700; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: background-color 0.2s;"
                       title="พิมพ์ใบเรียกเก็บเงินพร้อม QR ให้ลูกค้านำไปสแกนจ่าย"
                     >
                       <span>🖨️</span> พิมพ์ใบแจ้งหนี้ / QR จ่ายเงิน
-                    </button>
-                    <button 
-                      @click="confirmPayment"
-                      type="button"
-                      style="padding: 9px 8px; background-color: white; border: 1.5px solid #48785A; border-radius: 10px; font-size: 12px; font-weight: 700; color: #48785A; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: background-color 0.2s;"
-                    >
-                      <span>💳</span> ยืนยันรับเงิน (ปิดบิล)
                     </button>
                   </div>
                 </div>
@@ -735,11 +768,11 @@ const goBack = () => {
 
               <!-- Print Action Button at Bottom -->
               <button 
-                @click="qrTab === 'payment' ? printPaymentBillSlip() : printQrSlip()"
-                :style="qrTab === 'payment' ? 'background-color: #003B70;' : 'background-color: #48785A;'"
-                style="width: 100%; padding: 12px; color: white; font-weight: 700; font-size: 13px; border-radius: 12px; border: none; cursor: pointer; transition: background-color 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 16px; display: flex; align-items: center; justify-content: center; gap: 8px;"
+                v-if="qrTab === 'order'"
+                @click="printQrSlip"
+                style="background-color: #48785A; width: 100%; padding: 12px; color: white; font-weight: 700; font-size: 13px; border-radius: 12px; border: none; cursor: pointer; transition: background-color 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 16px; display: flex; align-items: center; justify-content: center; gap: 8px;"
               >
-                <span>{{ qrTab === 'payment' ? '🧾 พิมพ์ใบแจ้งหนี้ / QR จ่ายเงิน' : '🖨️ พิมพ์ใบเปิดโต๊ะ / QR สั่งอาหาร' }}</span>
+                <span>🖨️ พิมพ์ใบเปิดโต๊ะ / QR สั่งอาหาร</span>
               </button>
 
             </div>
