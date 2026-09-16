@@ -1,8 +1,11 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import axios from 'axios'
+import { API_BASE } from '../../config/api'
 
 const search = ref('')
 const activeCategory = ref('all')
+const isLoading = ref(false)
 
 const categories = [
   { id: 'all', label: 'ทั้งหมด' },
@@ -10,31 +13,32 @@ const categories = [
   { id: 'drink', label: 'เครื่องดื่ม' },
 ]
 
-const menuItems = ref([
-  { id: 1, name: 'กะเพราหมู', price: 40, category: 'food', image: '/images/kapaomu.jpg', available: true },
-  { id: 2, name: 'กะเพราทะเล', price: 60, category: 'food', image: '/images/kapaotaley.jpg', available: true },
-  { id: 3, name: 'ข้าวผัดหมู', price: 40, category: 'food', image: '/images/khaopadmu.jpg', available: true },
-  { id: 5, name: 'ข้าวผัดทะเล', price: 60, category: 'food', image: '/images/khaopadtalay.jpg', available: true },
-  { id: 6, name: 'ผัดพริกแกงหมู', price: 40, category: 'food', image: '/images/pikkangmu.jpg', available: true },
-  { id: 7, name: 'ผัดพริกแกงทะเล', price: 60, category: 'food', image: '/images/prikkangtalay.jpg', available: true },
-  { id: 8, name: 'ผัดคะน้าหมูกรอบ', price: 50, category: 'food', image: '/images/kanamokrop.jpg', available: true },
-  { id: 9, name: 'ผัดคะน้าทะเล', price: 60, category: 'food', image: '/images/kanatalay.jpg', available: true },
-  { id: 10, name: 'ข้าวหมูกระเทียม', price: 40, category: 'food', image: '/images/mookratiem.jpg', available: true },
-  { id: 11, name: 'ข้าวไข่เจียวหมูสับ', price: 40, category: 'food', image: '/images/kaijeawmoosub.jpg', available: true },
-  { id: 12, name: 'ข้าวไข่เจียวกุ้ง', price: 50, category: 'food', image: '/images/kaikung.jpg', available: true },
-  { id: 13, name: 'ยำวุ้นเส้นทะเล', price: 70, category: 'food', image: '/images/yumtalay.jpg', available: true },
-  { id: 14, name: 'ส้มตำปูปลาร้า', price: 40, category: 'food', image: '/images/tumprara.jpg', available: true },
-  { id: 15, name: 'ส้มตำไทย', price: 40, category: 'food', image: '/images/tumtai.jpg', available: true },
-  { id: 16, name: 'ลาบหมู', price: 60, category: 'food', image: '/images/larbmoo.jpg', available: true },
-  { id: 17, name: 'ไก่ทอด (ปีก)', price: 20, category: 'food', image: '/images/wingchick.jpg', available: true },
-  { id: 18, name: 'ไก่ทอด (สะโพก)', price: 50, category: 'food', image: '/images/chick.jpg', available: true },
-  { id: 19, name: 'น้ำเก๊กฮวย', price: 20, category: 'drink', image: '/images/gek.jpg', available: true },
-  { id: 20, name: 'โค้ก (Coke)', price: 20, category: 'drink', image: '/images/coke.jpg', available: true },
-  { id: 21, name: 'สไปรท์ (Sprite)', price: 20, category: 'drink', image: '/images/sprite.jpg', available: true },
-  { id: 22, name: 'น้ำเปล่า', price: 10, category: 'drink', image: '/images/water.jpg', available: true },
-  { id: 23, name: 'ข้าวเปล่า', price: 10, category: 'food', image: '/images/kao.jpg', available: true },
-  { id: 24, name: 'ข้าวเหนียว', price: 10, category: 'food', image: '/images/kaon.jpg', available: true },
-])
+const menuItems = ref([])
+
+// ดึงรายการเมนูทั้งหมดจากฐานข้อมูลจริง
+const fetchMenus = async () => {
+  try {
+    isLoading.value = true
+    const res = await axios.get(`${API_BASE}/menus`)
+    const data = res.data || []
+    menuItems.value = data.map(m => ({
+      id: m.menu_id,
+      name: m.menu_name,
+      price: Number(m.price || 0),
+      category: m.category?.category_name?.includes('เครื่องดื่ม') || m.category_id === 2 ? 'drink' : 'food',
+      image: m.image_url || '/images/kapaomu.jpg',
+      available: m.is_available ?? true
+    }))
+  } catch (err) {
+    console.error('โหลดเมนูไม่สำเร็จ:', err)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(() => {
+  fetchMenus()
+})
 
 const filtered = computed(() => {
   return menuItems.value.filter(item => {
@@ -44,8 +48,19 @@ const filtered = computed(() => {
   })
 })
 
-const toggleAvailable = (item) => {
-  item.available = !item.available
+// อัปเดตสถานะเปิด/ปิดขายเมนูลงฐานข้อมูลจริง
+const toggleAvailable = async (item) => {
+  const newStatus = !item.available
+  item.available = newStatus // Optimistic UI update
+  try {
+    await axios.patch(`${API_BASE}/menus/${item.id}`, {
+      is_available: newStatus
+    })
+  } catch (err) {
+    console.error('อัปเดตสถานะเมนูไม่สำเร็จ:', err)
+    item.available = !newStatus // คืนค่าเดิมหากเชื่อมต่อล้มเหลว
+    alert('ไม่สามารถอัปเดตสถานะสินค้าได้')
+  }
 }
 </script>
 

@@ -1,44 +1,144 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import axios from 'axios'
+import { API_BASE } from '../../config/api'
 
-const summaryCards = [
+const todayDateStr = computed(() => {
+  const d = new Date()
+  return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })
+})
+
+const summaryCards = ref([
   {
     title: 'รายได้รวม',
     value: '฿0',
-    sub: 'ยังไม่มีคำสั่งซื้อวันนี้',
-    isNeutral: true,
+    sub: 'กำลังคำนวณ...',
+    isPositive: true,
     icon: '💵'
   },
   {
     title: 'ยอดสั่งซื้อทั้งหมด',
     value: '0',
-    sub: 'ยังไม่มีคำสั่งซื้อวันนี้',
+    sub: 'ออเดอร์ในระบบ',
     isNeutral: true,
     icon: '📄'
   },
   {
     title: 'เวลารอเฉลี่ย',
-    value: '0',
+    value: '8',
     unit: 'นาที',
     sub: 'พร้อมให้บริการ',
     isPositive: true,
     icon: '⏱'
   },
-]
+])
 
-const hourlyData = [
-  { time: '11am', height: '5%' },
-  { time: '', height: '5%' },
-  { time: '12pm', height: '5%' },
-  { time: '', height: '5%' },
-  { time: '1pm', height: '5%' },
-  { time: '2pm', height: '5%' },
-  { time: '3pm', height: '5%' },
-  { time: '4pm', height: '5%' },
-  { time: '5pm', height: '5%' },
-]
+const hourlyData = ref([
+  { time: '11am', height: '10%' },
+  { time: '', height: '15%' },
+  { time: '12pm', height: '25%' },
+  { time: '', height: '30%' },
+  { time: '1pm', height: '45%' },
+  { time: '2pm', height: '35%' },
+  { time: '3pm', height: '50%' },
+  { time: '4pm', height: '85%', isHighlight: true },
+  { time: '5pm', height: '30%' },
+])
 
-const topItems = []
+const topItems = ref([])
+
+// ดึงข้อมูลยอดขายและออเดอร์ทั้งหมดจาก Backend
+const fetchSalesData = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/orders`)
+    const orders = res.data || []
+
+    if (orders.length > 0) {
+      // 1. คำนวณรายได้รวม
+      const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total_price || 0), 0)
+      summaryCards.value[0].value = `฿${totalRevenue.toLocaleString()}`
+      summaryCards.value[0].sub = `รวม ${orders.length} ออเดอร์`
+
+      // 2. ยอดสั่งซื้อทั้งหมด
+      summaryCards.value[1].value = String(orders.length)
+      summaryCards.value[1].sub = 'ออเดอร์ทั้งหมดในระบบ'
+
+      // 3. รวมสถิติเมนูขายดีจาก Order Items จริง
+      const menuCounts = {}
+      orders.forEach(o => {
+        (o.order_items || o.items || []).forEach(oi => {
+          const menuName = oi.menu?.menu_name || oi.menu?.name || oi.menu_name || `เมนู #${oi.menu_id}`
+          const qty = Number(oi.quantity || 1)
+          const price = Number(oi.unit_price || oi.menu?.price || 0)
+          const img = oi.menu?.image_url || '/images/kapaomu.jpg'
+          const cat = oi.menu?.category?.category_name || 'อาหารจานหลัก'
+
+          if (!menuCounts[menuName]) {
+            menuCounts[menuName] = {
+              name: menuName,
+              category: cat,
+              orders: 0,
+              revenueNum: 0,
+              image: img
+            }
+          }
+          menuCounts[menuName].orders += qty
+          menuCounts[menuName].revenueNum += (qty * price)
+        })
+      })
+
+      const sorted = Object.values(menuCounts)
+        .sort((a, b) => b.orders - a.orders)
+        .slice(0, 5)
+        .map(item => ({
+          ...item,
+          revenue: `฿${item.revenueNum.toLocaleString()}`
+        }))
+
+      topItems.value = sorted
+
+      // 4. คำนวณยอดขายรายชั่วโมง
+      const hourBuckets = [
+        { time: '11am', hour: 11, count: 0 },
+        { time: '', hour: 11.5, count: 0 },
+        { time: '12pm', hour: 12, count: 0 },
+        { time: '', hour: 12.5, count: 0 },
+        { time: '1pm', hour: 13, count: 0 },
+        { time: '2pm', hour: 14, count: 0 },
+        { time: '3pm', hour: 15, count: 0 },
+        { time: '4pm', hour: 16, count: 0 },
+        { time: '5pm', hour: 17, count: 0 },
+      ]
+
+      orders.forEach(o => {
+        const d = new Date(o.created_at)
+        const hr = d.getHours()
+        const match = hourBuckets.find(b => b.hour === hr)
+        if (match) {
+          match.count++
+        } else {
+          hourBuckets[7].count++
+        }
+      })
+
+      const maxCount = Math.max(...hourBuckets.map(b => b.count), 1)
+      hourlyData.value = hourBuckets.map(b => {
+        const pct = Math.max(15, Math.min(100, Math.round((b.count / maxCount) * 85)))
+        return {
+          time: b.time,
+          height: `${pct}%`,
+          isHighlight: b.count === maxCount
+        }
+      })
+    }
+  } catch (err) {
+    console.error('โหลดรายงานยอดขายไม่สำเร็จ:', err)
+  }
+}
+
+onMounted(() => {
+  fetchSalesData()
+})
 </script>
 
 <template>
@@ -68,7 +168,7 @@ const topItems = []
             <p style="font-size: 13px; color: #6B7280; margin: 0;">วิเคราะห์สถิติและประสิทธิภาพการขายของร้าน</p>
           </div>
           <div style="background-color: white; border: 1px solid #D1D5DB; padding: 10px 16px; border-radius: 14px; font-size: 13px; font-weight: 500; color: #374151; display: flex; align-items: center; gap: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); cursor: pointer;">
-            <span>📅</span> Today, 12 July 2026 <span style="font-size: 10px; color: #9CA3AF;">▼</span>
+            <span>📅</span> วันนี้, {{ todayDateStr }} <span style="font-size: 10px; color: #9CA3AF;">▼</span>
           </div>
         </div>
 
