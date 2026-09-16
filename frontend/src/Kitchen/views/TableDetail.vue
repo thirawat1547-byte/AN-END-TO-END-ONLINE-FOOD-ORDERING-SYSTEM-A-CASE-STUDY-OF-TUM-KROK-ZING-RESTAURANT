@@ -148,10 +148,10 @@ const fetchTableDetail = async () => {
       // สร้าง QR Code ตามโต๊ะ
       await generateQr()
 
-      // ค้นหาออเดอร์ที่ยังดำเนินอยู่ของโต๊ะนี้ (PENDING, COOKING, READY, PAID)
+      // ค้นหาออเดอร์ที่ยังดำเนินอยู่ของโต๊ะนี้ (PENDING, COOKING, READY, SERVED)
       const tableOrders = allOrders.filter(o => 
         (o.table_id === targetTable.table_id || o.table?.table_number === targetTable.table_number) &&
-        ['PENDING', 'COOKING', 'READY', 'PAID'].includes((o.status || '').toUpperCase())
+        ['PENDING', 'COOKING', 'READY', 'SERVED'].includes((o.status || '').toUpperCase())
       )
 
       activeOrderIds.value = tableOrders.map(o => o.order_id)
@@ -184,7 +184,7 @@ const fetchTableDetail = async () => {
               qty: Number(oi.quantity),
               price: Number(oi.unit_price || oi.menu?.price || 0),
               note: noteStr || '-',
-              status: ['READY', 'SERVED'].includes((ord.status || '').toUpperCase()) ? 'served' : 'cooking'
+              status: ['READY', 'SERVED', 'COMPLETED'].includes((ord.status || '').toUpperCase()) ? 'served' : 'cooking'
             })
           })
         })
@@ -230,9 +230,9 @@ const confirmPayment = async () => {
   if (confirm(`ยืนยันการชำระเงินโต๊ะ ${tableData.value.id} ยอดรวม ฿${netTotal.value.toLocaleString()}?`)) {
     try {
       for (const orderId of activeOrderIds.value) {
-        // ยืนยันการชำระเงินผ่าน Stripe Confirm Test API
+        // ยืนยันการชำระเงินผ่าน Stripe Confirm Test API หรือปรับสถานะเป็น PAID
         await axios.post(`${API_BASE}/transactions/stripe/confirm-test/${orderId}`).catch(() => {
-          return axios.patch(`${API_BASE}/orders/${orderId}/status`, { status: 'COMPLETED' })
+          return axios.patch(`${API_BASE}/orders/${orderId}/status`, { status: 'PAID' })
         })
       }
       if (tableData.value.table_id) {
@@ -361,7 +361,7 @@ const forceClear = async () => {
   if (confirm(`ยืนยันการบังคับปิดโต๊ะ ${tableData.value.id}? ออเดอร์ของโต๊ะนี้จะถูกเสร็จสิ้น`)) {
     try {
       for (const orderId of activeOrderIds.value) {
-        await axios.patch(`${API_BASE}/orders/${orderId}/status`, { status: 'COMPLETED' })
+        await axios.patch(`${API_BASE}/orders/${orderId}/status`, { status: 'PAID' })
       }
       if (tableData.value.table_id) {
         await axios.patch(`${API_BASE}/tables/${tableData.value.table_id}/status`, { status: 'AVAILABLE' }).catch(() => {})

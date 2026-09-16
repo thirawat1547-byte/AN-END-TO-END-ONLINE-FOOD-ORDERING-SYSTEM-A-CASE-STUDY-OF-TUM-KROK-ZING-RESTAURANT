@@ -78,9 +78,10 @@ const fetchOrders = async () => {
 
     allOrders.forEach((o) => {
       const formatted = formatOrder(o)
-      if (['COMPLETED', 'READY'].includes(o.status)) {
+      const st = (o.status || '').toUpperCase()
+      if (['SERVED', 'READY', 'COMPLETED'].includes(st)) {
         completed.push(formatted)
-      } else if (['PENDING', 'COOKING', 'PAID'].includes(o.status)) {
+      } else if (['PENDING', 'COOKING'].includes(st)) {
         incoming.push(formatted)
       }
     })
@@ -92,11 +93,11 @@ const fetchOrders = async () => {
   }
 }
 
-// 2. ปรับสถานะเป็นทำเสร็จแล้ว (Serve / Ready)
+// 2. ปรับสถานะเป็นเสิร์ฟแล้ว (Serve) -> ครัวปรุงเสร็จและนำไปเสิร์ฟที่โต๊ะ
 const serveOrder = async (orderId) => {
   try {
     await axios.patch(`${API_BASE}/orders/${orderId}/status`, {
-      status: 'COMPLETED'
+      status: 'SERVED'
     })
     await fetchOrders()
   } catch (err) {

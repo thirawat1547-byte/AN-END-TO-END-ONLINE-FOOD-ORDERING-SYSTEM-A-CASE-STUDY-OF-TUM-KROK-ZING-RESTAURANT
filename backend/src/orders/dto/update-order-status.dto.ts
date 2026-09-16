@@ -5,11 +5,11 @@ import { IsIn, IsNotEmpty, IsString } from 'class-validator';
 export class UpdateOrderStatusDto {
   @ApiProperty({
     example: 'COOKING',
-    enum: ['PENDING', 'COOKING', 'READY', 'COMPLETED', 'CANCELLED'],
+    enum: ['PENDING', 'COOKING', 'READY', 'SERVED', 'COMPLETED', 'PAID', 'CANCELLED'],
     description: 'สถานะใหม่ของออร์เดอร์',
   })
   @IsString()
   @IsNotEmpty()
-  @IsIn(['PENDING', 'COOKING', 'READY', 'COMPLETED', 'CANCELLED'])
+  @IsIn(['PENDING', 'COOKING', 'READY', 'SERVED', 'COMPLETED', 'PAID', 'CANCELLED'])
   status: string;
 }

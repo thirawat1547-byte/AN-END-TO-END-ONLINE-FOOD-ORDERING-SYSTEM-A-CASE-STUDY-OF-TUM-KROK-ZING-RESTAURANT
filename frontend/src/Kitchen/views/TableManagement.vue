@@ -45,7 +45,7 @@ const fetchTablesData = async () => {
         const matchesTableId = o.table_id === t.table_id || o.table?.table_id === t.table_id
         const matchesTableNum = o.table?.table_number === t.table_number || (typeof o.table === 'string' && o.table === t.table_number)
         const isTableOrder = matchesTableId || matchesTableNum
-        const isActiveStatus = ['PENDING', 'COOKING', 'READY', 'PAID'].includes((o.status || '').toUpperCase())
+        const isActiveStatus = ['PENDING', 'COOKING', 'READY', 'SERVED'].includes((o.status || '').toUpperCase())
         return isTableOrder && isActiveStatus
       })
 
@@ -233,12 +233,12 @@ const confirmTablePaymentFromModal = async () => {
     const allOrders = ordersRes.data || []
     const activeOrders = allOrders.filter(o => 
       (o.table_id === t.table_id || o.table?.table_number === t.id) &&
-      ['PENDING', 'COOKING', 'READY', 'PAID'].includes((o.status || '').toUpperCase())
+      ['PENDING', 'COOKING', 'READY', 'SERVED'].includes((o.status || '').toUpperCase())
     )
 
     for (const ord of activeOrders) {
       await axios.post(`${API_BASE}/transactions/stripe/confirm-test/${ord.order_id}`).catch(() => {
-        return axios.patch(`${API_BASE}/orders/${ord.order_id}/status`, { status: 'COMPLETED' })
+        return axios.patch(`${API_BASE}/orders/${ord.order_id}/status`, { status: 'PAID' })
       })
     }
 

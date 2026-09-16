@@ -146,28 +146,31 @@ export class OrdersService {
       data: { status: updateOrderStatusDto.status },
     });
 
-    // ถ้าออเดอร์เสร็จสิ้น (COMPLETED/CANCELLED) และมีโต๊ะ ให้เช็คว่าเหลือออเดอร์อื่นค้างอยู่หรือไม่
+    // สำคัญ: การเปลี่ยนสถานะออเดอร์ในครัว (COOKING, READY, SERVED)
+    // อาหารถูกปรุงและเสิร์ฟให้ลูกค้าแล้ว แต่ลูกค้ายังนั่งทานและยังไม่ได้เช็คบิล/ชำระเงิน
+    // ดังนั้น โต๊ะจะต้องคงสถานะ 'OCCUPIED' เสมอ ห้ามปรับเป็น 'AVAILABLE'
+    // โต๊ะจะกลายเป็น 'AVAILABLE' (ว่าง) ก็ต่อเมื่อมีการชำระเงินเรียบร้อย (PAID) หรือยกเลิก (CANCELLED)
     if (order.table_id) {
       const statusUpper = updateOrderStatusDto.status.toUpperCase();
-      if (['COMPLETED', 'CANCELLED'].includes(statusUpper)) {
-        const remaining = await this.prisma.order.count({
+      if (['PENDING', 'COOKING', 'READY', 'SERVED'].includes(statusUpper)) {
+        await this.prisma.table.update({
+          where: { table_id: order.table_id },
+          data: { status: 'OCCUPIED' },
+        }).catch(() => {});
+      } else if (['PAID', 'CANCELLED'].includes(statusUpper)) {
+        const remainingUnpaid = await this.prisma.order.count({
           where: {
             table_id: order.table_id,
-            status: { in: ['PENDING', 'COOKING', 'READY', 'PAID'] },
+            status: { in: ['PENDING', 'COOKING', 'READY', 'SERVED'] },
             order_id: { not: id },
           },
         });
-        if (remaining === 0) {
+        if (remainingUnpaid === 0) {
           await this.prisma.table.update({
             where: { table_id: order.table_id },
             data: { status: 'AVAILABLE' },
           }).catch(() => {});
         }
-      } else if (['PENDING', 'COOKING', 'READY', 'PAID'].includes(statusUpper)) {
-        await this.prisma.table.update({
-          where: { table_id: order.table_id },
-          data: { status: 'OCCUPIED' },
-        }).catch(() => {});
       }
     }
 
