@@ -72,8 +72,9 @@ const placeOrder = async () => {
     const token = localStorage.getItem('access_token')
     const headers = token ? { Authorization: `Bearer ${token}` } : {}
 
+    const parsedTableId = Number(String(tableId).replace(/\D/g, '')) || 1
     const orderPayload = {
-      table_id: Number(tableId) || 1,
+      table_id: parsedTableId,
       order_type: 'DINE_IN',
       items: cart.value.map(item => {
         const notesList = []

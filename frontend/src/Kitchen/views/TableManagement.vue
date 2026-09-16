@@ -101,6 +101,145 @@ const goToTableDetail = (tableId) => {
   router.push(`/kitchen/tables/${tableId}`)
 }
 
+import QRCode from 'qrcode'
+
+// ข้อมูลสำหรับ Modal แสดง QR โต๊ะเดี่ยว
+const selectedQrTable = ref(null)
+const selectedQrUrl = ref('')
+const selectedQrDataUrl = ref('')
+const isQrModalOpen = ref(false)
+
+const openQrModal = async (table) => {
+  selectedQrTable.value = table
+  const numId = table.table_id || Number(String(table.id).replace(/\D/g, '')) || 1
+  selectedQrUrl.value = `${window.location.origin}/table/${numId}`
+  try {
+    selectedQrDataUrl.value = await QRCode.toDataURL(selectedQrUrl.value, {
+      width: 260,
+      margin: 2,
+      color: { dark: '#1B3828', light: '#FFFFFF' }
+    })
+    isQrModalOpen.value = true
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+const printSingleQr = () => {
+  if (!selectedQrTable.value) return
+  const printWindow = window.open('', '_blank', 'width=450,height=640')
+  if (!printWindow) return
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8" />
+      <title>QR สั่งอาหาร - โต๊ะ ${selectedQrTable.value.id}</title>
+      <style>
+        @page { size: 80mm auto; margin: 4mm; }
+        body { font-family: 'Sarabun', 'Prompt', sans-serif; text-align: center; padding: 16px 12px; margin: 0; color: #111827; background: #fff; }
+        .brand { font-size: 22px; font-weight: 800; color: #336846; }
+        .sub { font-size: 11px; color: #6b7280; text-transform: uppercase; margin-top: 2px; }
+        .table-box { border: 2px solid #111827; background: #f9fafb; border-radius: 12px; padding: 8px 18px; display: inline-block; font-size: 26px; font-weight: 900; margin: 12px 0 6px 0; }
+        .instruction { font-size: 13px; font-weight: 700; color: #374151; margin-bottom: 8px; }
+        .qr-img { width: 220px; height: 220px; display: block; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; }
+        .url-text { font-size: 11px; color: #6b7280; word-break: break-all; margin-top: 8px; font-family: monospace; }
+        .divider { border-top: 1px dashed #9ca3af; margin: 14px 0 10px 0; }
+        .footer { font-size: 11px; color: #6b7280; line-height: 1.4; }
+      </style>
+    </head>
+    <body>
+      <div class="brand">🌶️ ร้านตำครกซิ่ง</div>
+      <div class="sub">TUMKROKZING RESTAURANT</div>
+      <div class="table-box">โต๊ะ ${selectedQrTable.value.id}</div>
+      <div class="instruction">📱 สแกน QR Code เพื่อสั่งอาหาร</div>
+      <img class="qr-img" src="${selectedQrDataUrl.value}" alt="QR Code" />
+      <div class="url-text">${selectedQrUrl.value}</div>
+      <div class="divider"></div>
+      <div class="footer">
+        สแกนผ่านกล้องโทรศัพท์ หรือ LINE เพื่อเลือกเมนูสั่งอาหารได้ทันที<br/>
+        ขอบคุณที่ใช้บริการครับ / ค่ะ
+      </div>
+      <script>
+        window.onload = function() {
+          setTimeout(function() { window.print(); }, 200);
+        };
+      <\/script>
+    </body>
+    </html>
+  `)
+  printWindow.document.close()
+}
+
+const printAllTablesQr = async () => {
+  const qrItems = []
+  for (const t of tables.value) {
+    const numId = t.table_id || Number(String(t.id).replace(/\D/g, '')) || 1
+    const url = `${window.location.origin}/table/${numId}`
+    const dataUrl = await QRCode.toDataURL(url, { width: 200, margin: 2, color: { dark: '#1B3828', light: '#FFFFFF' } })
+    qrItems.push({ id: t.id, url, dataUrl })
+  }
+
+  const printWindow = window.open('', '_blank', 'width=900,height=700')
+  if (!printWindow) return
+
+  const cardsHtml = qrItems.map(item => `
+    <div style="border: 2px dashed #336846; border-radius: 16px; padding: 14px; text-align: center; background: white; page-break-inside: avoid; break-inside: avoid;">
+      <div style="font-size: 18px; font-weight: 800; color: #336846;">🌶️ ร้านตำครกซิ่ง</div>
+      <div style="font-size: 10px; color: #6b7280; text-transform: uppercase;">TUMKROKZING</div>
+      <div style="border: 2px solid #111827; background: #f9fafb; border-radius: 10px; padding: 4px 12px; display: inline-block; font-size: 20px; font-weight: 900; margin: 6px 0;">
+        โต๊ะ ${item.id}
+      </div>
+      <div style="font-size: 11px; font-weight: bold; color: #374151; margin-bottom: 4px;">📱 สแกนสั่งอาหาร</div>
+      <img src="${item.dataUrl}" style="width: 150px; height: 150px; display: block; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 6px;" />
+      <div style="font-size: 10px; color: #6b7280; font-family: monospace; margin-top: 4px;">${item.url}</div>
+    </div>
+  `).join('')
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8" />
+      <title>พิมพ์ QR Code ทุกโต๊ะ - ร้านตำครกซิ่ง</title>
+      <style>
+        @page { size: A4 portrait; margin: 8mm; }
+        body { font-family: 'Sarabun', 'Prompt', sans-serif; margin: 0; padding: 8px; background: #fff; }
+        .grid-container {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 14px;
+        }
+      </style>
+    </head>
+    <body>
+      <div style="text-align: center; margin-bottom: 12px;">
+        <h2 style="margin: 0; color: #336846;">ใบ QR Code สำหรับตั้งโต๊ะอาหาร (ร้านตำครกซิ่ง)</h2>
+        <p style="margin: 2px 0 0 0; font-size: 12px; color: #6b7280;">พิมพ์ ตัดตามรอยประ และนำไปวางใส่ป้ายอะคริลิคประจำแต่ละโต๊ะ</p>
+      </div>
+      <div class="grid-container">
+        ${cardsHtml}
+      </div>
+      <script>
+        window.onload = function() {
+          setTimeout(function() { window.print(); }, 300);
+        };
+      <\/script>
+    </body>
+    </html>
+  `)
+  printWindow.document.close()
+}
+
+const copySingleLink = async () => {
+  try {
+    await navigator.clipboard.writeText(selectedQrUrl.value)
+    alert(`คัดลอกลิงก์สำเร็จ:\n${selectedQrUrl.value}`)
+  } catch (e) {
+    prompt('ลิงก์สั่งอาหารโต๊ะนี้:', selectedQrUrl.value)
+  }
+}
+
 // ฟังก์ชั่นเพิ่มโต๊ะใหม่
 const handleAddTable = async () => {
   if (!newTable.value.id.trim()) return
@@ -187,13 +326,24 @@ const handleAddTable = async () => {
             </button>
           </div>
 
-          <!-- ปุ่มเพิ่มโต๊ะใหม่ -->
-          <button 
-            @click="isAddModalOpen = true"
-            style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; background-color: white; border: 1px solid #D1D5DB; border-radius: 12px; font-size: 12px; font-weight: 600; color: #1F2937; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.02); transition: background-color 0.2s;"
-          >
-            <span style="font-size: 14px; font-weight: bold;">+</span> เพิ่มโต๊ะใหม่
-          </button>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <!-- ปุ่มพิมพ์ QR ทุกโต๊ะ -->
+            <button 
+              @click="printAllTablesQr"
+              style="display: flex; align-items: center; gap: 6px; padding: 8px 14px; background-color: #336846; color: white; border: none; border-radius: 12px; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: background-color 0.2s;"
+              title="พิมพ์ QR Code ใบตั้งโต๊ะสำหรับทั้ง 5 โต๊ะพร้อมกัน"
+            >
+              <span>🖨️</span> พิมพ์ QR ทุกโต๊ะ
+            </button>
+
+            <!-- ปุ่มเพิ่มโต๊ะใหม่ -->
+            <button 
+              @click="isAddModalOpen = true"
+              style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; background-color: white; border: 1px solid #D1D5DB; border-radius: 12px; font-size: 12px; font-weight: 600; color: #1F2937; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.02); transition: background-color 0.2s;"
+            >
+              <span style="font-size: 14px; font-weight: bold;">+</span> เพิ่มโต๊ะใหม่
+            </button>
+          </div>
         </div>
 
         <!-- Tables Grid -->
@@ -219,7 +369,7 @@ const handleAddTable = async () => {
               </span>
             </div>
 
-            <!-- Card Bottom Row (Seats & Total Price) -->
+            <!-- Card Bottom Row (Seats, QR Button & Total Price) -->
             <div style="display: flex; align-items: flex-end; justify-content: space-between; font-size: 13px;">
               <!-- Seats Info -->
               <div style="display: flex; align-items: center; gap: 6px; color: #6B7280; font-weight: 500;">
@@ -229,9 +379,18 @@ const handleAddTable = async () => {
                 <span>{{ table.seats }}/{{ table.capacity }} ที่นั่ง</span>
               </div>
 
-              <!-- Total Amount -->
-              <div style="font-weight: 700; font-size: 15px;" :style="table.total > 0 ? 'color: #2563EB;' : 'color: #9CA3AF;'">
-                ฿{{ table.total.toLocaleString() }}
+              <!-- QR Code Quick Button & Total Amount -->
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <button
+                  @click.stop="openQrModal(table)"
+                  style="padding: 3px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; background: white; border: 1px solid #D1D5DB; color: #374151; cursor: pointer; display: flex; align-items: center; gap: 3px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); transition: background-color 0.2s;"
+                  title="ดู QR Code สำหรับสแกนสั่งอาหารของโต๊ะนี้"
+                >
+                  <span>📱</span> QR
+                </button>
+                <div style="font-weight: 700; font-size: 15px;" :style="table.total > 0 ? 'color: #2563EB;' : 'color: #9CA3AF;'">
+                  ฿{{ table.total.toLocaleString() }}
+                </div>
               </div>
             </div>
           </div>
@@ -280,6 +439,55 @@ const handleAddTable = async () => {
             บันทึก
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- Modal แสดง QR Code สั่งอาหารประจำโต๊ะ -->
+    <div v-if="isQrModalOpen && selectedQrTable" style="position: fixed; inset: 0; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 60;">
+      <div style="background-color: white; border-radius: 24px; max-width: 380px; width: 100%; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15); display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px;">
+        <div style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="font-size: 18px; font-weight: 700; color: #111827; margin: 0;">QR Code สั่งอาหาร</h3>
+          <button @click="isQrModalOpen = false" style="background: none; border: none; font-size: 20px; color: #9CA3AF; cursor: pointer; padding: 4px;">✕</button>
+        </div>
+
+        <div style="background: #FAF9F5; border: 1.5px solid #E5E7EB; border-radius: 12px; padding: 6px 18px; font-size: 20px; font-weight: 800; color: #1F2937;">
+          โต๊ะ {{ selectedQrTable.id }}
+        </div>
+
+        <p style="font-size: 12px; color: #6B7280; margin: 0; line-height: 1.4;">
+          ลูกค้าใช้โทรศัพท์สแกน QR Code นี้เพื่อเลือกเมนูและสั่งอาหารเข้าสู่ระบบร้านได้ทันที
+        </p>
+
+        <div style="padding: 10px; background: white; border-radius: 16px; border: 2px solid #E5E7EB; box-shadow: 0 4px 12px rgba(0,0,0,0.04);">
+          <img :src="selectedQrDataUrl" :alt="`QR Code โต๊ะ ${selectedQrTable.id}`" style="width: 200px; height: 200px; display: block;" />
+        </div>
+
+        <div style="font-size: 11px; color: #6B7280; font-family: monospace; background: #F3F4F6; padding: 6px 12px; border-radius: 8px; border: 1px solid #E5E7EB; width: 100%; box-sizing: border-box; word-break: break-all;">
+          {{ selectedQrUrl }}
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-top: 4px;">
+          <button 
+            @click="printSingleQr"
+            style="padding: 10px; background-color: #48785A; color: white; border: none; border-radius: 12px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);"
+          >
+            <span>🖨️</span> พิมพ์ใบ QR
+          </button>
+          <button 
+            @click="copySingleLink"
+            style="padding: 10px; background-color: white; border: 1px solid #D1D5DB; color: #374151; border-radius: 12px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;"
+          >
+            <span>📋</span> คัดลอกลิงก์
+          </button>
+        </div>
+
+        <a 
+          :href="selectedQrUrl" 
+          target="_blank" 
+          style="font-size: 12px; color: #336846; text-decoration: underline; font-weight: 600; margin-top: 2px;"
+        >
+          🌐 ทดลองเปิดสั่งอาหารในแท็บใหม่
+        </a>
       </div>
     </div>
   </div>
