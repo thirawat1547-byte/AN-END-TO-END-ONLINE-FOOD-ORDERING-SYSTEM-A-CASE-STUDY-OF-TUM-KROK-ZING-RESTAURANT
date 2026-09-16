@@ -38,6 +38,19 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
           // ignore
         }
       }
+
+      // ซิงค์สถานะโต๊ะตามออเดอร์จริงที่มีอยู่ในระบบ
+      try {
+        await this.$executeRawUnsafe(`
+          UPDATE TABLES t
+          SET t.status = 'OCCUPIED'
+          WHERE EXISTS (
+            SELECT 1 FROM ORDERS o
+            WHERE o.table_id = t.table_id
+            AND o.status IN ('PENDING', 'COOKING', 'READY', 'PAID')
+          );
+        `);
+      } catch (e) {}
     } catch (err) {
       this.logger.error(`⚠️ ไม่สามารถเชื่อมต่อฐานข้อมูล MySQL (${err.message}) - โปรดตรวจสอบว่า MySQL รันอยู่`);
     }

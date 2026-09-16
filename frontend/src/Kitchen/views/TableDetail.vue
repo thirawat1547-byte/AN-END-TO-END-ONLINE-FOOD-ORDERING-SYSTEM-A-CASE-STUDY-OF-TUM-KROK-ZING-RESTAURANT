@@ -1,21 +1,105 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import axios from 'axios'
+import { API_BASE } from '../../config/api'
 
 const route = useRoute()
 const router = useRouter()
 
-const tableId = computed(() => route.params.id || '01')
+const paramValue = computed(() => route.params.tableId || route.params.id || 'T-01')
 
 const tableData = ref({
-  id: tableId.value,
+  id: paramValue.value,
+  table_id: null,
   status: 'ว่าง (AVAILABLE)',
   time: '-',
-  staff: '-',
+  staff: 'พนักงานหน้าร้าน',
   customers: 0,
 })
 
 const orders = ref([])
+const activeOrderIds = ref([])
+
+// ฟังก์ชันดึงรายละเอียดโต๊ะและออเดอร์ของโต๊ะนี้
+const fetchTableDetail = async () => {
+  try {
+    const [tablesRes, ordersRes] = await Promise.all([
+      axios.get(`${API_BASE}/tables`),
+      axios.get(`${API_BASE}/orders`)
+    ])
+
+    const dbTables = tablesRes.data || []
+    const allOrders = ordersRes.data || []
+
+    const currentParam = String(paramValue.value).trim()
+    const targetTable = dbTables.find(t => 
+      String(t.table_number).toUpperCase() === currentParam.toUpperCase() ||
+      String(t.table_id) === currentParam ||
+      `T-0${t.table_id}`.toUpperCase() === currentParam.toUpperCase() ||
+      `T-${t.table_id}`.toUpperCase() === currentParam.toUpperCase()
+    ) || dbTables[0]
+
+    if (targetTable) {
+      tableData.value.id = targetTable.table_number || `T-0${targetTable.table_id}`
+      tableData.value.table_id = targetTable.table_id
+
+      // ค้นหาออเดอร์ที่ยังดำเนินอยู่ของโต๊ะนี้ (PENDING, COOKING, READY, PAID)
+      const tableOrders = allOrders.filter(o => 
+        (o.table_id === targetTable.table_id || o.table?.table_number === targetTable.table_number) &&
+        ['PENDING', 'COOKING', 'READY', 'PAID'].includes((o.status || '').toUpperCase())
+      )
+
+      activeOrderIds.value = tableOrders.map(o => o.order_id)
+
+      if (tableOrders.length > 0) {
+        tableData.value.status = 'กำลังทาน (OCCUPIED)'
+        const firstOrder = tableOrders[tableOrders.length - 1]
+        tableData.value.time = new Date(firstOrder.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
+        tableData.value.customers = targetTable.capacity || 4
+
+        // รวมรายการอาหารจากออเดอร์ที่ค้างอยู่ของโต๊ะนี้
+        const itemsList = []
+        tableOrders.forEach(ord => {
+          (ord.order_items || []).forEach((oi, idx) => {
+            let noteStr = oi.notes || ''
+            if (!noteStr && oi.customization) {
+              if (typeof oi.customization === 'string') noteStr = oi.customization
+              else if (typeof oi.customization === 'object') {
+                const parts = []
+                if (oi.customization.spicy && oi.customization.spicy !== '-') parts.push(`เผ็ด: ${oi.customization.spicy}`)
+                if (oi.customization.no_msg) parts.push('ไม่ใส่ชูรส')
+                if (oi.customization.note) parts.push(oi.customization.note)
+                noteStr = parts.join(' | ')
+              }
+            }
+
+            itemsList.push({
+              id: `${ord.order_id}-${oi.order_item_id || idx}`,
+              name: oi.menu?.menu_name || oi.menu?.name || oi.menu_name || `เมนู #${oi.menu_id}`,
+              qty: Number(oi.quantity),
+              price: Number(oi.unit_price || oi.menu?.price || 0),
+              note: noteStr || '-',
+              status: ['READY', 'SERVED'].includes((ord.status || '').toUpperCase()) ? 'served' : 'cooking'
+            })
+          })
+        })
+        orders.value = itemsList
+      } else {
+        tableData.value.status = 'ว่าง (AVAILABLE)'
+        tableData.value.time = '-'
+        tableData.value.customers = 0
+        orders.value = []
+      }
+    }
+  } catch (err) {
+    console.error('โหลดรายละเอียดโต๊ะไม่สำเร็จ:', err)
+  }
+}
+
+onMounted(() => {
+  fetchTableDetail()
+})
 
 const subtotal = computed(() => {
   return orders.value.reduce((sum, item) => sum + (item.price * item.qty), 0)
@@ -27,9 +111,42 @@ const changeCustomers = (delta) => {
   tableData.value.customers = Math.max(0, tableData.value.customers + delta)
 }
 
-const forceClear = () => {
-  if (confirm(`ยืนยันการบังคับปิดโต๊ะ ${tableData.value.id}?`)) {
-    router.push('/kitchen/tables')
+const confirmPayment = async () => {
+  if (orders.value.length === 0) {
+    alert('โต๊ะนี้ยังไม่มีรายการอาหารค้างชำระครับ')
+    return
+  }
+
+  if (confirm(`ยืนยันการชำระเงินโต๊ะ ${tableData.value.id} ยอดรวม ฿${netTotal.value.toLocaleString()}?`)) {
+    try {
+      for (const orderId of activeOrderIds.value) {
+        await axios.patch(`${API_BASE}/orders/${orderId}/status`, { status: 'COMPLETED' })
+      }
+      if (tableData.value.table_id) {
+        await axios.patch(`${API_BASE}/tables/${tableData.value.table_id}/status`, { status: 'AVAILABLE' }).catch(() => {})
+      }
+      alert(`ชำระเงินโต๊ะ ${tableData.value.id} เรียบร้อยแล้ว`)
+      router.push('/kitchen/tables')
+    } catch (err) {
+      console.error('ชำระเงินไม่สำเร็จ:', err)
+      alert('เกิดข้อผิดพลาดในการชำระเงิน')
+    }
+  }
+}
+
+const forceClear = async () => {
+  if (confirm(`ยืนยันการบังคับปิดโต๊ะ ${tableData.value.id}? ออเดอร์ของโต๊ะนี้จะถูกเสร็จสิ้น`)) {
+    try {
+      for (const orderId of activeOrderIds.value) {
+        await axios.patch(`${API_BASE}/orders/${orderId}/status`, { status: 'COMPLETED' })
+      }
+      if (tableData.value.table_id) {
+        await axios.patch(`${API_BASE}/tables/${tableData.value.table_id}/status`, { status: 'AVAILABLE' }).catch(() => {})
+      }
+      router.push('/kitchen/tables')
+    } catch (e) {
+      router.push('/kitchen/tables')
+    }
   }
 }
 
@@ -85,7 +202,7 @@ const goBack = () => {
             <button style="display: flex; align-items: center; gap: 8px; background-color: white; border: 1px solid #D1D5DB; color: #374151; padding: 10px 16px; border-radius: 12px; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.02); transition: background-color 0.2s;">
               <span>🛒</span> เพิ่มรายการอาหาร
             </button>
-            <button style="display: flex; align-items: center; gap: 8px; background-color: #48785A; color: white; padding: 10px 16px; border-radius: 12px; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: background-color 0.2s;">
+            <button @click="confirmPayment" style="display: flex; align-items: center; gap: 8px; background-color: #48785A; color: white; padding: 10px 16px; border-radius: 12px; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: background-color 0.2s;">
               <span>💳</span> ยืนยันการชำระเงิน
             </button>
           </div>

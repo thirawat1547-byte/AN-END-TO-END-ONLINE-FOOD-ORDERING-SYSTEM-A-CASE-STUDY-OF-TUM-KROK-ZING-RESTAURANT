@@ -1,12 +1,15 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import axios from 'axios'
+import { API_BASE } from '../../config/api'
 
 const router = useRouter()
 const route = useRoute()
 
 // เมนู/ตัวกรองที่เลือกอยู่
 const activeFilter = ref('all')
+let pollingTimer = null
 
 // ป๊อปอัพสำหรับเพิ่มโต๊ะใหม่
 const isAddModalOpen = ref(false)
@@ -22,14 +25,64 @@ const statusMap = {
   billing: { label: 'รอเช็คบิล', bg: 'bg-[#819BF8]', text: 'text-white', border: 'border-l-4 border-l-[#4F46E5]' }
 }
 
-// รายการโต๊ะทั้งหมด (5 โต๊ะ โต๊ะละ 4 คน)
-const tables = ref([
-  { id: 'T-01', status: 'available', seats: 0, capacity: 4, total: 0 },
-  { id: 'T-02', status: 'available', seats: 0, capacity: 4, total: 0 },
-  { id: 'T-03', status: 'available', seats: 0, capacity: 4, total: 0 },
-  { id: 'T-04', status: 'available', seats: 0, capacity: 4, total: 0 },
-  { id: 'T-05', status: 'available', seats: 0, capacity: 4, total: 0 },
-])
+// รายการโต๊ะ
+const tables = ref([])
+
+// ดึงข้อมูลโต๊ะและออเดอร์จริงจาก Backend
+const fetchTablesData = async () => {
+  try {
+    const [tablesRes, ordersRes] = await Promise.all([
+      axios.get(`${API_BASE}/tables`),
+      axios.get(`${API_BASE}/orders`)
+    ])
+
+    const dbTables = tablesRes.data || []
+    const allOrders = ordersRes.data || []
+
+    tables.value = dbTables.map((t) => {
+      // ค้นหาออเดอร์ของโต๊ะนี้ที่ยังทานอยู่ (PENDING, COOKING, READY, PAID)
+      const activeOrders = allOrders.filter((o) => {
+        const matchesTableId = o.table_id === t.table_id || o.table?.table_id === t.table_id
+        const matchesTableNum = o.table?.table_number === t.table_number || (typeof o.table === 'string' && o.table === t.table_number)
+        const isTableOrder = matchesTableId || matchesTableNum
+        const isActiveStatus = ['PENDING', 'COOKING', 'READY', 'PAID'].includes((o.status || '').toUpperCase())
+        return isTableOrder && isActiveStatus
+      })
+
+      const totalAmount = activeOrders.reduce((sum, o) => sum + Number(o.total_price || 0), 0)
+
+      let currentStatus = 'available'
+      if (activeOrders.length > 0) {
+        currentStatus = t.status === 'BILLING' ? 'billing' : 'occupied'
+      } else if (t.status === 'OCCUPIED') {
+        currentStatus = 'occupied'
+      } else if (t.status === 'BILLING') {
+        currentStatus = 'billing'
+      }
+
+      return {
+        table_id: t.table_id,
+        id: t.table_number || `T-0${t.table_id}`,
+        status: currentStatus,
+        seats: activeOrders.length > 0 ? (t.capacity || 4) : 0,
+        capacity: t.capacity || 4,
+        total: totalAmount,
+        activeOrders
+      }
+    })
+  } catch (err) {
+    console.error('ไม่สามารถโหลดข้อมูลโต๊ะจาก API ได้:', err)
+  }
+}
+
+onMounted(() => {
+  fetchTablesData()
+  pollingTimer = setInterval(fetchTablesData, 5000)
+})
+
+onBeforeUnmount(() => {
+  if (pollingTimer) clearInterval(pollingTimer)
+})
 
 // ฟังก์ชันนับจำนวนตามสถานะจริง
 const countAll = computed(() => tables.value.length)
@@ -49,16 +102,24 @@ const goToTableDetail = (tableId) => {
 }
 
 // ฟังก์ชั่นเพิ่มโต๊ะใหม่
-const handleAddTable = () => {
+const handleAddTable = async () => {
   if (!newTable.value.id.trim()) return
   
-  tables.value.push({
-    id: newTable.value.id.trim(),
-    status: 'available',
-    seats: 0,
-    capacity: Number(newTable.value.capacity) || 4,
-    total: 0
-  })
+  try {
+    await axios.post(`${API_BASE}/tables`, {
+      table_number: newTable.value.id.trim(),
+      capacity: Number(newTable.value.capacity) || 4
+    })
+    await fetchTablesData()
+  } catch (e) {
+    tables.value.push({
+      id: newTable.value.id.trim(),
+      status: 'available',
+      seats: 0,
+      capacity: Number(newTable.value.capacity) || 4,
+      total: 0
+    })
+  }
 
   // รีเซ็ตค่าและปิด Modal
   newTable.value = { id: '', capacity: 4 }

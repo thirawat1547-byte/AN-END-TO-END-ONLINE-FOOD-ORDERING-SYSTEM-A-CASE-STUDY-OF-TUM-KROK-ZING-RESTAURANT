@@ -68,6 +68,18 @@ export class OrdersService {
         },
       });
 
+      // ถ้าเป็นการสั่งที่โต๊ะ ให้ปรับสถานะโต๊ะเป็น OCCUPIED ทันที
+      if (createOrderDto.table_id) {
+        try {
+          await tx.table.update({
+            where: { table_id: createOrderDto.table_id },
+            data: { status: 'OCCUPIED' },
+          });
+        } catch (e) {
+          // ignore if table doesn't exist
+        }
+      }
+
       return order;
     });
   }
@@ -127,11 +139,38 @@ export class OrdersService {
 
   // 5. อัปเดตสถานะคำสั่งซื้อ
   async updateStatus(id: number, updateOrderStatusDto: UpdateOrderStatusDto) {
-    await this.findOne(id);
+    const order = await this.findOne(id);
 
-    return this.prisma.order.update({
+    const updated = await this.prisma.order.update({
       where: { order_id: id },
       data: { status: updateOrderStatusDto.status },
     });
+
+    // ถ้าออเดอร์เสร็จสิ้น (COMPLETED/CANCELLED) และมีโต๊ะ ให้เช็คว่าเหลือออเดอร์อื่นค้างอยู่หรือไม่
+    if (order.table_id) {
+      const statusUpper = updateOrderStatusDto.status.toUpperCase();
+      if (['COMPLETED', 'CANCELLED'].includes(statusUpper)) {
+        const remaining = await this.prisma.order.count({
+          where: {
+            table_id: order.table_id,
+            status: { in: ['PENDING', 'COOKING', 'READY', 'PAID'] },
+            order_id: { not: id },
+          },
+        });
+        if (remaining === 0) {
+          await this.prisma.table.update({
+            where: { table_id: order.table_id },
+            data: { status: 'AVAILABLE' },
+          }).catch(() => {});
+        }
+      } else if (['PENDING', 'COOKING', 'READY', 'PAID'].includes(statusUpper)) {
+        await this.prisma.table.update({
+          where: { table_id: order.table_id },
+          data: { status: 'OCCUPIED' },
+        }).catch(() => {});
+      }
+    }
+
+    return updated;
   }
 }
