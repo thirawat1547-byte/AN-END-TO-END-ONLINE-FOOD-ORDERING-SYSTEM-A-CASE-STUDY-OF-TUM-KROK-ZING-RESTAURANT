@@ -601,314 +601,81 @@ export const adminStore = reactive({
     soundAlertKDS: true
   },
 
-  // ===== API Fetch Dashboard Stats =====
+  // ===== Centralized Admin Initialization =====
+  async initAdminData() {
+    await Promise.allSettled([
+      this.fetchMenusFromAPI(),
+      this.fetchInventoryFromAPI(),
+      this.fetchTablesFromAPI(),
+      this.fetchOrdersFromAPI(),
+      this.fetchPromotionsFromAPI()
+    ])
+    this.recomputeDashboardStats()
+  },
+
+  recomputeDashboardStats() {
+    // 1. Gross Sales and Order Counts
+    this.dashboardStats.totalOrders = this.orders.length
+    this.dashboardStats.grossSales = this.orders.reduce((sum, o) => sum + Number(o.total_price || 0), 0)
+
+    // 2. Table occupancy
+    this.dashboardStats.totalTablesCount = this.tables.length
+    this.dashboardStats.activeTablesCount = this.tables.filter(t => t.status === 'Occupied' || t.status === 'OCCUPIED' || t.status === 'Billing').length
+
+    // 3. Compute menu total_sold dynamically from real orders
+    const soldMap = {}
+    for (const ord of this.orders) {
+      for (const itm of (ord.items || [])) {
+        if (itm.menu_id) {
+          soldMap[itm.menu_id] = (soldMap[itm.menu_id] || 0) + Number(itm.quantity || 1)
+        }
+      }
+    }
+    for (const m of this.menus) {
+      if (soldMap[m.menu_id] !== undefined) {
+        m.total_sold = soldMap[m.menu_id]
+      }
+    }
+
+    // 4. Update table active orders & bills dynamically
+    for (const tbl of this.tables) {
+      const activeOrd = this.orders.find(o => o.table_id === tbl.table_id && o.status !== 'Completed' && o.status !== 'PAID')
+      if (activeOrd) {
+        tbl.status = 'Occupied'
+        tbl.activeOrderId = activeOrd.order_id
+        tbl.currentBill = Number(activeOrd.total_price || 0)
+      }
+    }
+  },
+
   async fetchAdminDashboardData() {
-    try {
-      const [ordersRes, tablesRes] = await Promise.all([
-        fetch(`${API_BASE}/orders`),
-        fetch(`${API_BASE}/tables`)
-      ])
-      
-      if (ordersRes.ok) {
-        const ordersData = await ordersRes.json()
-        if (Array.isArray(ordersData) && ordersData.length > 0) {
-          this.orders = ordersData
-          // คำนวณยอดขายรวมจากออเดอร์ที่สำเร็จ
-          const completedOrders = ordersData.filter(o => o.status === 'Completed' || o.payment_status === 'Completed')
-          this.dashboardStats.grossSales = completedOrders.reduce((sum, o) => sum + Number(o.total_price || 0), 0)
-          this.dashboardStats.totalOrders = ordersData.length
-        }
-      }
-
-      if (tablesRes.ok) {
-        const tablesData = await tablesRes.json()
-        if (Array.isArray(tablesData) && tablesData.length > 0) {
-          this.tables = tablesData
-          this.dashboardStats.totalTablesCount = tablesData.length
-          this.dashboardStats.activeTablesCount = tablesData.filter(t => t.status === 'Occupied' || t.status === 'Billing').length
-        }
-      }
-
-      console.log('✅ โหลดข้อมูลสถิติ Dashboard จาก API สำเร็จ')
-    } catch (err) {
-      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API Dashboard ได้ ใช้ข้อมูลจำลองแทน:', err.message)
-    }
+    await this.initAdminData()
   },
 
-  // ===== Inventory API Functions =====
-  async fetchInventoryFromAPI() {
-    try {
-      const res = await fetch(`${API_BASE}/ingredients`)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
-      if (Array.isArray(data) && data.length > 0) {
-        this.ingredients = data.map(i => ({
-          ingredient_id: i.ingredient_id || i.id,
-          ingredient_name: i.ingredient_name || i.name,
-          quantity_in_stock: Number(i.quantity_in_stock || i.stock || 0),
-          unit: i.unit || 'หน่วย',
-          reorder_level: Number(i.reorder_level || 0),
-          cost_per_unit: Number(i.cost_per_unit || 0),
-          last_updated: i.last_updated || new Date().toISOString().replace('T', ' ').substring(0, 16)
-        }))
-      }
-      console.log(`✅ โหลดคลังวัตถุดิบจาก API สำเร็จ: ${this.ingredients.length} รายการ`)
-    } catch (err) {
-      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API คลังวัตถุดิบได้ ใช้ข้อมูลจำลองแทน:', err.message)
-    }
-  },
-
- async updateStockAPI(ingredientId, newQty) {
-    const item = this.ingredients.find(i => i.ingredient_id === ingredientId)
-    if (!item) return
-
-    // อัปเดตค่าและเวลาทันที (Optimistic Update)
-    item.quantity_in_stock = Math.max(0, Number(newQty))
-    item.last_updated = new Date().toISOString().replace('T', ' ').substring(0, 16)
-
-    try {
-      const res = await fetch(`${API_BASE}/ingredients/${ingredientId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quantity_in_stock: item.quantity_in_stock })
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      console.log(`✅ อัปเดตสต็อกวัตถุดิบ #${ingredientId} ลง Database สำเร็จ`)
-    } catch (err) {
-      // แม้ API หลังบ้านจะยังไม่เปิดเส้นทางนี้ ก็ให้ถือว่าอัปเดตในระบบสำเร็จทันที (ไม่ rollback ค่าหนี)
-      console.warn('⚠️ บันทึกสต็อกในโหมด Local Store สำเร็จ:', err.message)
-    }
-  },
-
-  // ===== Table API Functions =====
-  async fetchTablesFromAPI() {
-    try {
-      const res = await fetch(`${API_BASE}/tables`)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
-      if (Array.isArray(data) && data.length > 0) {
-        this.tables = data.map(t => ({
-          table_id: t.table_id || t.id,
-          table_number: t.table_number || t.number,
-          capacity: Number(t.capacity || 4),
-          status: t.status || 'Empty',
-          activeOrderId: t.activeOrderId || t.active_order_id || null,
-          elapsedMinutes: t.elapsedMinutes || t.elapsed_minutes || 0,
-          currentBill: Number(t.currentBill || t.current_bill || 0)
-        }))
-      }
-      console.log(`✅ โหลดข้อมูลโต๊ะจาก API สำเร็จ: ${this.tables.length} โต๊ะ`)
-    } catch (err) {
-      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API โต๊ะอาหารได้ ใช้ข้อมูลจำลองแทน:', err.message)
-    }
-  },
-
-  async toggleTableStatusAPI(tableId, status) {
-    const tbl = this.tables.find(t => t.table_id === tableId)
-    if (!tbl) return
-
-    const oldStatus = tbl.status
-    // อัปเดตสถานะและเคลียร์ข้อมูลโต๊ะในหน้าจอทันที
-    tbl.status = status
-    if (status === 'Empty') {
-      tbl.activeOrderId = null
-      tbl.currentBill = 0
-      tbl.elapsedMinutes = 0
-    }
-
-    try {
-      const res = await fetch(`${API_BASE}/tables/${tableId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      console.log(`✅ อัปเดตสถานะโต๊ะ #${tableId} สำเร็จ`)
-    } catch (err) {
-      // แม้ API หลังบ้านจะยังไม่เปิดเส้นทางนี้ ก็ให้คงสถานะที่เปลี่ยนในหน้าจอไว้ปกติ
-      console.warn('⚠️ อัปเดตสถานะโต๊ะใน Local Store สำเร็จ:', err.message)
-    }
-  },
-
-// ===== Orders API for KDS & Dashboard =====
-  async fetchOrdersFromAPI() {
-    try {
-      const res = await fetch(`${API_BASE}/orders`)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
-      if (Array.isArray(data) && data.length > 0) {
-        this.orders = data.map(o => ({
-          ...o,
-          customer_name: o.user?.username || (o.table ? `โต๊ะ ${o.table.table_number}` : `ลูกค้า #${o.order_id}`),
-          items: (o.order_items || o.items || []).map(oi => {
-            let cust = oi.customization;
-            if (!cust && oi.notes) {
-              cust = { note: oi.notes };
-            }
-            return {
-              menu_id: oi.menu_id,
-              menu_name: oi.menu?.menu_name || oi.menu?.name || oi.menu_name || `เมนู #${oi.menu_id}`,
-              quantity: oi.quantity,
-              price: oi.unit_price || oi.price,
-              customization: cust
-            };
-          })
-        }))
-      }
-      console.log(`✅ โหลดรายการออเดอร์จาก API สำเร็จ: ${this.orders.length} ออเดอร์`)
-    } catch (err) {
-      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API ออเดอร์ได้ ใช้ข้อมูลจำลองแทน:', err.message)
-    }
-  },
-
-// ===== Promotion API Functions =====
-  async fetchPromotionsFromAPI() {
-    try {
-      const res = await fetch(`${API_BASE}/promotions`)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
-      if (Array.isArray(data) && data.length > 0) {
-        this.promotions = data.map(p => ({
-          promo_id: p.promo_id || p.id,
-          code: p.code,
-          discount_type: p.discount_type || 'Fixed',
-          discount_value: Number(p.discount_value || 0),
-          min_order_price: Number(p.min_order_price || 0),
-          expiry_date: p.expiry_date ? p.expiry_date.slice(0, 10) : '2026-12-31',
-          is_active: p.is_active ?? true,
-          used_count: p.used_count || 0
-        }))
-      }
-      console.log(`✅ โหลดโปรโมชันจาก API สำเร็จ: ${this.promotions.length} รายการ`)
-    } catch (err) {
-      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API โปรโมชันได้ ใช้ข้อมูลจำลองแทน:', err.message)
-    }
-  },
-
-  async togglePromoStatusAPI(promoId) {
-    const p = this.promotions.find(x => x.promo_id === promoId)
-    if (!p) return
-
-    const oldStatus = p.is_active
-    p.is_active = !p.is_active
-
-    try {
-      const res = await fetch(`${API_BASE}/promotions/${promoId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_active: p.is_active })
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      console.log(`✅ สลับสถานะโปรโมชัน #${promoId} สำเร็จ`)
-    } catch (err) {
-      console.warn('⚠️ สลับสถานะโปรโมชันใน Local Store สำเร็จ:', err.message)
-    }
-  },
-
-  async addPromotionAPI(promo) {
-    try {
-      const res = await fetch(`${API_BASE}/promotions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(promo)
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const created = await res.json()
-      this.promotions.push({
-        promo_id: created.promo_id || created.id,
-        code: created.code,
-        discount_type: created.discount_type,
-        discount_value: Number(created.discount_value),
-        min_order_price: Number(created.min_order_price),
-        expiry_date: created.expiry_date ? created.expiry_date.slice(0, 10) : promo.expiry_date,
-        is_active: created.is_active ?? true,
-        used_count: 0
-      })
-      console.log(`✅ เพิ่มโปรโมชันใหม่ลง Database สำเร็จ: ${created.code}`)
-    } catch (err) {
-      const id = this.promotions.length > 0 ? Math.max(...this.promotions.map(p => p.promo_id)) + 1 : 1
-      this.promotions.push({ promo_id: id, used_count: 0, ...promo })
-      console.warn('⚠️ เพิ่มโปรโมชันใน Local Store สำเร็จ:', err.message)
-    }
-  },
-
-  async deletePromotionAPI(promoId) {
-    try {
-      const res = await fetch(`${API_BASE}/promotions/${promoId}`, {
-        method: 'DELETE'
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      this.promotions = this.promotions.filter(p => p.promo_id !== promoId)
-      console.log(`✅ ลบโปรโมชัน #${promoId} สำเร็จ`)
-    } catch (err) {
-      this.promotions = this.promotions.filter(p => p.promo_id !== promoId)
-      console.warn('⚠️ ลบโปรโมชันใน Local Store สำเร็จ:', err.message)
-    }
-  },
-
-// ===== Promotion Management with LocalStorage =====
-  fetchPromotionsFromAPI() {
-    try {
-      const saved = localStorage.getItem('tumkrok_promotions')
-      if (saved) {
-        this.promotions = JSON.parse(saved)
-      } else {
-        // ค่าเริ่มต้นถ้ายังไม่มีใน Storage
-        this.promotions = [
-          { promo_id: 1, code: 'ZING50', discount_type: 'Fixed', discount_value: 50, min_order_price: 300, expiry_date: '2026-10-31', is_active: true, used_count: 38 },
-          { promo_id: 2, code: 'SEP10', discount_type: 'Percentage', discount_value: 10, min_order_price: 200, expiry_date: '2026-09-30', is_active: true, used_count: 64 },
-          { promo_id: 3, code: 'WELCOME100', discount_type: 'Fixed', discount_value: 100, min_order_price: 500, expiry_date: '2026-12-31', is_active: true, used_count: 15 }
-        ]
-        localStorage.setItem('tumkrok_promotions', JSON.stringify(this.promotions))
-      }
-    } catch (err) {
-      console.warn('⚠️ โหลดโปรโมชันจาก LocalStorage ไม่สำเร็จ', err)
-    }
-  },
-
-  togglePromoStatusAPI(promoId) {
-    const p = this.promotions.find(x => x.promo_id === promoId)
-    if (p) {
-      p.is_active = !p.is_active
-      localStorage.setItem('tumkrok_promotions', JSON.stringify(this.promotions))
-    }
-  },
-
-  addPromotionAPI(promo) {
-    const id = this.promotions.length > 0 ? Math.max(...this.promotions.map(p => p.promo_id)) + 1 : 1
-    const newP = { promo_id: id, used_count: 0, ...promo }
-    this.promotions.push(newP)
-    localStorage.setItem('tumkrok_promotions', JSON.stringify(this.promotions))
-  },
-
-  deletePromotionAPI(promoId) {
-    this.promotions = this.promotions.filter(p => p.promo_id !== promoId)
-    localStorage.setItem('tumkrok_promotions', JSON.stringify(this.promotions))
-  },
-
-
-  // ===== Menu API Functions (เชื่อม Backend จริง) =====
+  // ===== Menus API =====
   async fetchMenusFromAPI() {
     try {
       const res = await fetch(`${API_BASE}/menus`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
-      this.menus = data.map(m => ({
-        menu_id: m.menu_id,
-        category_id: m.category_id,
-        menu_name: m.menu_name,
-        description: m.description || '',
-        price: Number(m.price),
-        calories: m.calories || 0,
-        is_available: m.is_available,
-        image_url: m.image_url || 'https://images.unsplash.com/photo-1569562211093-4ed0d0758f12?w=500&auto=format&fit=crop&q=80',
-        allergen_ids: m.allergens ? m.allergens.map(a => a.allergen_id || a.allergen?.allergen_id) : [],
-        total_sold: m.total_sold || 0
-      }))
+      if (Array.isArray(data) && data.length > 0) {
+        this.menus = data.map(m => ({
+          menu_id: m.menu_id,
+          category_id: m.category_id,
+          menu_name: m.menu_name,
+          description: m.description || '',
+          price: Number(m.price),
+          calories: m.calories || 0,
+          is_available: m.is_available ?? true,
+          image_url: m.image_url || 'https://images.unsplash.com/photo-1569562211093-4ed0d0758f12?w=500&auto=format&fit=crop&q=80',
+          allergen_ids: m.allergens ? m.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean) : [],
+          total_sold: m.total_sold || 0
+        }))
+      }
       console.log(`✅ โหลดเมนูจาก API สำเร็จ: ${this.menus.length} รายการ`)
       return true
     } catch (err) {
-      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API ได้ ใช้ข้อมูล Mock แทน:', err.message)
+      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API เมนูได้:', err.message)
       return false
     }
   },
@@ -916,10 +683,8 @@ export const adminStore = reactive({
   async toggleMenuAvailability(menuId) {
     const item = this.menus.find(m => m.menu_id === menuId)
     if (!item) return
-
     const newStatus = !item.is_available
     item.is_available = newStatus
-
     try {
       const res = await fetch(`${API_BASE}/menus/${menuId}`, {
         method: 'PATCH',
@@ -931,7 +696,6 @@ export const adminStore = reactive({
     } catch (err) {
       item.is_available = !newStatus
       console.error('❌ เปลี่ยนสถานะเมนูไม่สำเร็จ:', err.message)
-      alert('ไม่สามารถเปลี่ยนสถานะเมนูได้ กรุณาตรวจสอบการเชื่อมต่อ Backend')
     }
   },
 
@@ -941,7 +705,7 @@ export const adminStore = reactive({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          category_id: newMenu.category_id,
+          category_id: Number(newMenu.category_id) || 1,
           menu_name: newMenu.menu_name,
           description: newMenu.description || '',
           price: Number(newMenu.price),
@@ -966,22 +730,19 @@ export const adminStore = reactive({
       })
       console.log(`✅ เพิ่มเมนูใหม่สำเร็จ: ${created.menu_name} (ID: ${created.menu_id})`)
     } catch (err) {
-      const id = this.menus.length > 0 ? Math.max(...this.menus.map(m => m.menu_id)) + 1 : 1
-      this.menus.push({ menu_id: id, total_sold: 0, is_available: true, ...newMenu })
-      console.warn('⚠️ เพิ่มเมนูแบบ offline:', err.message)
+      console.warn('⚠️ เพิ่มเมนู API ไม่สำเร็จ:', err.message)
     }
   },
 
   async updateMenuItem(updatedMenu) {
     const index = this.menus.findIndex(m => m.menu_id === updatedMenu.menu_id)
     if (index === -1) return
-
     try {
       const res = await fetch(`${API_BASE}/menus/${updatedMenu.menu_id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          category_id: updatedMenu.category_id,
+          category_id: Number(updatedMenu.category_id) || 1,
           menu_name: updatedMenu.menu_name,
           description: updatedMenu.description || '',
           price: Number(updatedMenu.price),
@@ -995,7 +756,7 @@ export const adminStore = reactive({
       console.log(`✅ แก้ไขเมนู #${updatedMenu.menu_id} สำเร็จ`)
     } catch (err) {
       this.menus[index] = { ...this.menus[index], ...updatedMenu }
-      console.warn('⚠️ แก้ไขเมนูแบบ offline:', err.message)
+      console.warn('⚠️ แก้ไขเมนู API ไม่สำเร็จ:', err.message)
     }
   },
 
@@ -1008,92 +769,349 @@ export const adminStore = reactive({
       this.menus = this.menus.filter(m => m.menu_id !== menuId)
       console.log(`✅ ลบเมนู #${menuId} สำเร็จ`)
     } catch (err) {
+      console.warn('⚠️ ลบเมนู API ไม่สำเร็จ:', err.message)
       this.menus = this.menus.filter(m => m.menu_id !== menuId)
-      console.warn('⚠️ ลบเมนูแบบ offline:', err.message)
     }
   },
 
-  updateStock(ingredientId, newQty) {
+  // ===== Inventory API =====
+  async fetchInventoryFromAPI() {
+    try {
+      const res = await fetch(`${API_BASE}/ingredients`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) {
+        this.ingredients = data.map(i => ({
+          ingredient_id: i.ingredient_id || i.id,
+          ingredient_name: i.name || i.ingredient_name,
+          quantity_in_stock: Number(i.quantity ?? i.quantity_in_stock ?? 0),
+          unit: i.unit || 'กก.',
+          reorder_level: Number(i.min_quantity ?? i.reorder_level ?? 5),
+          cost_per_unit: Number(i.cost_per_unit || 25),
+          last_updated: i.updated_at ? String(i.updated_at).replace('T', ' ').substring(0, 16) : new Date().toISOString().replace('T', ' ').substring(0, 16)
+        }))
+      }
+      console.log(`✅ โหลดคลังวัตถุดิบจาก API สำเร็จ: ${this.ingredients.length} รายการ`)
+    } catch (err) {
+      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API คลังวัตถุดิบได้:', err.message)
+    }
+  },
+
+  async updateStockAPI(ingredientId, newQty) {
     const item = this.ingredients.find(i => i.ingredient_id === ingredientId)
-    if (item) {
-      item.quantity_in_stock = Math.max(0, Number(newQty))
-      item.last_updated = new Date().toISOString().replace('T', ' ').substring(0, 16)
+    if (!item) return
+    item.quantity_in_stock = Math.max(0, Number(newQty))
+    item.last_updated = new Date().toISOString().replace('T', ' ').substring(0, 16)
+
+    try {
+      const res = await fetch(`${API_BASE}/ingredients/${ingredientId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quantity: item.quantity_in_stock })
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      console.log(`✅ อัปเดตสต็อกวัตถุดิบ #${ingredientId} สำเร็จ: ${item.quantity_in_stock}`)
+    } catch (err) {
+      console.warn('⚠️ อัปเดตสต็อก API ไม่สำเร็จ:', err.message)
+    }
+  },
+  updateStock(ingredientId, newQty) {
+    return this.updateStockAPI(ingredientId, newQty)
+  },
+
+  async addIngredientAPI(item) {
+    try {
+      const res = await fetch(`${API_BASE}/ingredients`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: item.ingredient_name || item.name,
+          quantity: Number(item.quantity_in_stock || item.quantity || 0),
+          unit: item.unit || 'กก.',
+          min_quantity: Number(item.reorder_level || item.min_quantity || 5)
+        })
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const created = await res.json()
+      this.ingredients.push({
+        ingredient_id: created.ingredient_id || created.id,
+        ingredient_name: created.name,
+        quantity_in_stock: Number(created.quantity),
+        unit: created.unit,
+        reorder_level: Number(created.min_quantity),
+        cost_per_unit: Number(item.cost_per_unit || 25),
+        last_updated: new Date().toISOString().replace('T', ' ').substring(0, 16)
+      })
+      console.log(`✅ เพิ่มวัตถุดิบใหม่สำเร็จ: ${created.name}`)
+    } catch (err) {
+      console.warn('⚠️ เพิ่มวัตถุดิบ API ไม่สำเร็จ:', err.message)
+      const id = this.ingredients.length > 0 ? Math.max(...this.ingredients.map(i => i.ingredient_id)) + 1 : 1
+      this.ingredients.push({ ingredient_id: id, ...item })
+    }
+  },
+  addIngredient(item) {
+    return this.addIngredientAPI(item)
+  },
+
+  async deleteIngredientAPI(id) {
+    try {
+      const res = await fetch(`${API_BASE}/ingredients/${id}`, {
+        method: 'DELETE'
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      this.ingredients = this.ingredients.filter(i => i.ingredient_id !== id)
+      console.log(`✅ ลบวัตถุดิบ #${id} สำเร็จ`)
+    } catch (err) {
+      console.warn('⚠️ ลบวัตถุดิบ API ไม่สำเร็จ:', err.message)
+      this.ingredients = this.ingredients.filter(i => i.ingredient_id !== id)
+    }
+  },
+  deleteIngredient(id) {
+    return this.deleteIngredientAPI(id)
+  },
+
+  // ===== Tables API =====
+  async fetchTablesFromAPI() {
+    try {
+      const res = await fetch(`${API_BASE}/tables`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) {
+        this.tables = data.map(t => {
+          const isOcc = (t.status === 'OCCUPIED' || t.status === 'Occupied')
+          const activeOrder = this.orders.find(o => o.table_id === t.table_id && o.status !== 'Completed' && o.status !== 'PAID')
+          return {
+            table_id: t.table_id || t.id,
+            table_number: t.table_number || t.number,
+            capacity: Number(t.capacity || 4),
+            status: isOcc ? 'Occupied' : 'Empty',
+            activeOrderId: activeOrder ? activeOrder.order_id : null,
+            elapsedMinutes: isOcc ? 15 : 0,
+            currentBill: activeOrder ? Number(activeOrder.total_price || 0) : 0
+          }
+        })
+      }
+      console.log(`✅ โหลดข้อมูลโต๊ะจาก API สำเร็จ: ${this.tables.length} โต๊ะ`)
+    } catch (err) {
+      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API โต๊ะอาหารได้:', err.message)
     }
   },
 
-  addIngredient(item) {
-    const id = this.ingredients.length > 0 ? Math.max(...this.ingredients.map(i => i.ingredient_id)) + 1 : 1
-    this.ingredients.push({
-      ingredient_id: id,
-      last_updated: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      ...item
-    })
+  async toggleTableStatusAPI(tableId, status) {
+    const tbl = this.tables.find(t => t.table_id === tableId)
+    if (!tbl) return
+
+    tbl.status = status
+    if (status === 'Empty' || status === 'AVAILABLE') {
+      tbl.activeOrderId = null
+      tbl.currentBill = 0
+      tbl.elapsedMinutes = 0
+    }
+
+    const dbStatus = (status === 'Occupied' || status === 'OCCUPIED') ? 'OCCUPIED' : 'AVAILABLE'
+    try {
+      const res = await fetch(`${API_BASE}/tables/${tableId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: dbStatus })
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      console.log(`✅ อัปเดตสถานะโต๊ะ #${tableId} เป็น ${dbStatus} สำเร็จ`)
+    } catch (err) {
+      console.warn('⚠️ อัปเดตสถานะโต๊ะ API ไม่สำเร็จ:', err.message)
+    }
+  },
+  toggleTableStatus(tableId, status) {
+    return this.toggleTableStatusAPI(tableId, status)
   },
 
-  deleteIngredient(id) {
-    this.ingredients = this.ingredients.filter(i => i.ingredient_id !== id)
+  // ===== Orders API =====
+  async fetchOrdersFromAPI() {
+    try {
+      const res = await fetch(`${API_BASE}/orders`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) {
+        this.orders = data.map(o => {
+          const rawItems = o.order_items || o.items || []
+          const items = rawItems.map(oi => ({
+            menu_id: oi.menu_id,
+            menu_name: oi.menu?.menu_name || oi.menu?.name || oi.menu_name || `เมนู #${oi.menu_id}`,
+            quantity: Number(oi.quantity || 1),
+            price: Number(oi.unit_price || oi.menu?.price || 0),
+            customization: oi.customization || (oi.notes ? { note: oi.notes } : null)
+          }))
+
+          const rawStatus = (o.status || '').toUpperCase()
+          let normStatus = 'Pending'
+          if (rawStatus === 'COOKING') normStatus = 'Cooking'
+          else if (rawStatus === 'SERVED' || rawStatus === 'READY') normStatus = 'Served'
+          else if (rawStatus === 'PAID' || rawStatus === 'COMPLETED') normStatus = 'Completed'
+          else if (rawStatus === 'CANCELLED') normStatus = 'Cancelled'
+
+          const txn = Array.isArray(o.transaction) && o.transaction.length > 0 ? o.transaction[0] : (o.transaction || null)
+          const isPaid = normStatus === 'Completed' || txn?.payment_status === 'COMPLETED' || rawStatus === 'PAID'
+
+          return {
+            ...o,
+            customer_name: o.user?.username || (o.table ? `โต๊ะ ${o.table.table_number}` : (o.table_id ? `โต๊ะ T-0${o.table_id}` : `ลูกค้า #${o.order_id}`)),
+            items,
+            status: normStatus,
+            raw_status: rawStatus,
+            order_type: o.order_type === 'DINE_IN' || o.table_id ? 'In-store' : 'Online',
+            payment_method: txn?.payment_method || (o.table_id ? 'Stripe / QR' : 'PromptPay'),
+            payment_status: isPaid ? 'Completed' : 'Pending',
+            payment_slip_url: txn?.payment_slip_url || null,
+            discount_applied: Number(o.discount_applied || 0)
+          }
+        })
+      }
+      console.log(`✅ โหลดรายการออเดอร์จาก API สำเร็จ: ${this.orders.length} ออเดอร์`)
+    } catch (err) {
+      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API ออเดอร์ได้:', err.message)
+    }
   },
 
-  updateOrderStatus(orderId, newStatus) {
+  async updateOrderStatus(orderId, newStatus) {
     const order = this.orders.find(o => o.order_id === orderId)
     if (order) {
       order.status = newStatus
-      if (newStatus === 'Completed' && order.table_id) {
-        const tbl = this.tables.find(t => t.table_id === order.table_id)
-        if (tbl) {
-          tbl.status = 'Empty'
-          tbl.activeOrderId = null
-          tbl.currentBill = 0
-          tbl.elapsedMinutes = 0
-        }
-      }
+    }
+
+    let dbStatus = 'PENDING'
+    const s = String(newStatus).toUpperCase()
+    if (s === 'COOKING') dbStatus = 'COOKING'
+    else if (s === 'SERVED') dbStatus = 'SERVED'
+    else if (s === 'READY') dbStatus = 'READY'
+    else if (s === 'COMPLETED' || s === 'PAID') dbStatus = 'COMPLETED'
+    else if (s === 'CANCELLED') dbStatus = 'CANCELLED'
+
+    try {
+      const res = await fetch(`${API_BASE}/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: dbStatus })
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      console.log(`✅ อัปเดตสถานะออเดอร์ #${orderId} เป็น ${dbStatus} สำเร็จ`)
+    } catch (err) {
+      console.warn('⚠️ อัปเดตสถานะออเดอร์ API ไม่สำเร็จ:', err.message)
     }
   },
 
-  toggleTableStatus(tableId, status) {
-    const tbl = this.tables.find(t => t.table_id === tableId)
-    if (tbl) {
-      tbl.status = status
-      if (status === 'Empty') {
-        tbl.activeOrderId = null
-        tbl.currentBill = 0
-        tbl.elapsedMinutes = 0
+  // ===== Promotions API =====
+  async fetchPromotionsFromAPI() {
+    try {
+      const res = await fetch(`${API_BASE}/promotions`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) {
+        this.promotions = data.map(p => ({
+          promo_id: p.promo_id || p.id,
+          code: p.code,
+          discount_type: (p.discount_type || 'FIXED').toUpperCase() === 'PERCENTAGE' ? 'Percentage' : 'Fixed',
+          discount_value: Number(p.discount_value || 0),
+          min_order_price: Number(p.min_order_price || 0),
+          expiry_date: p.expiry_date ? String(p.expiry_date).slice(0, 10) : '2026-12-31',
+          is_active: p.is_active ?? true,
+          used_count: p.used_count || 0
+        }))
       }
+      console.log(`✅ โหลดโปรโมชันจาก API สำเร็จ: ${this.promotions.length} รายการ`)
+    } catch (err) {
+      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API โปรโมชันได้:', err.message)
     }
   },
 
-  togglePromoStatus(promoId) {
+  async togglePromoStatusAPI(promoId) {
     const p = this.promotions.find(x => x.promo_id === promoId)
-    if (p) p.is_active = !p.is_active
+    if (!p) return
+    p.is_active = !p.is_active
+    try {
+      const res = await fetch(`${API_BASE}/promotions/${promoId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: p.is_active })
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      console.log(`✅ สลับสถานะโปรโมชัน #${promoId} สำเร็จ`)
+    } catch (err) {
+      console.warn('⚠️ สลับสถานะโปรโมชัน API ไม่สำเร็จ:', err.message)
+    }
+  },
+  togglePromoStatus(promoId) {
+    return this.togglePromoStatusAPI(promoId)
   },
 
+  async addPromotionAPI(promo) {
+    try {
+      const expDate = promo.expiry_date ? new Date(promo.expiry_date).toISOString() : new Date('2026-12-31T23:59:59Z').toISOString()
+      const res = await fetch(`${API_BASE}/promotions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: String(promo.code || '').toUpperCase(),
+          discount_type: (promo.discount_type || 'FIXED').toUpperCase(),
+          discount_value: Number(promo.discount_value),
+          min_order_price: Number(promo.min_order_price || 0),
+          expiry_date: expDate
+        })
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const created = await res.json()
+      this.promotions.push({
+        promo_id: created.promo_id || created.id,
+        code: created.code,
+        discount_type: (created.discount_type || 'FIXED').toUpperCase() === 'PERCENTAGE' ? 'Percentage' : 'Fixed',
+        discount_value: Number(created.discount_value),
+        min_order_price: Number(created.min_order_price),
+        expiry_date: created.expiry_date ? String(created.expiry_date).slice(0, 10) : promo.expiry_date,
+        is_active: created.is_active ?? true,
+        used_count: 0
+      })
+      console.log(`✅ เพิ่มโปรโมชันใหม่ลง Database สำเร็จ: ${created.code}`)
+    } catch (err) {
+      console.warn('⚠️ เพิ่มโปรโมชัน API ไม่สำเร็จ:', err.message)
+      const id = this.promotions.length > 0 ? Math.max(...this.promotions.map(p => p.promo_id)) + 1 : 1
+      this.promotions.push({ promo_id: id, used_count: 0, ...promo })
+    }
+  },
   addPromotion(promo) {
-    const id = this.promotions.length > 0 ? Math.max(...this.promotions.map(p => p.promo_id)) + 1 : 1
-    this.promotions.push({
-      promo_id: id,
-      used_count: 0,
-      ...promo
-    })
+    return this.addPromotionAPI(promo)
   },
 
+  async deletePromotionAPI(promoId) {
+    try {
+      const res = await fetch(`${API_BASE}/promotions/${promoId}`, {
+        method: 'DELETE'
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      this.promotions = this.promotions.filter(p => p.promo_id !== promoId)
+      console.log(`✅ ลบโปรโมชัน #${promoId} สำเร็จ`)
+    } catch (err) {
+      console.warn('⚠️ ลบโปรโมชัน API ไม่สำเร็จ:', err.message)
+      this.promotions = this.promotions.filter(p => p.promo_id !== promoId)
+    }
+  },
   deletePromotion(promoId) {
-    this.promotions = this.promotions.filter(p => p.promo_id !== promoId)
+    return this.deletePromotionAPI(promoId)
   },
 
+  // ===== CSV Export =====
   exportSalesCSV() {
     const headers = ['Order ID', 'Date Time', 'Type', 'Table', 'Customer', 'Items Count', 'Payment Method', 'Discount (THB)', 'Total Amount (THB)', 'Payment Status', 'Order Status']
     const rows = this.orders.map(o => [
       '#ORD-' + o.order_id,
-      '"' + o.created_at + '"',
-      '"' + o.order_type + '"',
+      '"' + (o.created_at || '') + '"',
+      '"' + (o.order_type || 'In-store') + '"',
       '"' + (o.table_id ? 'T-0' + o.table_id : '-') + '"',
-      '"' + o.customer_name + '"',
-      o.items.reduce((s, i) => s + i.quantity, 0),
-      '"' + o.payment_method + '"',
-      o.discount_applied,
-      o.total_price,
-      '"' + o.payment_status + '"',
-      '"' + o.status + '"'
+      '"' + (o.customer_name || 'ลูกค้า') + '"',
+      (o.items || []).reduce((s, i) => s + (Number(i.quantity) || 1), 0),
+      '"' + (o.payment_method || '-') + '"',
+      o.discount_applied || 0,
+      o.total_price || 0,
+      '"' + (o.payment_status || 'Completed') + '"',
+      '"' + (o.status || 'Completed') + '"'
     ])
 
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n')

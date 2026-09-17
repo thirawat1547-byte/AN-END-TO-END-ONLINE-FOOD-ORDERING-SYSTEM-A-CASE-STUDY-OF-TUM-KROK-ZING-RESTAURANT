@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { adminStore } from './store/adminData'
 import logoImg from '../assets/logo.png'
@@ -12,9 +12,9 @@ const isMobileOpen = ref(false)
 const navLinks = [
   { name: 'ภาพรวมยอดขาย', path: '/admin/dashboard', icon: '📊', badge: null },
   { name: 'จัดการเมนูอาหาร', path: '/admin/menus', icon: '🌶️', badge: () => adminStore.menus.length },
-  { name: 'คลังวัตถุดิบ & สูตร', path: '/admin/inventory', icon: '📦', badge: () => adminStore.ingredients.filter(i => i.quantity_in_stock <= i.reorder_level).length || null, badgeColor: 'bg-red-500' },
-  { name: 'ผังโต๊ะอาหาร', path: '/admin/tables', icon: '🪑', badge: () => adminStore.tables.filter(t => t.status === 'Occupied').length + ' โต๊ะ' },
-  { name: 'จอห้องครัว KDS', path: '/admin/kds', icon: '🍳', badge: () => adminStore.orders.filter(o => ['Pending', 'Cooking'].includes(o.status)).length || null, badgeColor: 'bg-[#2d5a43]' },
+  { name: 'คลังวัตถุดิบ & สูตร', path: '/admin/inventory', icon: '📦', badge: () => adminStore.ingredients.filter(i => Number(i.quantity_in_stock) <= Number(i.reorder_level)).length || null, badgeColor: 'bg-red-500' },
+  { name: 'ผังโต๊ะอาหาร', path: '/admin/tables', icon: '🪑', badge: () => adminStore.tables.filter(t => t.status === 'Occupied' || t.status === 'OCCUPIED').length + ' โต๊ะ' },
+  { name: 'จอห้องครัว KDS', path: '/admin/kds', icon: '🍳', badge: () => adminStore.orders.filter(o => ['Pending', 'Cooking', 'PENDING', 'COOKING'].includes(o.status)).length || null, badgeColor: 'bg-[#2d5a43]' },
   { name: 'โปรโมชัน & ส่วนลด', path: '/admin/promotions', icon: '🏷️', badge: () => adminStore.promotions.filter(p => p.is_active).length },
   { name: 'ประวัติบิล & การเงิน', path: '/admin/transactions', icon: '💰', badge: null },
   { name: 'ตั้งค่าร้านค้า', path: '/admin/settings', icon: '⚙️', badge: null }
@@ -26,11 +26,23 @@ const currentTitle = computed(() => {
 })
 
 const lowStockCount = computed(() => {
-  return adminStore.ingredients.filter(i => i.quantity_in_stock <= i.reorder_level).length
+  return adminStore.ingredients.filter(i => Number(i.quantity_in_stock) <= Number(i.reorder_level)).length
 })
 
 const activeCookingOrders = computed(() => {
-  return adminStore.orders.filter(o => ['Pending', 'Cooking'].includes(o.status)).length
+  return adminStore.orders.filter(o => ['Pending', 'Cooking', 'PENDING', 'COOKING'].includes(o.status)).length
+})
+
+let pollTimer = null
+onMounted(async () => {
+  await adminStore.initAdminData()
+  pollTimer = setInterval(() => {
+    adminStore.initAdminData()
+  }, 5000)
+})
+
+onUnmounted(() => {
+  if (pollTimer) clearInterval(pollTimer)
 })
 </script>
 

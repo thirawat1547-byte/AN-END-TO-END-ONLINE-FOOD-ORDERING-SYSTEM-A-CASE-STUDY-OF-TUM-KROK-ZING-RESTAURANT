@@ -96,6 +96,7 @@ export class OrdersService {
           include: { menu: true },
         },
         table: true,
+        transaction: true,
       },
       orderBy: { order_id: 'desc' },
     });
@@ -110,6 +111,7 @@ export class OrdersService {
           include: { menu: true },
         },
         table: true,
+        transaction: true,
       },
       orderBy: { order_id: 'desc' },
     });
@@ -124,6 +126,7 @@ export class OrdersService {
           include: { menu: true },
         },
         table: true,
+        transaction: true,
         user: {
           select: { user_id: true, username: true, phone_number: true },
         },

@@ -47,6 +47,14 @@ export declare class OrdersService {
             table_number: string;
             capacity: number;
         };
+        transaction: {
+            order_id: number;
+            transaction_id: number;
+            amount: import("@prisma/client/runtime/library").Decimal;
+            payment_method: string;
+            payment_status: string;
+            payment_slip_url: string | null;
+        }[];
         order_items: ({
             menu: {
                 menu_id: number;
@@ -83,6 +91,14 @@ export declare class OrdersService {
             table_number: string;
             capacity: number;
         };
+        transaction: {
+            order_id: number;
+            transaction_id: number;
+            amount: import("@prisma/client/runtime/library").Decimal;
+            payment_method: string;
+            payment_status: string;
+            payment_slip_url: string | null;
+        }[];
         order_items: ({
             menu: {
                 menu_id: number;
@@ -124,6 +140,14 @@ export declare class OrdersService {
             table_number: string;
             capacity: number;
         };
+        transaction: {
+            order_id: number;
+            transaction_id: number;
+            amount: import("@prisma/client/runtime/library").Decimal;
+            payment_method: string;
+            payment_status: string;
+            payment_slip_url: string | null;
+        }[];
         order_items: ({
             menu: {
                 menu_id: number;

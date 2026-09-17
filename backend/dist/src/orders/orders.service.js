@@ -91,6 +91,7 @@ let OrdersService = class OrdersService {
                     include: { menu: true },
                 },
                 table: true,
+                transaction: true,
             },
             orderBy: { order_id: 'desc' },
         });
@@ -103,6 +104,7 @@ let OrdersService = class OrdersService {
                     include: { menu: true },
                 },
                 table: true,
+                transaction: true,
             },
             orderBy: { order_id: 'desc' },
         });
@@ -115,6 +117,7 @@ let OrdersService = class OrdersService {
                     include: { menu: true },
                 },
                 table: true,
+                transaction: true,
                 user: {
                     select: { user_id: true, username: true, phone_number: true },
                 },
@@ -133,26 +136,26 @@ let OrdersService = class OrdersService {
         });
         if (order.table_id) {
             const statusUpper = updateOrderStatusDto.status.toUpperCase();
-            if (['COMPLETED', 'CANCELLED'].includes(statusUpper)) {
-                const remaining = await this.prisma.order.count({
+            if (['PENDING', 'COOKING', 'READY', 'SERVED'].includes(statusUpper)) {
+                await this.prisma.table.update({
+                    where: { table_id: order.table_id },
+                    data: { status: 'OCCUPIED' },
+                }).catch(() => { });
+            }
+            else if (['PAID', 'CANCELLED'].includes(statusUpper)) {
+                const remainingUnpaid = await this.prisma.order.count({
                     where: {
                         table_id: order.table_id,
-                        status: { in: ['PENDING', 'COOKING', 'READY', 'PAID'] },
+                        status: { in: ['PENDING', 'COOKING', 'READY', 'SERVED'] },
                         order_id: { not: id },
                     },
                 });
-                if (remaining === 0) {
+                if (remainingUnpaid === 0) {
                     await this.prisma.table.update({
                         where: { table_id: order.table_id },
                         data: { status: 'AVAILABLE' },
                     }).catch(() => { });
                 }
-            }
-            else if (['PENDING', 'COOKING', 'READY', 'PAID'].includes(statusUpper)) {
-                await this.prisma.table.update({
-                    where: { table_id: order.table_id },
-                    data: { status: 'OCCUPIED' },
-                }).catch(() => { });
             }
         }
         return updated;

@@ -118,10 +118,26 @@ let TransactionsService = class TransactionsService {
             where: { order_id: orderId },
             data: { payment_status: 'COMPLETED' },
         });
-        return this.prisma.order.update({
+        const updated = await this.prisma.order.update({
             where: { order_id: orderId },
             data: { status: 'PAID' },
         });
+        if (order.table_id) {
+            const remainingUnpaid = await this.prisma.order.count({
+                where: {
+                    table_id: order.table_id,
+                    status: { in: ['PENDING', 'COOKING', 'READY', 'SERVED'] },
+                    order_id: { not: orderId },
+                },
+            });
+            if (remainingUnpaid === 0) {
+                await this.prisma.table.update({
+                    where: { table_id: order.table_id },
+                    data: { status: 'AVAILABLE' },
+                }).catch(() => { });
+            }
+        }
+        return updated;
     }
 };
 exports.TransactionsService = TransactionsService;

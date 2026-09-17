@@ -18,7 +18,8 @@ const filteredOrders = computed(() => {
   return adminStore.orders.filter(o => {
     const matchStatus = selectedStatus.value === 'All' || o.payment_status === selectedStatus.value
     const matchSearch = String(o.order_id).includes(searchQuery.value) || 
-                        o.payment_method.toLowerCase().includes(searchQuery.value.toLowerCase())
+                        (o.payment_method || '').toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+                        (o.customer_name || '').toLowerCase().includes(searchQuery.value.toLowerCase())
     return matchStatus && matchSearch
   })
 })

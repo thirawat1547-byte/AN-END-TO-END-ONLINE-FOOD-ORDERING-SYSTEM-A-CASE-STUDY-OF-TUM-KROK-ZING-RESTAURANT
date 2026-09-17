@@ -22,20 +22,30 @@ const totalItemsSold = computed(() => {
 })
 
 const occupiedTablesCount = computed(() => {
-  return adminStore.tables.filter(t => t.status === 'Occupied' || t.status === 'Billing').length
+  return adminStore.tables.filter(t => t.status === 'Occupied' || t.status === 'OCCUPIED' || t.status === 'Billing').length
 })
 
 const lowStockItems = computed(() => {
-  return adminStore.ingredients.filter(i => i.quantity_in_stock <= i.reorder_level)
+  return adminStore.ingredients.filter(i => Number(i.quantity_in_stock) <= Number(i.reorder_level))
 })
 
 const topMenus = computed(() => {
-  return [...adminStore.menus].sort((a, b) => b.total_sold - a.total_sold).slice(0, 5)
+  return [...adminStore.menus].sort((a, b) => (b.total_sold || 0) - (a.total_sold || 0)).slice(0, 5)
 })
 
 const recentOrders = computed(() => {
   return [...adminStore.orders].slice(0, 5)
 })
+
+function formatTime(dateStr) {
+  if (!dateStr) return ''
+  try {
+    const d = new Date(dateStr)
+    return d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+  } catch (e) {
+    return String(dateStr).slice(11, 16)
+  }
+}
 
 // Hourly sales distribution mock
 const hourlySales = [
@@ -315,7 +325,7 @@ const hourlySales = [
 
             <div class="text-right">
               <p class="font-bold text-xs text-slate-900">฿{{ order.total_price }}</p>
-              <p class="text-[10px] text-slate-400">{{ order.created_at ? order.created_at.slice(11, 16) : '' }} น. ({{ order.payment_method }})</p>
+              <p class="text-[10px] text-slate-400">{{ formatTime(order.created_at) }} น. ({{ order.payment_method }})</p>
             </div>
           </div>
         </div>

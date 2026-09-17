@@ -1,6 +1,10 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { adminStore } from '../store/adminData'
+
+onMounted(async () => {
+  await adminStore.fetchMenusFromAPI()
+})
 
 const selectedCategory = ref(0) // 0 = all
 const searchQuery = ref('')

@@ -4,9 +4,10 @@ import { adminStore } from '../store/adminData'
 
 // โหลดข้อมูลโต๊ะจริงจาก Backend ทันทีที่เปิดหน้าเว็บ
 onMounted(async () => {
-  if (typeof adminStore.fetchTablesFromAPI === 'function') {
-    await adminStore.fetchTablesFromAPI()
-  }
+  await Promise.allSettled([
+    adminStore.fetchTablesFromAPI(),
+    adminStore.fetchOrdersFromAPI()
+  ])
 })
 
 const selectedTable = ref(null)
@@ -31,7 +32,7 @@ async function changeStatus(table, newStatus) {
 async function clearTable(table) {
   if (confirm(`คุณต้องการเช็คบิลและเคลียร์โต๊ะ ${table.table_number} หรือไม่?`)) {
     if (table.activeOrderId) {
-      adminStore.updateOrderStatus(table.activeOrderId, 'Completed')
+      await adminStore.updateOrderStatus(table.activeOrderId, 'Completed')
     }
     if (typeof adminStore.toggleTableStatusAPI === 'function') {
       await adminStore.toggleTableStatusAPI(table.table_id, 'Empty')
@@ -53,10 +54,10 @@ async function clearTable(table) {
       </div>
       <div class="flex items-center gap-2">
         <span class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
-          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> ว่าง: {{ adminStore.tables.filter(t => t.status === 'Empty').length }}
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> ว่าง: {{ adminStore.tables.filter(t => t.status === 'Empty' || t.status === 'AVAILABLE').length }}
         </span>
         <span class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-red-50 text-red-700 border border-red-200">
-          <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span> มีลูกค้า: {{ adminStore.tables.filter(t => t.status === 'Occupied').length }}
+          <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span> มีลูกค้า: {{ adminStore.tables.filter(t => t.status === 'Occupied' || t.status === 'OCCUPIED').length }}
         </span>
         <span class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-amber-50 text-amber-700 border border-amber-200">
           <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> รอเช็คบิล: {{ adminStore.tables.filter(t => t.status === 'Billing').length }}
