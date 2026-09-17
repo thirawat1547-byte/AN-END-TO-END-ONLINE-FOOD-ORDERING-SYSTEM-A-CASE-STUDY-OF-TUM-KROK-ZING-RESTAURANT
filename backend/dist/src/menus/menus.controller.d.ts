@@ -10,8 +10,8 @@ export declare class MenusController {
             category_name: string;
         };
     } & {
-        menu_id: number;
         category_id: number;
+        menu_id: number;
         menu_name: string;
         description: string | null;
         price: import("@prisma/client/runtime/library").Decimal;
@@ -35,8 +35,8 @@ export declare class MenusController {
             allergen_id: number;
         })[];
     } & {
-        menu_id: number;
         category_id: number;
+        menu_id: number;
         menu_name: string;
         description: string | null;
         price: import("@prisma/client/runtime/library").Decimal;
@@ -61,22 +61,22 @@ export declare class MenusController {
         })[];
         ingredients: ({
             ingredient: {
-                created_at: Date;
                 name: string;
-                ingredient_id: number;
+                created_at: Date;
                 quantity: number;
+                ingredient_id: number;
                 unit: string;
                 min_quantity: number;
                 updated_at: Date;
             };
         } & {
-            ingredient_id: number;
             menu_id: number;
+            ingredient_id: number;
             quantity_used: import("@prisma/client/runtime/library").Decimal;
         })[];
     } & {
-        menu_id: number;
         category_id: number;
+        menu_id: number;
         menu_name: string;
         description: string | null;
         price: import("@prisma/client/runtime/library").Decimal;
@@ -90,8 +90,8 @@ export declare class MenusController {
             category_name: string;
         };
     } & {
-        menu_id: number;
         category_id: number;
+        menu_id: number;
         menu_name: string;
         description: string | null;
         price: import("@prisma/client/runtime/library").Decimal;
@@ -100,8 +100,8 @@ export declare class MenusController {
         is_available: boolean;
     }>;
     remove(id: number): Promise<{
-        menu_id: number;
         category_id: number;
+        menu_id: number;
         menu_name: string;
         description: string | null;
         price: import("@prisma/client/runtime/library").Decimal;
