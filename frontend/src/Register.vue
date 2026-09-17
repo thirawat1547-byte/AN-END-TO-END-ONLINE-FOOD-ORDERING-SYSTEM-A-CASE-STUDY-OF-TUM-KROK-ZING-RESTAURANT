@@ -125,10 +125,8 @@ export default {
         const payload = {
           username: this.form.username.trim(),
           password: this.form.password,
-          name: this.form.name.trim() || this.form.username.trim(),
           phone_number: this.form.phone.trim() || undefined,
-          email: this.form.email.trim() || undefined,
-          address: this.form.address.trim() || undefined
+          email: this.form.email.trim() || undefined
         };
 
         // 1. บันทึกบัญชีผู้ใช้ลงฐานข้อมูล MySQL จริงผ่าน Backend API
