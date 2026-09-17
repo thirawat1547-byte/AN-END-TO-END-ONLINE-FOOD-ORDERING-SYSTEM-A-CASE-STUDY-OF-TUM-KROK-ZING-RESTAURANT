@@ -92,6 +92,7 @@
 <script>
 import axios from 'axios';
 import { API_BASE } from './config/api';
+import { authStore } from './store/authStore';
 
 export default {
   data() {
@@ -113,13 +114,21 @@ export default {
       this.loading = true;
       this.errorMessage = '';
 
+      // Validate
+      if (!this.form.username || !this.form.password) {
+        this.errorMessage = 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน';
+        this.loading = false;
+        return;
+      }
+
       try {
-        const usernameClean = this.form.username.trim();
         const payload = {
-          username: usernameClean,
+          username: this.form.username.trim(),
           password: this.form.password,
-          email: this.form.email ? this.form.email.trim() : undefined,
-          phone_number: this.form.phone ? this.form.phone.trim() : undefined
+          name: this.form.name.trim() || this.form.username.trim(),
+          phone_number: this.form.phone.trim() || undefined,
+          email: this.form.email.trim() || undefined,
+          address: this.form.address.trim() || undefined
         };
 
         // 1. บันทึกบัญชีผู้ใช้ลงฐานข้อมูล MySQL จริงผ่าน Backend API
@@ -134,9 +143,6 @@ export default {
 
           const token = loginRes.data?.access_token || loginRes.data?.token;
           if (token) {
-            localStorage.setItem('access_token', token);
-            localStorage.setItem('isLoggedIn', 'true');
-
             // 3. ถ้ามีที่อยู่ ให้อัปเดตลง Database
             if (this.form.address && this.form.address.trim()) {
               try {
@@ -157,7 +163,7 @@ export default {
               address: this.form.address || '',
               email: payload.email || ''
             };
-            localStorage.setItem('userProfile', JSON.stringify(userProfile));
+            authStore.setAuth(token, userProfile);
           }
         } catch (loginErr) {
           console.warn('Auto-login หลังสมัครไม่สำเร็จ:', loginErr);

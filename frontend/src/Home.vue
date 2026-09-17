@@ -1,61 +1,11 @@
 <template>
   <div class="page-container">
+    <!-- Top Navbar มาตรฐานเดียวกันทุกหน้า -->
+    <CustomerNavbar v-model="searchQuery" :showSearch="true" />
+
     <div class="main-layout">
       <!-- ส่วนเนื้อหาหลักด้านซ้าย -->
       <div class="content-area">
-        <!-- Header -->
-        <header class="navbar">
-          <div class="logo-section">
-            <img src="./assets/logo.png" alt="Logo" class="logo-img">
-          </div>
-          <nav class="nav-menu">
-            <router-link to="/" class="nav-item active">ค้นหา</router-link>
-            <router-link to="/tracking" class="nav-item">คำสั่งซื้อ</router-link>
-            <router-link to="/history" class="nav-item">ประวัติคำสั่งซื้อ</router-link>
-            <router-link to="/promotions" class="nav-item">โปรโมชั่น</router-link>
-            <router-link to="/help" class="nav-item">ช่วยเหลือ</router-link>
-          </nav>
-          
-          <div class="search-box">
-            <span class="search-icon">🔍</span>
-            <input type="text" placeholder="ค้นหาของอร่อยออร์แกนิก..." v-model="searchQuery">
-          </div>
-
-          <div class="location-wrapper">
-            <div class="location-box" @click="showAddressDropdown = !showAddressDropdown">
-              <span class="loc-icon">📍</span>
-              <span class="loc-text">
-                จัดส่งที่: <b>{{ displayAddress }}</b>
-              </span>
-              <span class="dropdown-arrow" :class="{ 'arrow-up': showAddressDropdown }">▼</span>
-            </div>
-
-            <div class="address-dropdown-menu" v-if="showAddressDropdown">
-              <div class="addr-title">📍 ที่อยู่จัดส่งปัจจุบัน</div>
-              <div class="addr-full-text">
-                {{ isLoggedIn && userProfile.address ? userProfile.address : 'ตลาดปากเกร็ด (ค่าเริ่มต้น)' }}
-              </div>
-              <button class="addr-edit-btn" @click.stop="$router.push('/profile')">
-                ✏️ แก้ไขที่อยู่
-              </button>
-            </div>
-          </div>
-
-          <div class="header-actions">
-            <button class="icon-btn">🔔</button>
-            <div class="auth-links" v-if="!isLoggedIn">
-              <router-link to="/login" class="login-text">เข้าสู่ระบบ</router-link>
-              <router-link to="/register" class="reg-text">สมัครสมาชิก</router-link>
-            </div>
-            <div class="auth-links" v-else>
-              <button class="logout-btn" @click="logout">ออกจากระบบ</button>
-              <div class="profile-avatar" @click="$router.push('/profile')">
-                <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop" alt="Profile">
-              </div>
-            </div>
-          </div>
-        </header>
-
         <!-- Hero Banner -->
         <div class="hero-banner">
           <div class="hero-text-box">
@@ -322,8 +272,12 @@
 <script>
 import axios from 'axios';
 import { API_BASE } from './config/api';
+import CustomerNavbar from './components/CustomerNavbar.vue';
 
 export default {
+  components: {
+    CustomerNavbar
+  },
   data() {
     return {
       isLoggedIn: false,
@@ -572,8 +526,8 @@ export default {
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap');
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Prompt', sans-serif; }
-.page-container { background-color: #f7f6f0; min-height: 100vh; width: 100%; padding: 20px 0; position: relative; }
-.main-layout { display: flex; width: 100%; background: #f7f6f0; gap: 20px; padding: 0 30px; align-items: flex-start; }
+.page-container { background-color: #f7f6f0; min-height: 100vh; width: 100%; padding: 0 0 20px 0; position: relative; }
+.main-layout { display: flex; width: 100%; background: #f7f6f0; gap: 20px; padding: 25px 40px 0 40px; align-items: flex-start; }
 
 .out-of-stock-card { opacity: 0.7; background: #faf9f5; cursor: not-allowed; }
 .out-of-stock-overlay { position: absolute; inset: 0; background: rgba(15, 23, 42, 0.6); display: flex; align-items: center; justify-content: center; border-radius: 10px; z-index: 5; }
@@ -581,40 +535,6 @@ export default {
 .disabled-btn { background: #cbd5e1 !important; color: #64748b !important; cursor: not-allowed !important; }
 
 .content-area { flex: 1; min-width: 0; }
-.navbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 25px; padding-top: 10px; gap: 15px; }
-.logo-img { height: 40px; }
-.nav-menu { display: flex; gap: 20px; white-space: nowrap; }
-.nav-item { text-decoration: none; color: #444; font-size: 14px; font-weight: 500; transition: 0.2s; }
-.nav-item:hover { color: #557c61; }
-.nav-item.active { color: #557c61; font-weight: 600; border-bottom: 2px solid #557c61; padding-bottom: 3px; }
-
-.search-box { position: relative; width: 220px; z-index: 10; }
-.search-box input { width: 100%; padding: 8px 12px 8px 32px; border-radius: 20px; border: 1px solid #e0dfd5; background: #fff; font-size: 13px; color: #333; outline: none; position: relative; z-index: 11; }
-.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 12px; color: #888; z-index: 12; }
-
-.location-wrapper { position: relative; display: inline-block; z-index: 20; }
-.location-box { display: flex; align-items: center; gap: 5px; font-size: 13px; color: #444; background: #f1ede1; padding: 6px 12px; border-radius: 20px; cursor: pointer; white-space: nowrap; transition: 0.2s; border: 1px solid transparent; }
-.location-box:hover { background: #e8e4d5; border-color: #d6d2c4; }
-.loc-icon { color: #557c61; }
-.dropdown-arrow { font-size: 10px; color: #777; margin-left: 3px; transition: transform 0.3s ease; }
-.dropdown-arrow.arrow-up { transform: rotate(180deg); color: #557c61; }
-
-.address-dropdown-menu { position: absolute; top: calc(100% + 10px); left: 50%; transform: translateX(-50%); background: white; border: 1px solid #e5e2d5; border-radius: 16px; padding: 15px 20px; width: 260px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 100; cursor: default; }
-.address-dropdown-menu::before { content: ''; position: absolute; top: -6px; left: 50%; transform: translateX(-50%) rotate(45deg); width: 12px; height: 12px; background: white; border-left: 1px solid #e5e2d5; border-top: 1px solid #e5e2d5; }
-.addr-title { font-size: 13px; font-weight: 600; color: #557c61; margin-bottom: 6px; }
-.addr-full-text { font-size: 13px; color: #555; line-height: 1.5; margin-bottom: 12px; word-wrap: break-word; background: #faf9f5; padding: 10px; border-radius: 8px; }
-.addr-edit-btn { width: 100%; background: white; border: 1px solid #557c61; color: #557c61; padding: 8px; border-radius: 10px; font-size: 13px; font-weight: 500; cursor: pointer; transition: 0.2s; font-family: inherit; }
-.addr-edit-btn:hover { background: #f4faeb; }
-
-.header-actions { display: flex; align-items: center; gap: 15px; white-space: nowrap; }
-.icon-btn { background: none; border: none; font-size: 16px; cursor: pointer; }
-.auth-links { display: flex; gap: 12px; font-size: 13px; font-weight: 600; align-items: center; }
-.login-text { color: #557c61; text-decoration: none; }
-.reg-text { color: #333; text-decoration: none; }
-.logout-btn { background: none; border: 1px solid #ff4d4f; color: #ff4d4f; padding: 4px 10px; border-radius: 12px; cursor: pointer; font-size: 12px; font-family: inherit; }
-.profile-avatar { width: 32px; height: 32px; border-radius: 50%; overflow: hidden; cursor: pointer; border: 1px solid transparent; margin-left: 10px; }
-.profile-avatar:hover { border-color: #557c61; }
-.profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
 .hero-banner { background: url('https://images.unsplash.com/photo-1540420773420-3366772f4999?q=80&w=1200') center/cover; border-radius: 24px; padding: 45px 50px; color: white; margin-bottom: 25px; position: relative; overflow: hidden; }
 .hero-banner::before { content: ''; position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.35); }

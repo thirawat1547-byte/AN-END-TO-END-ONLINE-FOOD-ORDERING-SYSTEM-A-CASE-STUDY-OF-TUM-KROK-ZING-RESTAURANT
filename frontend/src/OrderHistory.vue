@@ -1,37 +1,7 @@
 <template>
   <div class="page-container">
-    <header class="navbar">
-      <!-- กลุ่มซ้าย: โลโก้ + เมนู -->
-      <div class="nav-left-group">
-        <img src="./assets/logo.png" alt="Logo" class="logo-img" @click="$router.push('/')">
-        <nav class="nav-menu">
-          <router-link to="/" class="nav-item">ค้นหา</router-link>
-          <router-link to="/tracking" class="nav-item">คำสั่งซื้อ</router-link>
-          <router-link to="/history" class="nav-item">ประวัติคำสั่งซื้อ</router-link>
-          <router-link to="/promotions" class="nav-item">โปรโมชั่น</router-link>
-          <router-link to="/help" class="nav-item">ช่วยเหลือ</router-link>
-        </nav>
-      </div>
-      
-      <!-- ดันขวา -->
-      <div class="header-spacer"></div>
-
-      <!-- กลุ่มขวา: แจ้งเตือน + ตะกร้า + โปรไฟล์ -->
-      <div class="header-actions">
-        <button class="icon-btn">🔔</button>
-        <button class="icon-btn" @click="$router.push('/')" v-if="$route.path !== '/'">🛒</button>
-        <div class="auth-links" v-if="!isLoggedIn">
-          <router-link to="/login" class="login-text">เข้าสู่ระบบ</router-link>
-          <router-link to="/register" class="reg-text">สมัครสมาชิก</router-link>
-        </div>
-        <div class="auth-links" v-else>
-          <button class="logout-btn" @click="logout">ออกจากระบบ</button>
-          <div class="profile-avatar" @click="$router.push('/profile')">
-            <img :src="userProfile.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop'" alt="Profile">
-          </div>
-        </div>
-      </div>
-    </header>
+    <!-- Header มาตรฐานเดียวกันทุกหน้า -->
+    <CustomerNavbar />
 
     <div class="content-wrapper">
       <h1 class="page-main-title">ประวัติคำสั่งซื้อ</h1>
@@ -155,8 +125,12 @@
 <script>
 import axios from 'axios';
 import { API_BASE } from './config/api';
+import CustomerNavbar from './components/CustomerNavbar.vue';
 
 export default {
+  components: {
+    CustomerNavbar
+  },
   data() {
     return {
       isLoggedIn: false,
@@ -285,25 +259,6 @@ export default {
 @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap');
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Prompt', sans-serif; }
 .page-container { background-color: #f7f6f0; min-height: 100vh; display: flex; flex-direction: column; }
-
-.navbar { display: flex; align-items: center; justify-content: space-between; padding: 15px 40px; background: #f7f6f0; border-bottom: 1px solid #e5e2d5; gap: 15px; }
-.nav-left-group { display: flex; align-items: center; gap: 30px; }
-.logo-img { height: 40px; cursor: pointer; display: block; }
-.nav-menu { display: flex; align-items: center; gap: 20px; white-space: nowrap; margin-top: 5px; }
-.nav-item { text-decoration: none; color: #444; font-size: 14px; font-weight: 500; }
-.nav-item.router-link-exact-active { color: #557c61; font-weight: 600; border-bottom: 2px solid #557c61; padding-bottom: 3px; }
-
-.header-spacer { flex-grow: 1; }
-
-.header-actions { display: flex; align-items: center; gap: 15px; white-space: nowrap; }
-.icon-btn { background: none; border: none; font-size: 16px; cursor: pointer; }
-.auth-links { display: flex; gap: 12px; font-size: 13px; font-weight: 600; align-items: center; }
-.login-text { color: #557c61; text-decoration: none; }
-.reg-text { color: #333; text-decoration: none; }
-.logout-btn { background: none; border: 1px solid #ff4d4f; color: #ff4d4f; padding: 4px 10px; border-radius: 12px; cursor: pointer; font-size: 12px; font-family: inherit; }
-.profile-avatar { width: 32px; height: 32px; border-radius: 50%; overflow: hidden; cursor: pointer; border: 1px solid transparent; margin-left: 10px; }
-.profile-avatar:hover { border-color: #557c61; }
-.profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
 .content-wrapper { max-width: 1300px; margin: 0 auto; width: 100%; padding: 40px; display: flex; flex-direction: column; gap: 25px; flex-grow: 1; }
 .page-main-title { font-size: 26px; font-weight: 700; color: #333; text-align: center; margin-bottom: 10px; }

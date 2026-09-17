@@ -1,32 +1,7 @@
 <template>
   <div class="checkout-container">
-    <header class="navbar">
-      <!-- กลุ่มซ้าย: โลโก้ + เมนู -->
-      <div class="nav-left-group">
-        <img src="./assets/logo.png" alt="Logo" class="logo-img" @click="$router.push('/')">
-        <nav class="nav-menu">
-          <router-link to="/" class="nav-item">ค้นหา</router-link>
-          <router-link to="/tracking" class="nav-item">คำสั่งซื้อ</router-link>
-          <router-link to="/history" class="nav-item">ประวัติคำสั่งซื้อ</router-link>
-          <router-link to="/promotions" class="nav-item">โปรโมชั่น</router-link>
-          <router-link to="/help" class="nav-item">ช่วยเหลือ</router-link>
-        </nav>
-      </div>
-      
-      <!-- พื้นที่ว่างดันไปขวา -->
-      <div class="header-spacer"></div>
-
-      <!-- กลุ่มขวา: จัดเรียงแนวนอนทั้งหมด -->
-      <div class="header-actions">
-        <button class="icon-btn">🔔</button>
-        <button class="icon-btn" @click="$router.push('/')" v-if="$route.path !== '/'">🛒</button>
-        <button class="logout-btn" @click="logout" v-if="isLoggedIn">ออกจากระบบ</button>
-        <router-link to="/login?redirect=/checkout" class="nav-item" style="color: #2d5a43; font-weight: 600;" v-else>เข้าสู่ระบบ</router-link>
-        <div class="profile-avatar" @click="$router.push('/profile')">
-          <img :src="userProfile.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop'" alt="Profile">
-        </div>
-      </div>
-    </header>
+    <!-- Header มาตรฐานเดียวกันทุกหน้า -->
+    <CustomerNavbar />
 
     <div class="checkout-main">
       <div class="left-section">
@@ -208,6 +183,7 @@ import axios from 'axios';
 import QRCode from 'qrcode';
 import { adminStore } from './admin/store/adminData.js';
 import { API_BASE } from './config/api';
+import CustomerNavbar from './components/CustomerNavbar.vue';
 
 // คำนวณรหัส CRC16 สำหรับ PromptPay EMVCo
 function crc16(data) {
@@ -244,6 +220,9 @@ function generatePromptPayPayload(target, amount) {
 }
 
 export default {
+  components: {
+    CustomerNavbar
+  },
   data() {
     return {
       isLoggedIn: false,
@@ -538,22 +517,6 @@ async validateAndCheckout() {
 @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap');
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Prompt', sans-serif; }
 .checkout-container { background-color: #f7f6f0; min-height: 100vh; display: flex; flex-direction: column; }
-.navbar { display: flex; align-items: center; justify-content: space-between; padding: 15px 40px; background: #f7f6f0; border-bottom: 1px solid #e5e2d5; }
-.logo-img { height: 40px; cursor: pointer; display: block; }
-.nav-menu { display: flex; align-items: center; gap: 20px; white-space: nowrap; margin-top: 5px; }
-.nav-item { text-decoration: none; color: #444; font-size: 14px; font-weight: 500; transition: 0.2s; }
-.nav-item:hover { color: #557c61; }
-.nav-left-group { display: flex; align-items: center; gap: 30px; }
-
-.header-spacer { flex-grow: 1; }
-
-.header-actions { display: flex; align-items: center; gap: 15px; }
-.icon-btn { background: none; border: none; font-size: 16px; cursor: pointer; }
-.logout-btn { background: none; border: 1px solid #ff4d4f; color: #ff4d4f; padding: 4px 12px; border-radius: 15px; cursor: pointer; font-size: 13px; font-weight: 500; font-family: inherit; transition: 0.2s; }
-.logout-btn:hover { background: #fff0f0; }
-.profile-avatar { width: 34px; height: 34px; border-radius: 50%; overflow: hidden; cursor: pointer; border: 1px solid transparent; display: flex; justify-content: center; align-items: center; }
-.profile-avatar:hover { border-color: #557c61; }
-.profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
 .checkout-main { display: flex; justify-content: center; gap: 30px; padding: 30px 40px; flex-grow: 1; max-width: 1200px; margin: 0 auto; width: 100%; }
 .left-section { flex: 1; display: flex; flex-direction: column; gap: 20px; max-width: 680px; }

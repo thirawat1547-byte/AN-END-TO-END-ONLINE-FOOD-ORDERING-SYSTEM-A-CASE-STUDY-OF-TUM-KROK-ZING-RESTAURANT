@@ -52,6 +52,7 @@
 <script>
 import axios from 'axios';
 import { API_BASE } from './config/api';
+import { authStore } from './store/authStore';
 
 export default {
   data() {
@@ -77,20 +78,20 @@ export default {
         const token = response.data?.access_token || response.data?.token;
 
         if (token) {
-          localStorage.setItem('access_token', token);
-          localStorage.setItem('isLoggedIn', 'true');
-
+          let userProfileData = null;
           // ดึงข้อมูลโปรไฟล์ผู้ใช้จริงมาเก็บไว้
           try {
             const profileRes = await axios.get(`${API_BASE}/auth/profile`, {
               headers: { Authorization: `Bearer ${token}` }
             });
-            localStorage.setItem('userProfile', JSON.stringify(profileRes.data));
+            userProfileData = profileRes.data;
           } catch (profileErr) {
             if (response.data?.user) {
-              localStorage.setItem('userProfile', JSON.stringify(response.data.user));
+              userProfileData = response.data.user;
             }
           }
+
+          authStore.setAuth(token, userProfileData);
 
           alert('เข้าสู่ระบบสำเร็จ!');
           const redirect = this.$route.query.redirect || '/';
