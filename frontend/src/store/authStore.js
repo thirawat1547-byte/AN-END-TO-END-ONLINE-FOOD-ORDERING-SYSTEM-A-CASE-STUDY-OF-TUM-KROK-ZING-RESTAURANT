@@ -43,6 +43,10 @@ export const authStore = reactive({
     localStorage.removeItem('access_token');
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('userProfile');
+    localStorage.removeItem('orderHistoryList');
+    sessionStorage.removeItem('currentOrder');
+    sessionStorage.removeItem('cartData');
+    localStorage.removeItem('cartData');
     this.isLoggedIn = false;
     this.userProfile = {};
   }

@@ -3,8 +3,18 @@
     <!-- Header มาตรฐานเดียวกันทุกหน้า -->
     <CustomerNavbar />
 
-    <!-- ส่วนที่ 1: แสดงผลเมื่อมีคำสั่งซื้อ -->
-    <template v-if="hasActiveOrder">
+    <!-- ส่วนที่ 1: เมื่อยังไม่ได้เข้าสู่ระบบ (ซ่อนคำสั่งซื้อ) -->
+    <div class="empty-tracking-wrapper" v-if="!authStore.isLoggedIn">
+      <div class="empty-tracking-card">
+        <div class="empty-icon">🔒</div>
+        <h3>กรุณาเข้าสู่ระบบ</h3>
+        <p>คุณยังไม่ได้เข้าสู่ระบบ กรุณาเข้าสู่ระบบเพื่อติดตามสถานะคำสั่งซื้อของคุณ</p>
+        <button class="go-home-btn" @click="$router.push('/login?redirect=/tracking')">เข้าสู่ระบบ ➔</button>
+      </div>
+    </div>
+
+    <!-- ส่วนที่ 2: แสดงผลเมื่อเข้าสู่ระบบแล้ว และมีคำสั่งซื้อ -->
+    <template v-else-if="hasActiveOrder && currentOrder">
       <div class="map-banner">
         <div class="map-overlay-simulation">
           <iframe 
@@ -118,7 +128,7 @@
       </div>
     </template>
 
-    <!-- ส่วนที่ 2: เมื่อไม่มีออเดอร์ -->
+    <!-- ส่วนที่ 3: เมื่อล็อกอินแล้วแต่ยังไม่มีคำสั่งซื้อ -->
     <div class="empty-tracking-wrapper" v-else>
       <div class="empty-tracking-card">
         <div class="empty-icon">🛵💨</div>
@@ -188,6 +198,7 @@
 import axios from 'axios';
 import { API_BASE } from './config/api';
 import CustomerNavbar from './components/CustomerNavbar.vue';
+import { authStore } from './store/authStore';
 
 export default {
   components: {
@@ -195,6 +206,7 @@ export default {
   },
   data() {
     return {
+      authStore,
       hasActiveOrder: false, 
       userProfile: {
         name: '',
@@ -205,6 +217,16 @@ export default {
       showReceiptModal: false,
       rawStatus: 'PENDING',
       pollingTimer: null
+    }
+  },
+  watch: {
+    'authStore.isLoggedIn'(val) {
+      if (!val) {
+        this.hasActiveOrder = false;
+        this.currentOrder = null;
+      } else {
+        this.fetchLatestOrder();
+      }
     }
   },
   computed: {
@@ -254,6 +276,8 @@ export default {
     }
   },
   async mounted() {
+    authStore.syncAuth();
+
     // 1. โหลดข้อมูลโปรไฟล์
     const profileData = localStorage.getItem('userProfile');
     if (profileData) {
@@ -265,12 +289,17 @@ export default {
       };
     }
 
-    // 2. ดึงข้อมูลออเดอร์ล่าสุดจากเซิร์ฟเวอร์
-    await this.fetchLatestOrder();
+    // 2. ดึงข้อมูลออเดอร์เฉพาะของผู้ใช้คนนี้จากเซิร์ฟเวอร์
+    if (this.authStore.isLoggedIn) {
+      await this.fetchLatestOrder();
+    } else {
+      this.hasActiveOrder = false;
+      this.currentOrder = null;
+    }
 
     // 3. เริ่มต้น Polling อัปเดตสถานะทุกๆ 5 วินาที
     this.pollingTimer = setInterval(() => {
-      if (this.hasActiveOrder && this.rawStatus !== 'COMPLETED' && this.rawStatus !== 'CANCELLED') {
+      if (this.authStore.isLoggedIn && this.hasActiveOrder && this.rawStatus !== 'COMPLETED' && this.rawStatus !== 'CANCELLED') {
         this.fetchLatestOrder(true);
       }
     }, 5000);
@@ -287,14 +316,16 @@ export default {
       return 'pending';
     },
     async fetchLatestOrder(isSilent = false) {
+      if (!this.authStore.isLoggedIn) {
+        this.hasActiveOrder = false;
+        this.currentOrder = null;
+        return;
+      }
+
       const token = localStorage.getItem('access_token');
-      
       if (!token) {
-        const savedOrder = sessionStorage.getItem('currentOrder');
-        if (savedOrder) {
-          this.currentOrder = JSON.parse(savedOrder);
-          this.hasActiveOrder = true;
-        }
+        this.hasActiveOrder = false;
+        this.currentOrder = null;
         return;
       }
 
@@ -342,17 +373,12 @@ export default {
           };
 
           this.hasActiveOrder = true;
-          sessionStorage.setItem('currentOrder', JSON.stringify(this.currentOrder));
         } else {
           this.hasActiveOrder = false;
+          this.currentOrder = null;
         }
       } catch (err) {
-        if (!isSilent) console.warn('ดึงข้อมูลสถานะล่าสุดไม่สำเร็จ ใช้ข้อมูลสำรอง:', err);
-        const savedOrder = sessionStorage.getItem('currentOrder');
-        if (savedOrder) {
-          this.currentOrder = JSON.parse(savedOrder);
-          this.hasActiveOrder = true;
-        }
+        if (!isSilent) console.warn('ดึงข้อมูลสถานะล่าสุดไม่สำเร็จ:', err);
       }
     },
     logout() {

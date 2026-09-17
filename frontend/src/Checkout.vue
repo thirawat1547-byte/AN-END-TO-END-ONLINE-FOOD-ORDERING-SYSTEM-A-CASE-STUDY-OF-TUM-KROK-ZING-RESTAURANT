@@ -184,6 +184,7 @@ import QRCode from 'qrcode';
 import { adminStore } from './admin/store/adminData.js';
 import { API_BASE } from './config/api';
 import CustomerNavbar from './components/CustomerNavbar.vue';
+import { authStore } from './store/authStore';
 
 // คำนวณรหัส CRC16 สำหรับ PromptPay EMVCo
 function crc16(data) {
@@ -225,6 +226,7 @@ export default {
   },
   data() {
     return {
+      authStore,
       isLoggedIn: false,
       selectedPayment: 'qr',
       userProfile: {
@@ -398,6 +400,15 @@ async validateAndCheckout() {
         return;
       }
 
+      // ตรวจสอบว่าผู้ใช้ล็อกอินหรือยัง ถ้ายังไม่ล็อกอินให้แจ้งเตือนและพาไปล็อกอิน
+      this.authStore.syncAuth();
+      const token = localStorage.getItem('access_token');
+      if (!this.authStore.isLoggedIn || !token) {
+        alert('กรุณาเข้าสู่ระบบก่อนทำการสั่งซื้ออาหารครับ');
+        this.$router.push('/login?redirect=/checkout');
+        return;
+      }
+
       // 🛑 บังคับให้รอผลลัพธ์การเช็กจาก Backend ให้เสร็จก่อนทุกครั้ง
       const isValid = await this.validateAndCheckout();
       
@@ -476,28 +487,12 @@ async validateAndCheckout() {
           }
         }
 
-        const orderInfo = {
-          orderNumber: String(orderId),
-          date: new Date().toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }),
-          items: this.cartItems,
-          subtotal: this.subtotal,
-          shippingFee: this.shippingFee,
-          total: this.total,
-          paymentMethod: this.selectedPayment === 'qr' ? 'พร้อมเพย์' : 'เงินสด',
-          deliveryAddress: this.userProfile.address,
-          status: 'กำลังดำเนินการ'
-        };
-
-        sessionStorage.setItem('currentOrder', JSON.stringify(orderInfo));
-
-        let history = JSON.parse(localStorage.getItem('orderHistoryList') || '[]');
-        history.unshift(orderInfo);
-        localStorage.setItem('orderHistoryList', JSON.stringify(history));
-
-        alert(`สั่งซื้อสำเร็จ!\nเลขออเดอร์: #${orderInfo.orderNumber}\nทางร้านได้รับคำสั่งซื้อเรียบร้อยแล้วครับ`);
+        alert(`สั่งซื้อสำเร็จ!\nเลขออเดอร์: #${orderId}\nทางร้านได้รับคำสั่งซื้อเรียบร้อยแล้วครับ`);
 
         sessionStorage.removeItem('cartData');
         localStorage.removeItem('cartData');
+        sessionStorage.removeItem('currentOrder');
+        localStorage.removeItem('orderHistoryList');
         this.cartItems = [];
 
         this.$router.push('/tracking');

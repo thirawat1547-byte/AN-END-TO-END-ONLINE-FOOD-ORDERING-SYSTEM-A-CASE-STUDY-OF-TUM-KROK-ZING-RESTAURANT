@@ -3,7 +3,18 @@
     <!-- Header มาตรฐานเดียวกันทุกหน้า -->
     <CustomerNavbar />
 
-    <div class="content-wrapper">
+    <!-- ส่วนที่ 1: เมื่อยังไม่ได้เข้าสู่ระบบ (ซ่อนประวัติคำสั่งซื้อ) -->
+    <div class="empty-history-wrapper" v-if="!authStore.isLoggedIn">
+      <div class="empty-history-card">
+        <div class="empty-icon">🔒</div>
+        <h3>กรุณาเข้าสู่ระบบ</h3>
+        <p>คุณยังไม่ได้เข้าสู่ระบบ กรุณาเข้าสู่ระบบเพื่อดูประวัติคำสั่งซื้อของคุณ</p>
+        <button class="go-home-btn" @click="$router.push('/login?redirect=/history')">เข้าสู่ระบบ ➔</button>
+      </div>
+    </div>
+
+    <!-- ส่วนที่ 2: เมื่อเข้าสู่ระบบแล้ว -->
+    <div class="content-wrapper" v-else>
       <h1 class="page-main-title">ประวัติคำสั่งซื้อ</h1>
 
       <div class="history-card-box">
@@ -126,6 +137,7 @@
 import axios from 'axios';
 import { API_BASE } from './config/api';
 import CustomerNavbar from './components/CustomerNavbar.vue';
+import { authStore } from './store/authStore';
 
 export default {
   components: {
@@ -133,8 +145,7 @@ export default {
   },
   data() {
     return {
-      isLoggedIn: false,
-      userProfile: { address: '', avatar: '' },
+      authStore,
       showReceiptModal: false,
       selectedOrder: null,
       orderHistory: [],
@@ -150,35 +161,37 @@ export default {
       return this.orderHistory;
     }
   },
-  mounted() {
-    this.isLoggedIn = !!localStorage.getItem('access_token') || localStorage.getItem('isLoggedIn') === 'true';
-    const profileData = localStorage.getItem('userProfile');
-    if (profileData) {
-      this.userProfile = { ...this.userProfile, ...JSON.parse(profileData) };
+  watch: {
+    'authStore.isLoggedIn'(newVal) {
+      if (newVal) {
+        this.fetchOrderHistory();
+      } else {
+        this.orderHistory = [];
+      }
     }
-
-    this.fetchOrderHistory();
+  },
+  mounted() {
+    authStore.syncAuth();
+    if (this.authStore.isLoggedIn) {
+      this.fetchOrderHistory();
+    } else {
+      this.orderHistory = [];
+    }
   },
   methods: {
-    logout() {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('isLoggedIn');
-      this.isLoggedIn = false;
-      this.$router.push('/');
-    },
     viewOrderDetails(order) {
       this.selectedOrder = order;
       this.showReceiptModal = true;
     },
     async fetchOrderHistory() {
+      if (!this.authStore.isLoggedIn) {
+        this.orderHistory = [];
+        return;
+      }
+
       const token = localStorage.getItem('access_token');
-      
-      // ถ้าไม่ได้เข้าสู่ระบบ ให้ดึงจาก LocalStorage ชั่วคราว
       if (!token) {
-        const savedHistory = localStorage.getItem('orderHistoryList');
-        if (savedHistory) {
-          this.orderHistory = JSON.parse(savedHistory);
-        }
+        this.orderHistory = [];
         return;
       }
 
@@ -242,11 +255,7 @@ export default {
         });
       } catch (err) {
         console.error('โหลดประวัติคำสั่งซื้อไม่สำเร็จ:', err);
-        // หากเชื่อมต่อ Backend ไม่ได้ ให้ดึงประวัติเก่าจาก LocalStorage แทน
-        const savedHistory = localStorage.getItem('orderHistoryList');
-        if (savedHistory) {
-          this.orderHistory = JSON.parse(savedHistory);
-        }
+        this.orderHistory = [];
       } finally {
         this.isLoading = false;
       }
@@ -305,4 +314,12 @@ export default {
 .r-summary-row { display: flex; justify-content: space-between; font-size: 14px; color: #555; }
 .r-total-row { font-size: 18px; font-weight: 700; color: #557c61; margin-top: 5px; }
 .payment-info-box { background: #faf9f5; border: 1px solid #e0dfd5; padding: 12px; border-radius: 12px; margin-top: 20px; font-size: 13px; color: #555; display: flex; justify-content: space-between; }
+
+.empty-history-wrapper { display: flex; justify-content: center; align-items: center; flex-grow: 1; padding: 40px 20px; }
+.empty-history-card { background: white; border-radius: 20px; padding: 60px 30px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.02); display: flex; flex-direction: column; align-items: center; gap: 12px; border: 1px solid #e5e2d5; max-width: 600px; width: 100%; }
+.empty-icon { font-size: 60px; margin-bottom: 5px; }
+.empty-history-card h3 { font-size: 22px; font-weight: 600; color: #333; }
+.empty-history-card p { font-size: 15px; color: #777; margin-bottom: 20px; }
+.go-home-btn { background: #557c61; color: white; border: none; padding: 12px 30px; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: inherit; }
+.go-home-btn:hover { background: #405e49; }
 </style>
