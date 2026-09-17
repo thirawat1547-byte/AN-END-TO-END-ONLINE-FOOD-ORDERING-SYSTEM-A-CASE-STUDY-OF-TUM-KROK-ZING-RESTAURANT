@@ -93,7 +93,8 @@ export default {
           }
 
           alert('เข้าสู่ระบบสำเร็จ!');
-          this.$router.push('/');
+          const redirect = this.$route.query.redirect || '/';
+          this.$router.push(redirect);
         } else {
           throw new Error('ไม่พบข้อมูล Token ยืนยันตัวตน');
         }

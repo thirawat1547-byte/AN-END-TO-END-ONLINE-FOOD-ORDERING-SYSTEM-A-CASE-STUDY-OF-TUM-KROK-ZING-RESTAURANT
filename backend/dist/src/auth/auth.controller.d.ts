@@ -6,12 +6,12 @@ export declare class AuthController {
     private readonly authService;
     constructor(authService: AuthService);
     register(registerDto: RegisterDto): Promise<{
-        user_id: number;
         username: string;
         email: string | null;
         phone_number: string | null;
         address: string | null;
         role: string;
+        user_id: number;
     }>;
     login(loginDto: LoginDto): Promise<{
         access_token: string;
@@ -19,23 +19,24 @@ export declare class AuthController {
             user_id: number;
             username: string;
             email: string;
+            phone_number: string;
             role: string;
         };
     }>;
     getProfile(user: any): Promise<{
-        user_id: number;
         username: string;
         email: string;
         phone_number: string;
         address: string;
         role: string;
+        user_id: number;
     }>;
     updateProfile(user: any, updateDto: UpdateProfileDto): Promise<{
-        user_id: number;
         username: string;
         email: string;
         phone_number: string;
         address: string;
         role: string;
+        user_id: number;
     }>;
 }

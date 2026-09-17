@@ -39,6 +39,16 @@ export class OrdersService {
         });
       }
 
+      let validUserId: number | undefined = undefined;
+      if (createOrderDto.user_id) {
+        const existingUser = await tx.user.findUnique({
+          where: { user_id: createOrderDto.user_id },
+        });
+        if (existingUser) {
+          validUserId = existingUser.user_id;
+        }
+      }
+
       const order = await tx.order.create({
         data: {
           order_type: createOrderDto.order_type || 'DINE_IN',
@@ -49,9 +59,9 @@ export class OrdersService {
               connect: { table_id: createOrderDto.table_id },
             },
           }),
-          ...(createOrderDto.user_id && {
+          ...(validUserId && {
             user: {
-              connect: { user_id: createOrderDto.user_id },
+              connect: { user_id: validUserId },
             },
           }),
           order_items: {

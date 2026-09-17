@@ -20,7 +20,8 @@
       <div class="header-actions">
         <button class="icon-btn">🔔</button>
         <button class="icon-btn" @click="$router.push('/')" v-if="$route.path !== '/'">🛒</button>
-        <button class="logout-btn" @click="logout">ออกจากระบบ</button>
+        <button class="logout-btn" @click="logout" v-if="isLoggedIn">ออกจากระบบ</button>
+        <router-link to="/login?redirect=/checkout" class="nav-item" style="color: #2d5a43; font-weight: 600;" v-else>เข้าสู่ระบบ</router-link>
         <div class="profile-avatar" @click="$router.push('/profile')">
           <img :src="userProfile.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop'" alt="Profile">
         </div>
@@ -245,6 +246,7 @@ function generatePromptPayPayload(target, amount) {
 export default {
   data() {
     return {
+      isLoggedIn: false,
       selectedPayment: 'qr',
       userProfile: {
         name: '',
@@ -286,6 +288,7 @@ export default {
     }
   },
   mounted() {
+    this.isLoggedIn = !!localStorage.getItem('access_token') || localStorage.getItem('isLoggedIn') === 'true';
     const profileData = localStorage.getItem('userProfile');
     if (profileData) {
       const parsed = JSON.parse(profileData);
@@ -435,12 +438,6 @@ async validateAndCheckout() {
       if (this.isSubmitting) return;
 
       const token = localStorage.getItem('access_token');
-      if (!token) {
-        alert('กรุณาเข้าสู่ระบบก่อนทำการสั่งซื้อครับ');
-        this.$router.push('/login');
-        return;
-      }
-
       this.isSubmitting = true;
 
       try {
@@ -453,6 +450,7 @@ async validateAndCheckout() {
         }
 
         const orderPayload = {
+          order_type: 'DELIVERY',
           items: this.cartItems.map(item => {
             const cleanItemName = (item.name || '').trim().toLowerCase();
             const matched = dbMenus.find(m => {
@@ -460,7 +458,7 @@ async validateAndCheckout() {
               return dbName === cleanItemName || dbName.includes(cleanItemName) || cleanItemName.includes(dbName);
             });
 
-            const realMenuId = matched?.menu_id ?? matched?.id ?? item.id ?? item.menu_id ?? (dbMenus[0]?.menu_id || dbMenus[0]?.id || 1);
+            const realMenuId = matched?.menu_id ?? matched?.id ?? item.id ?? item.menu_id ?? (dbMenus[0]?.menu_id || dbMenus[0]?.id || 10);
 
             const options = [];
             if (item.dishType) options.push(item.dishType);
@@ -473,20 +471,31 @@ async validateAndCheckout() {
 
             return {
               menu_id: Number(realMenuId),
-              quantity: Number(item.qty),
+              quantity: Number(item.qty || item.quantity || 1),
               notes: options.join(' | ')
             };
           })
         };
 
-        const response = await axios.post(`${API_BASE}/orders`, orderPayload, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const response = await axios.post(`${API_BASE}/orders`, orderPayload, { headers });
 
         const createdOrder = response.data;
         const orderId = createdOrder?.order_id || createdOrder?.id || ('TRX-' + Math.floor(1000 + Math.random() * 9000));
+
+        // บันทึกข้อมูล Transaction ลงในฐานข้อมูลจริง
+        if (createdOrder?.order_id) {
+          try {
+            await axios.post(`${API_BASE}/transactions`, {
+              order_id: createdOrder.order_id,
+              amount: Number(this.total),
+              payment_method: this.selectedPayment === 'qr' ? 'PromptPay' : 'Cash',
+              payment_status: this.selectedPayment === 'qr' ? 'COMPLETED' : 'PENDING'
+            });
+          } catch (txnErr) {
+            console.warn('บันทึก transaction ไม่สำเร็จ:', txnErr);
+          }
+        }
 
         const orderInfo = {
           orderNumber: String(orderId),

@@ -41,8 +41,15 @@ let AuthService = class AuthService {
         return result;
     }
     async login(dto) {
+        const identifier = (dto.username || '').trim();
         const user = await this.prisma.user.findFirst({
-            where: { username: dto.username },
+            where: {
+                OR: [
+                    { username: identifier },
+                    { phone_number: identifier },
+                    { email: identifier },
+                ],
+            },
         });
         if (!user) {
             throw new common_1.UnauthorizedException('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
@@ -62,6 +69,7 @@ let AuthService = class AuthService {
                 user_id: user.user_id,
                 username: user.username,
                 email: user.email,
+                phone_number: user.phone_number,
                 role: user.role,
             },
         };
