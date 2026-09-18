@@ -55,6 +55,26 @@
 
       <!-- เมื่อล็อกอินแล้ว -->
       <template v-if="authStore.isLoggedIn">
+        <!-- ปุ่มทางลัดสำหรับ Admin -->
+        <router-link 
+          v-if="authStore.isAdmin" 
+          to="/admin/dashboard" 
+          class="role-shortcut-btn admin-btn" 
+          title="ไปที่ระบบจัดการร้านค้า (Admin Panel)"
+        >
+          🛠️ จัดการร้าน
+        </router-link>
+
+        <!-- ปุ่มทางลัดสำหรับ Kitchen หรือ Admin -->
+        <router-link 
+          v-if="authStore.isAdmin || authStore.isKitchen" 
+          to="/kitchen/monitor" 
+          class="role-shortcut-btn kitchen-btn" 
+          title="ไปที่หน้าจอห้องครัว (Kitchen KDS)"
+        >
+          🍳 ครัว KDS
+        </router-link>
+
         <button class="logout-btn" type="button" @click="handleLogout">ออกจากระบบ</button>
         <div class="profile-avatar" @click="$router.push('/profile')" title="โปรไฟล์ของฉัน">
           <img :src="authStore.userProfile?.avatar || defaultAvatar" alt="Profile" />
@@ -487,5 +507,40 @@ export default {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.role-shortcut-btn {
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.role-shortcut-btn.admin-btn {
+  background: #2d5a43;
+  color: white;
+  box-shadow: 0 2px 6px rgba(45, 90, 67, 0.25);
+}
+
+.role-shortcut-btn.admin-btn:hover {
+  background: #224432;
+  transform: translateY(-1px);
+}
+
+.role-shortcut-btn.kitchen-btn {
+  background: #eef2ed;
+  color: #2d5a43;
+  border: 1px solid #557c61;
+}
+
+.role-shortcut-btn.kitchen-btn:hover {
+  background: #dfe8de;
+  transform: translateY(-1px);
 }
 </style>

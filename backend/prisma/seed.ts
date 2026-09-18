@@ -7,7 +7,8 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 กำลังเริ่มต้นใส่ข้อมูลทดสอบ (Database Seeding)...');
 
-  // 1. Seed ข้อมูล Admin User (Password: admin1234)
+  // 1. Seed ข้อมูลผู้ใช้งานตาม Role
+  // 1.1 Admin User (Password: admin1234)
   const existingAdmin = await prisma.user.findFirst({
     where: { username: 'admin' },
   });
@@ -28,6 +29,45 @@ async function main() {
     console.log(`✅ สร้างผู้ดูแลระบบสำเร็จ: ${admin.username} (Role: ${admin.role})`);
   } else {
     console.log('ℹ️ พบบัญชี Admin ในระบบแล้ว ข้ามขั้นตอนนี้');
+  }
+
+  // 1.2 Kitchen User (Password: kitchen1234)
+  const existingKitchen = await prisma.user.findFirst({
+    where: { username: 'kitchen' },
+  });
+
+  if (!existingKitchen) {
+    const hashedPassword = await bcrypt.hash('kitchen1234', 10);
+    const kitchen = await prisma.user.create({
+      data: {
+        username: 'kitchen',
+        password: hashedPassword,
+        email: 'kitchen@tumkrokzing.com',
+        phone_number: '0899998888',
+        role: 'KITCHEN',
+      },
+    });
+    console.log(`✅ สร้างพนักงานห้องครัวสำเร็จ: ${kitchen.username} (Role: ${kitchen.role})`);
+  }
+
+  // 1.3 Customer User (Password: password123)
+  const existingCustomer = await prisma.user.findFirst({
+    where: { username: 'somchai' },
+  });
+
+  if (!existingCustomer) {
+    const hashedPassword = await bcrypt.hash('password123', 10);
+    const customer = await prisma.user.create({
+      data: {
+        username: 'somchai',
+        password: hashedPassword,
+        email: 'somchai@example.com',
+        phone_number: '0811112222',
+        address: 'ตลาดปากเกร็ด นนทบุรี',
+        role: 'CUSTOMER',
+      },
+    });
+    console.log(`✅ สร้างสมาชิกลูกค้าสำเร็จ: ${customer.username} (Role: ${customer.role})`);
   }
 
   // 2. Seed ข้อมูลโต๊ะภายในร้าน (Tables)

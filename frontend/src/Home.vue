@@ -273,6 +273,7 @@
 import axios from 'axios';
 import { API_BASE } from './config/api';
 import CustomerNavbar from './components/CustomerNavbar.vue';
+import { authStore } from './store/authStore';
 
 export default {
   components: {
@@ -280,6 +281,7 @@ export default {
   },
   data() {
     return {
+      authStore,
       isLoggedIn: false,
       showAuthModal: false,
       showAddressDropdown: false,
@@ -466,7 +468,11 @@ export default {
 
     openModalOrAdd(item) {
       if (item.is_available === false) return;
-      if (!this.isLoggedIn) { this.showAuthModal = true; return; }
+      this.authStore.syncAuth();
+      if (!this.authStore.isLoggedIn) { 
+        this.showAuthModal = true; 
+        return; 
+      }
       
       if (item.category.includes('เครื่องดื่ม') || item.name.includes('ไก่ทอด') || item.name === 'ข้าวเปล่า' || item.name === 'ข้าวเหนียว') {
         this.addDirectToCart(item);
@@ -514,8 +520,17 @@ export default {
     removeItem(index) { this.cartItems.splice(index, 1); },
     goToLogin() { this.showAuthModal = false; this.$router.push('/login'); },
     goToRegister() { this.showAuthModal = false; this.$router.push('/register'); },
-    logout() { localStorage.removeItem('isLoggedIn'); this.isLoggedIn = false; this.cartItems = []; },
+    logout() { 
+      this.authStore.logout(); 
+      this.isLoggedIn = false; 
+      this.cartItems = []; 
+    },
     proceedToCheckout() {
+      this.authStore.syncAuth();
+      if (!this.authStore.isLoggedIn) {
+        this.showAuthModal = true;
+        return;
+      }
       localStorage.setItem('cartData', JSON.stringify(this.cartItems));
       this.$router.push('/checkout');
     }

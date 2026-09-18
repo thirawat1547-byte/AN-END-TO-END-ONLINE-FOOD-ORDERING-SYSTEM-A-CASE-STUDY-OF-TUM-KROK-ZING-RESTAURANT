@@ -30,18 +30,19 @@ export class AuthService {
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(dto.password, saltRounds);
 
+    const normalizedRole = (dto.role || 'CUSTOMER').toUpperCase();
     const user = await this.prisma.user.create({
       data: {
         username: dto.username,
         password: hashedPassword,
         email: dto.email,
         phone_number: dto.phone_number,
-        role: dto.role || 'Customer',
+        role: normalizedRole,
       },
     });
 
     const { password, ...result } = user;
-    return result;
+    return { ...result, role: normalizedRole };
   }
 
   async login(dto: LoginDto) {
@@ -65,10 +66,12 @@ export class AuthService {
       throw new UnauthorizedException('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
     }
 
+    const normalizedRole = (user.role || 'CUSTOMER').toUpperCase();
+
     const payload = {
       sub: user.user_id,
       username: user.username,
-      role: user.role,
+      role: normalizedRole,
     };
 
     return {
@@ -78,7 +81,7 @@ export class AuthService {
         username: user.username,
         email: user.email,
         phone_number: user.phone_number,
-        role: user.role,
+        role: normalizedRole,
       },
     };
   }
@@ -102,7 +105,10 @@ export class AuthService {
       throw new NotFoundException('ไม่พบข้อมูลผู้ใช้งาน');
     }
 
-    return user;
+    return {
+      ...user,
+      role: (user.role || 'CUSTOMER').toUpperCase(),
+    };
   }
 
   // อัปเดตข้อมูลส่วนตัว / ที่อยู่จัดส่งเดลิเวอรี่

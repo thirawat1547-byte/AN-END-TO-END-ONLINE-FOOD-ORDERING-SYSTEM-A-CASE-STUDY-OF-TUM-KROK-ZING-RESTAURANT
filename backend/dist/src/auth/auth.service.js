@@ -28,17 +28,18 @@ let AuthService = class AuthService {
         }
         const saltRounds = 10;
         const hashedPassword = await bcrypt.hash(dto.password, saltRounds);
+        const normalizedRole = (dto.role || 'CUSTOMER').toUpperCase();
         const user = await this.prisma.user.create({
             data: {
                 username: dto.username,
                 password: hashedPassword,
                 email: dto.email,
                 phone_number: dto.phone_number,
-                role: dto.role || 'Customer',
+                role: normalizedRole,
             },
         });
         const { password, ...result } = user;
-        return result;
+        return { ...result, role: normalizedRole };
     }
     async login(dto) {
         const identifier = (dto.username || '').trim();
@@ -58,10 +59,11 @@ let AuthService = class AuthService {
         if (!isPasswordValid) {
             throw new common_1.UnauthorizedException('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
         }
+        const normalizedRole = (user.role || 'CUSTOMER').toUpperCase();
         const payload = {
             sub: user.user_id,
             username: user.username,
-            role: user.role,
+            role: normalizedRole,
         };
         return {
             access_token: this.jwtService.sign(payload),
@@ -70,7 +72,7 @@ let AuthService = class AuthService {
                 username: user.username,
                 email: user.email,
                 phone_number: user.phone_number,
-                role: user.role,
+                role: normalizedRole,
             },
         };
     }
@@ -89,7 +91,10 @@ let AuthService = class AuthService {
         if (!user) {
             throw new common_1.NotFoundException('ไม่พบข้อมูลผู้ใช้งาน');
         }
-        return user;
+        return {
+            ...user,
+            role: (user.role || 'CUSTOMER').toUpperCase(),
+        };
     }
     async updateProfile(userId, dto) {
         await this.getProfile(userId);

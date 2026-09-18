@@ -24,20 +24,19 @@ export declare class OrdersController {
             };
         } & {
             menu_id: number;
+            quantity: number;
             created_at: Date;
             order_id: number;
-            quantity: number;
             unit_price: number;
-            notes: string | null;
             order_item_id: number;
         })[];
     } & {
         user_id: number | null;
         table_id: number | null;
         status: string;
+        created_at: Date;
         order_type: string;
         total_price: import("@prisma/client/runtime/library").Decimal;
-        created_at: Date;
         order_id: number;
         promo_id: number | null;
     }>;
@@ -61,28 +60,27 @@ export declare class OrdersController {
             };
         } & {
             menu_id: number;
+            quantity: number;
             created_at: Date;
             order_id: number;
-            quantity: number;
             unit_price: number;
-            notes: string | null;
             order_item_id: number;
         })[];
         transaction: {
             order_id: number;
+            transaction_id: number;
             amount: import("@prisma/client/runtime/library").Decimal;
             payment_method: string;
-            payment_slip_url: string | null;
             payment_status: string;
-            transaction_id: number;
+            payment_slip_url: string | null;
         }[];
     } & {
         user_id: number | null;
         table_id: number | null;
         status: string;
+        created_at: Date;
         order_type: string;
         total_price: import("@prisma/client/runtime/library").Decimal;
-        created_at: Date;
         order_id: number;
         promo_id: number | null;
     })[]>;
@@ -106,28 +104,27 @@ export declare class OrdersController {
             };
         } & {
             menu_id: number;
+            quantity: number;
             created_at: Date;
             order_id: number;
-            quantity: number;
             unit_price: number;
-            notes: string | null;
             order_item_id: number;
         })[];
         transaction: {
             order_id: number;
+            transaction_id: number;
             amount: import("@prisma/client/runtime/library").Decimal;
             payment_method: string;
-            payment_slip_url: string | null;
             payment_status: string;
-            transaction_id: number;
+            payment_slip_url: string | null;
         }[];
     } & {
         user_id: number | null;
         table_id: number | null;
         status: string;
+        created_at: Date;
         order_type: string;
         total_price: import("@prisma/client/runtime/library").Decimal;
-        created_at: Date;
         order_id: number;
         promo_id: number | null;
     })[]>;
@@ -156,28 +153,27 @@ export declare class OrdersController {
             };
         } & {
             menu_id: number;
+            quantity: number;
             created_at: Date;
             order_id: number;
-            quantity: number;
             unit_price: number;
-            notes: string | null;
             order_item_id: number;
         })[];
         transaction: {
             order_id: number;
+            transaction_id: number;
             amount: import("@prisma/client/runtime/library").Decimal;
             payment_method: string;
-            payment_slip_url: string | null;
             payment_status: string;
-            transaction_id: number;
+            payment_slip_url: string | null;
         }[];
     } & {
         user_id: number | null;
         table_id: number | null;
         status: string;
+        created_at: Date;
         order_type: string;
         total_price: import("@prisma/client/runtime/library").Decimal;
-        created_at: Date;
         order_id: number;
         promo_id: number | null;
     }>;
@@ -185,9 +181,9 @@ export declare class OrdersController {
         user_id: number | null;
         table_id: number | null;
         status: string;
+        created_at: Date;
         order_type: string;
         total_price: import("@prisma/client/runtime/library").Decimal;
-        created_at: Date;
         order_id: number;
         promo_id: number | null;
     }>;

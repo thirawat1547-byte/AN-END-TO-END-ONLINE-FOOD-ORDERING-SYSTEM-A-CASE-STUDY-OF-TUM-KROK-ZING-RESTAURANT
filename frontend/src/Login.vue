@@ -94,7 +94,12 @@ export default {
           authStore.setAuth(token, userProfileData);
 
           alert('เข้าสู่ระบบสำเร็จ!');
-          const redirect = this.$route.query.redirect || '/';
+          let redirect = this.$route.query.redirect;
+          if (!redirect) {
+            if (authStore.isAdmin) redirect = '/admin/dashboard';
+            else if (authStore.isKitchen) redirect = '/kitchen/monitor';
+            else redirect = '/';
+          }
           this.$router.push(redirect);
         } else {
           throw new Error('ไม่พบข้อมูล Token ยืนยันตัวตน');

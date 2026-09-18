@@ -25,6 +25,39 @@ async function main() {
     else {
         console.log('ℹ️ พบบัญชี Admin ในระบบแล้ว ข้ามขั้นตอนนี้');
     }
+    const existingKitchen = await prisma.user.findFirst({
+        where: { username: 'kitchen' },
+    });
+    if (!existingKitchen) {
+        const hashedPassword = await bcrypt.hash('kitchen1234', 10);
+        const kitchen = await prisma.user.create({
+            data: {
+                username: 'kitchen',
+                password: hashedPassword,
+                email: 'kitchen@tumkrokzing.com',
+                phone_number: '0899998888',
+                role: 'KITCHEN',
+            },
+        });
+        console.log(`✅ สร้างพนักงานห้องครัวสำเร็จ: ${kitchen.username} (Role: ${kitchen.role})`);
+    }
+    const existingCustomer = await prisma.user.findFirst({
+        where: { username: 'somchai' },
+    });
+    if (!existingCustomer) {
+        const hashedPassword = await bcrypt.hash('password123', 10);
+        const customer = await prisma.user.create({
+            data: {
+                username: 'somchai',
+                password: hashedPassword,
+                email: 'somchai@example.com',
+                phone_number: '0811112222',
+                address: 'ตลาดปากเกร็ด นนทบุรี',
+                role: 'CUSTOMER',
+            },
+        });
+        console.log(`✅ สร้างสมาชิกลูกค้าสำเร็จ: ${customer.username} (Role: ${customer.role})`);
+    }
     const tables = [
         { table_number: 'T-01', capacity: 2, status: 'AVAILABLE' },
         { table_number: 'T-02', capacity: 4, status: 'AVAILABLE' },

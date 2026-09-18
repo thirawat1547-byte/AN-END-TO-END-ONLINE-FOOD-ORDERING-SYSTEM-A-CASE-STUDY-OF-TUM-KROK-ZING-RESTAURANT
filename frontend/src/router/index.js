@@ -70,4 +70,53 @@ const router = createRouter({
   routes
 });
 
+import { authStore } from '../store/authStore';
+
+// ระบบตรวจสอบสิทธิ์การเข้าถึงหน้าตามบทบาท (Role-Based Access Control)
+router.beforeEach((to, from, next) => {
+  authStore.syncAuth();
+  const token = localStorage.getItem('access_token');
+  const role = authStore.role; // 'ADMIN', 'KITCHEN', 'CUSTOMER', 'GUEST'
+
+  // 1. หน้าผู้ดูแลระบบ (/admin/*)
+  // สิทธิ์: เฉพาะ ADMIN เท่านั้น (Kitchen ห้ามเข้า!)
+  if (to.path.startsWith('/admin')) {
+    if (!authStore.isLoggedIn || !token) {
+      alert('🔒 กรุณาเข้าสู่ระบบด้วยบัญชีผู้ดูแลร้าน (Admin) ก่อนเข้าใช้งาน');
+      return next({ path: '/login', query: { redirect: to.fullPath } });
+    }
+    if (role !== 'ADMIN') {
+      alert('⚠️ คุณไม่มีสิทธิ์เข้าถึงหน้าผู้ดูแลร้าน (สำหรับ Admin เท่านั้น)');
+      if (role === 'KITCHEN') {
+        return next('/kitchen/monitor');
+      }
+      return next('/');
+    }
+  }
+
+  // 2. หน้าห้องครัว KDS & จัดการโต๊ะ (/kitchen/*)
+  // สิทธิ์: ADMIN และ KITCHEN เท่านั้น (Customer/Guest ห้ามเข้า)
+  if (to.path.startsWith('/kitchen')) {
+    if (!authStore.isLoggedIn || !token) {
+      alert('🔒 กรุณาเข้าสู่ระบบก่อนเข้าใช้งานส่วนของห้องครัว');
+      return next({ path: '/login', query: { redirect: to.fullPath } });
+    }
+    if (role !== 'ADMIN' && role !== 'KITCHEN') {
+      alert('⚠️ ส่วนนี้เปิดให้เฉพาะพนักงานห้องครัวและผู้ดูแลร้านเท่านั้น');
+      return next('/');
+    }
+  }
+
+  // 3. หน้าสั่งซื้ออาหาร / ชำระเงิน / ข้อมูลส่วนตัว
+  // สิทธิ์: ต้องล็อกอิน (Customer, Admin, Kitchen) ส่วน Guest สั่งไม่ได้
+  if (to.path === '/checkout' || to.path === '/profile') {
+    if (!authStore.isLoggedIn || !token) {
+      alert('🔒 กรุณาเข้าสู่ระบบก่อนทำการสั่งซื้ออาหารครับ');
+      return next({ path: '/login', query: { redirect: to.fullPath } });
+    }
+  }
+
+  next();
+});
+
 export default router

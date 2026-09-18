@@ -19,6 +19,27 @@ export const authStore = reactive({
   isLoggedIn: checkStoredAuth(),
   userProfile: getStoredProfile(),
 
+  get role() {
+    if (!this.isLoggedIn) return 'GUEST';
+    return (this.userProfile?.role || 'CUSTOMER').toUpperCase();
+  },
+
+  get isAdmin() {
+    return this.role === 'ADMIN';
+  },
+
+  get isKitchen() {
+    return this.role === 'KITCHEN';
+  },
+
+  get isCustomer() {
+    return this.role === 'CUSTOMER';
+  },
+
+  get isGuest() {
+    return !this.isLoggedIn;
+  },
+
   syncAuth() {
     this.isLoggedIn = checkStoredAuth();
     this.userProfile = getStoredProfile();
@@ -28,14 +49,21 @@ export const authStore = reactive({
     if (token) localStorage.setItem('access_token', token);
     localStorage.setItem('isLoggedIn', 'true');
     if (user) {
-      localStorage.setItem('userProfile', JSON.stringify(user));
-      this.userProfile = user;
+      const normalizedUser = {
+        ...user,
+        role: (user.role || 'CUSTOMER').toUpperCase()
+      };
+      localStorage.setItem('userProfile', JSON.stringify(normalizedUser));
+      this.userProfile = normalizedUser;
     }
     this.isLoggedIn = true;
   },
 
   updateProfile(profile) {
     this.userProfile = { ...this.userProfile, ...profile };
+    if (this.userProfile.role) {
+      this.userProfile.role = this.userProfile.role.toUpperCase();
+    }
     localStorage.setItem('userProfile', JSON.stringify(this.userProfile));
   },
 

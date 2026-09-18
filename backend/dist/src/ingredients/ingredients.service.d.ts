@@ -6,47 +6,47 @@ export declare class IngredientsService {
     constructor(prisma: PrismaService);
     findAll(): Promise<{
         name: string;
-        created_at: Date;
-        quantity: number;
         ingredient_id: number;
+        quantity: number;
         unit: string;
         min_quantity: number;
+        created_at: Date;
         updated_at: Date;
     }[]>;
     findOne(ingredient_id: number): Promise<{
         name: string;
-        created_at: Date;
-        quantity: number;
         ingredient_id: number;
+        quantity: number;
         unit: string;
         min_quantity: number;
+        created_at: Date;
         updated_at: Date;
     }>;
     create(createDto: CreateIngredientDto): Promise<{
         name: string;
-        created_at: Date;
-        quantity: number;
         ingredient_id: number;
+        quantity: number;
         unit: string;
         min_quantity: number;
+        created_at: Date;
         updated_at: Date;
     }>;
     update(ingredient_id: number, updateDto: UpdateIngredientDto): Promise<{
         name: string;
-        created_at: Date;
-        quantity: number;
         ingredient_id: number;
+        quantity: number;
         unit: string;
         min_quantity: number;
+        created_at: Date;
         updated_at: Date;
     }>;
     remove(ingredient_id: number): Promise<{
         name: string;
-        created_at: Date;
-        quantity: number;
         ingredient_id: number;
+        quantity: number;
         unit: string;
         min_quantity: number;
+        created_at: Date;
         updated_at: Date;
     }>;
 }

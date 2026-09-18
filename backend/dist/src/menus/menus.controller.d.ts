@@ -62,11 +62,11 @@ export declare class MenusController {
         ingredients: ({
             ingredient: {
                 name: string;
-                created_at: Date;
-                quantity: number;
                 ingredient_id: number;
+                quantity: number;
                 unit: string;
                 min_quantity: number;
+                created_at: Date;
                 updated_at: Date;
             };
         } & {
