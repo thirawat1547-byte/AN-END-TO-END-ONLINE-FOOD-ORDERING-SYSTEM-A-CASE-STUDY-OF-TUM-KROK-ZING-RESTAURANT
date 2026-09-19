@@ -75,6 +75,16 @@
           🍳 ครัว KDS
         </router-link>
 
+        <!-- ปุ่มทางลัดสำหรับ Rider หรือ Admin -->
+        <router-link 
+          v-if="authStore.isAdmin || authStore.isRider" 
+          to="/rider" 
+          class="role-shortcut-btn rider-btn" 
+          title="ไปที่หน้าจอพนักงานจัดส่ง (Rider)"
+        >
+          🛵 ไรเดอร์
+        </router-link>
+
         <button class="logout-btn" type="button" @click="handleLogout">ออกจากระบบ</button>
         <div class="profile-avatar" @click="$router.push('/profile')" title="โปรไฟล์ของฉัน">
           <img :src="authStore.userProfile?.avatar || defaultAvatar" alt="Profile" />
@@ -541,6 +551,17 @@ export default {
 
 .role-shortcut-btn.kitchen-btn:hover {
   background: #dfe8de;
+  transform: translateY(-1px);
+}
+
+.role-shortcut-btn.rider-btn {
+  background: #00b14f;
+  color: white;
+  box-shadow: 0 2px 6px rgba(0, 177, 79, 0.25);
+}
+
+.role-shortcut-btn.rider-btn:hover {
+  background: #008b3e;
   transform: translateY(-1px);
 }
 </style>

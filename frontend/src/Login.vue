@@ -98,6 +98,7 @@ export default {
           if (!redirect) {
             if (authStore.isAdmin) redirect = '/admin/dashboard';
             else if (authStore.isKitchen) redirect = '/kitchen/monitor';
+            else if (authStore.isRider) redirect = '/rider';
             else redirect = '/';
           }
           this.$router.push(redirect);

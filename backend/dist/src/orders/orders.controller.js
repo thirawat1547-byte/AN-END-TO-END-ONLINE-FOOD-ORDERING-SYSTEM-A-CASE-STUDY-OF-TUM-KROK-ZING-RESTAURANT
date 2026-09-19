@@ -31,8 +31,8 @@ let OrdersController = class OrdersController {
         }
         return this.ordersService.create(createOrderDto);
     }
-    findAll(status, tableId) {
-        return this.ordersService.findAll(status, tableId ? parseInt(tableId, 10) : undefined);
+    findAll(status, tableId, orderType) {
+        return this.ordersService.findAll(status, tableId ? parseInt(tableId, 10) : undefined, orderType);
     }
     findMyOrders(req) {
         const userId = req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub;
@@ -61,12 +61,14 @@ __decorate([
 __decorate([
     (0, common_1.Get)(),
     (0, swagger_1.ApiOperation)({ summary: 'ดูรายการคำสั่งซื้อทั้งหมด' }),
-    (0, swagger_1.ApiQuery)({ name: 'status', required: false, description: 'กรองตามสถานะ (PENDING, COOKING, READY, COMPLETED)' }),
+    (0, swagger_1.ApiQuery)({ name: 'status', required: false, description: 'กรองตามสถานะ (PENDING, COOKING, READY, IN_DELIVERY, DELIVERED, COMPLETED)' }),
     (0, swagger_1.ApiQuery)({ name: 'tableId', required: false, type: Number, description: 'กรองตามหมายเลขโต๊ะ' }),
+    (0, swagger_1.ApiQuery)({ name: 'orderType', required: false, description: 'กรองตามประเภท (DELIVERY, DINE_IN, TAKEAWAY)' }),
     __param(0, (0, common_1.Query)('status')),
     __param(1, (0, common_1.Query)('tableId')),
+    __param(2, (0, common_1.Query)('orderType')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:paramtypes", [String, String, String]),
     __metadata("design:returntype", void 0)
 ], OrdersController.prototype, "findAll", null);
 __decorate([

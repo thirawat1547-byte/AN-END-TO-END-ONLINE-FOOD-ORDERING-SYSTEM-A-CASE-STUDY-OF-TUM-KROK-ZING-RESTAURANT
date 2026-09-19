@@ -18,12 +18,12 @@ exports.UpdateOrderStatusDto = UpdateOrderStatusDto;
 __decorate([
     (0, swagger_1.ApiProperty)({
         example: 'COOKING',
-        enum: ['PENDING', 'COOKING', 'READY', 'SERVED', 'COMPLETED', 'PAID', 'CANCELLED'],
+        enum: ['PENDING', 'COOKING', 'READY', 'SERVED', 'IN_DELIVERY', 'DELIVERED', 'COMPLETED', 'PAID', 'CANCELLED'],
         description: 'สถานะใหม่ของออร์เดอร์',
     }),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsNotEmpty)(),
-    (0, class_validator_1.IsIn)(['PENDING', 'COOKING', 'READY', 'SERVED', 'COMPLETED', 'PAID', 'CANCELLED']),
+    (0, class_validator_1.IsIn)(['PENDING', 'COOKING', 'READY', 'SERVED', 'IN_DELIVERY', 'DELIVERED', 'COMPLETED', 'PAID', 'CANCELLED']),
     __metadata("design:type", String)
 ], UpdateOrderStatusDto.prototype, "status", void 0);
 //# sourceMappingURL=update-order-status.dto.js.map

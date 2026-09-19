@@ -89,11 +89,12 @@ let OrdersService = class OrdersService {
             return order;
         });
     }
-    async findAll(status, tableId) {
+    async findAll(status, tableId, orderType) {
         return this.prisma.order.findMany({
             where: {
                 ...(status && { status: status }),
                 ...(tableId && { table_id: tableId }),
+                ...(orderType && { order_type: orderType }),
             },
             include: {
                 order_items: {
@@ -101,6 +102,15 @@ let OrdersService = class OrdersService {
                 },
                 table: true,
                 transaction: true,
+                user: {
+                    select: {
+                        user_id: true,
+                        username: true,
+                        email: true,
+                        phone_number: true,
+                        address: true,
+                    },
+                },
             },
             orderBy: { order_id: 'desc' },
         });
@@ -128,7 +138,7 @@ let OrdersService = class OrdersService {
                 table: true,
                 transaction: true,
                 user: {
-                    select: { user_id: true, username: true, phone_number: true },
+                    select: { user_id: true, username: true, phone_number: true, address: true },
                 },
             },
         });

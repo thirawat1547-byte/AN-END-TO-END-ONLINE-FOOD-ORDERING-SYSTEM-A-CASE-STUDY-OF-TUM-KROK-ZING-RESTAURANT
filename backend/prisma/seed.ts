@@ -70,6 +70,26 @@ async function main() {
     console.log(`✅ สร้างสมาชิกลูกค้าสำเร็จ: ${customer.username} (Role: ${customer.role})`);
   }
 
+  // 1.4 Rider User (Password: rider1234)
+  const existingRider = await prisma.user.findFirst({
+    where: { username: 'rider' },
+  });
+
+  if (!existingRider) {
+    const hashedPassword = await bcrypt.hash('rider1234', 10);
+    const rider = await prisma.user.create({
+      data: {
+        username: 'rider',
+        password: hashedPassword,
+        email: 'rider@tumkrokzing.com',
+        phone_number: '0877776666',
+        address: 'ประจำร้านตำครกซิ่ง',
+        role: 'RIDER',
+      },
+    });
+    console.log(`✅ สร้างพนักงานจัดส่ง (ไรเดอร์) สำเร็จ: ${rider.username} (Role: ${rider.role})`);
+  }
+
   // 2. Seed ข้อมูลโต๊ะภายในร้าน (Tables)
   const tables = [
     { table_number: 'T-01', capacity: 2, status: 'AVAILABLE' },

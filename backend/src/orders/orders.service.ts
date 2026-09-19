@@ -94,12 +94,13 @@ export class OrdersService {
     });
   }
 
-  // 2. ดึงรายการออร์เดอร์ทั้งหมด
-  async findAll(status?: string, tableId?: number) {
+  // 2. ดึงรายการออร์เดอร์ทั้งหมด (รองรับตัวกรอง status, tableId, orderType)
+  async findAll(status?: string, tableId?: number, orderType?: string) {
     return this.prisma.order.findMany({
       where: {
         ...(status && { status: status }),
         ...(tableId && { table_id: tableId }),
+        ...(orderType && { order_type: orderType }),
       },
       include: {
         order_items: {
@@ -107,6 +108,15 @@ export class OrdersService {
         },
         table: true,
         transaction: true,
+        user: {
+          select: {
+            user_id: true,
+            username: true,
+            email: true,
+            phone_number: true,
+            address: true,
+          },
+        },
       },
       orderBy: { order_id: 'desc' },
     });
@@ -138,7 +148,7 @@ export class OrdersService {
         table: true,
         transaction: true,
         user: {
-          select: { user_id: true, username: true, phone_number: true },
+          select: { user_id: true, username: true, phone_number: true, address: true },
         },
       },
     });

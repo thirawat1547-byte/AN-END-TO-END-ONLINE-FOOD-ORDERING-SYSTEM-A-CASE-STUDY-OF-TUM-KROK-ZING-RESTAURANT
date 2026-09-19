@@ -32,6 +32,10 @@ export const authStore = reactive({
     return this.role === 'KITCHEN';
   },
 
+  get isRider() {
+    return this.role === 'RIDER';
+  },
+
   get isCustomer() {
     return this.role === 'CUSTOMER';
   },

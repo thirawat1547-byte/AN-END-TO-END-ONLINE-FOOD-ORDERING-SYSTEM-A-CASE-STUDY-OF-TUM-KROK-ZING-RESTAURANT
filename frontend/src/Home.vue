@@ -41,7 +41,7 @@
           >
             <div class="img-wrapper">
               <span class="badge-popular" v-if="item.isPopular">ยอดนิยม</span>
-              <img :src="item.img" :alt="item.name">
+              <img :src="item.img" :alt="item.name" @error="onImgError($event, item)">
               
               <!-- 🛑 แสดงป้ายทับเมื่อสินค้าหมดชั่วคราว -->
               <div v-if="item.is_available === false" class="out-of-stock-overlay">
@@ -444,6 +444,15 @@ export default {
         }
       } catch (error) {
         console.warn('ไม่สามารถเชื่อมต่อ Backend เพื่อดึงสถานะเมนูได้:', error);
+      }
+    },
+
+    onImgError(e, item) {
+      if (e.target.dataset.tried) return;
+      e.target.dataset.tried = 'true';
+      const filename = item.img ? item.img.split('/').pop().split('?')[0] : '';
+      if (filename) {
+        e.target.src = `/images/${filename}`;
       }
     },
 

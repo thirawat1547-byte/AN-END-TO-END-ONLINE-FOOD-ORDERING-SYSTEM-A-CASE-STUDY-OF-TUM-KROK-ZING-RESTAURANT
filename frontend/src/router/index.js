@@ -62,6 +62,12 @@ const routes = [
       { path: 'tables', component: () => import('../Kitchen/views/TableManagement.vue') },
       { path: 'manage', component: () => import('../Kitchen/views/TableManagement.vue') }
     ]
+  },
+  // Rider section (ระบบพนักงานจัดส่งอาหาร)
+  {
+    path: '/rider',
+    component: () => import('../rider/views/RiderView.vue'),
+    meta: { requiresAuth: true, allowedRoles: ['ADMIN', 'RIDER', 'KITCHEN'] }
   }
 ];
 
@@ -108,11 +114,24 @@ router.beforeEach((to, from, next) => {
   }
 
   // 3. หน้าสั่งซื้ออาหาร / ชำระเงิน / ข้อมูลส่วนตัว
-  // สิทธิ์: ต้องล็อกอิน (Customer, Admin, Kitchen) ส่วน Guest สั่งไม่ได้
+  // สิทธิ์: ต้องล็อกอิน (Customer, Admin, Kitchen, Rider) ส่วน Guest สั่งไม่ได้
   if (to.path === '/checkout' || to.path === '/profile') {
     if (!authStore.isLoggedIn || !token) {
       alert('🔒 กรุณาเข้าสู่ระบบก่อนทำการสั่งซื้ออาหารครับ');
       return next({ path: '/login', query: { redirect: to.fullPath } });
+    }
+  }
+
+  // 4. หน้าจอพนักงานจัดส่งอาหาร (/rider)
+  // สิทธิ์: ADMIN, RIDER, KITCHEN (Customer/Guest ห้ามเข้า)
+  if (to.path === '/rider' || to.path.startsWith('/rider')) {
+    if (!authStore.isLoggedIn || !token) {
+      alert('🔒 กรุณาเข้าสู่ระบบก่อนเข้าใช้งานส่วนของพนักงานจัดส่ง (ไรเดอร์)');
+      return next({ path: '/login', query: { redirect: to.fullPath } });
+    }
+    if (role !== 'ADMIN' && role !== 'RIDER' && role !== 'KITCHEN') {
+      alert('⚠️ ส่วนนี้เปิดให้เฉพาะพนักงานจัดส่ง (Rider) และผู้ดูแลร้านเท่านั้น');
+      return next('/');
     }
   }
 
