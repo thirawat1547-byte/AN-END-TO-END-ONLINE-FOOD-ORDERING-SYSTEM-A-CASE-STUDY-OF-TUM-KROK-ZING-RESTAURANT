@@ -31,6 +31,21 @@ let AuthController = class AuthController {
     login(loginDto) {
         return this.authService.login(loginDto);
     }
+    sessionCheck(user) {
+        return {
+            valid: true,
+            user_id: user.user_id,
+            username: user.username,
+            role: user.role,
+        };
+    }
+    async logout(user) {
+        const userId = user.userId || user.sub || user.user_id;
+        if (userId) {
+            await this.authService.logout(Number(userId));
+        }
+        return { success: true, message: 'ออกจากระบบสำเร็จ' };
+    }
     getProfile(user) {
         const userId = user.userId || user.sub || user.user_id;
         return this.authService.getProfile(Number(userId));
@@ -61,6 +76,29 @@ __decorate([
     __metadata("design:paramtypes", [login_dto_1.LoginDto]),
     __metadata("design:returntype", void 0)
 ], AuthController.prototype, "login", null);
+__decorate([
+    (0, common_1.Get)('session-check'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)('JWT-auth'),
+    (0, swagger_1.ApiOperation)({ summary: 'ตรวจสอบสถานะเซสชันของอุปกรณ์ปัจจุบันแบบ Real-time' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'เซสชันถูกต้องและยังใช้งานได้บนเครื่องนี้' }),
+    (0, swagger_1.ApiResponse)({ status: 401, description: 'เซสชันหมดอายุหรือถูกเข้าสู่ระบบจากอุปกรณ์อื่นแล้ว' }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "sessionCheck", null);
+__decorate([
+    (0, common_1.Post)('logout'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)('JWT-auth'),
+    (0, swagger_1.ApiOperation)({ summary: 'ออกจากระบบและเคลียร์เซสชัน' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'ออกจากระบบสำเร็จ' }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "logout", null);
 __decorate([
     (0, common_1.Get)('profile'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),

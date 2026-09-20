@@ -40,6 +40,34 @@ export class AuthController {
     return this.authService.login(loginDto);
   }
 
+  @Get('session-check')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'ตรวจสอบสถานะเซสชันของอุปกรณ์ปัจจุบันแบบ Real-time' })
+  @ApiResponse({ status: 200, description: 'เซสชันถูกต้องและยังใช้งานได้บนเครื่องนี้' })
+  @ApiResponse({ status: 401, description: 'เซสชันหมดอายุหรือถูกเข้าสู่ระบบจากอุปกรณ์อื่นแล้ว' })
+  sessionCheck(@CurrentUser() user: any) {
+    return {
+      valid: true,
+      user_id: user.user_id,
+      username: user.username,
+      role: user.role,
+    };
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'ออกจากระบบและเคลียร์เซสชัน' })
+  @ApiResponse({ status: 200, description: 'ออกจากระบบสำเร็จ' })
+  async logout(@CurrentUser() user: any) {
+    const userId = user.userId || user.sub || user.user_id;
+    if (userId) {
+      await this.authService.logout(Number(userId));
+    }
+    return { success: true, message: 'ออกจากระบบสำเร็จ' };
+  }
+
   @Get('profile')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')

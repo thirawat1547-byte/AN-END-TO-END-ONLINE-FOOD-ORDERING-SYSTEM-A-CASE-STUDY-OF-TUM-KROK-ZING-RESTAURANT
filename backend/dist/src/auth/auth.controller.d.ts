@@ -7,14 +7,15 @@ export declare class AuthController {
     constructor(authService: AuthService);
     register(registerDto: RegisterDto): Promise<{
         role: string;
-        user_id: number;
         username: string;
         email: string | null;
         phone_number: string | null;
         address: string | null;
+        user_id: number;
     }>;
     login(loginDto: LoginDto): Promise<{
         access_token: string;
+        session_id: `${string}-${string}-${string}-${string}-${string}`;
         user: {
             user_id: number;
             username: string;
@@ -23,20 +24,30 @@ export declare class AuthController {
             role: string;
         };
     }>;
+    sessionCheck(user: any): {
+        valid: boolean;
+        user_id: any;
+        username: any;
+        role: any;
+    };
+    logout(user: any): Promise<{
+        success: boolean;
+        message: string;
+    }>;
     getProfile(user: any): Promise<{
         role: string;
-        user_id: number;
         username: string;
         email: string;
         phone_number: string;
         address: string;
+        user_id: number;
     }>;
     updateProfile(user: any, updateDto: UpdateProfileDto): Promise<{
-        user_id: number;
         username: string;
         email: string;
         phone_number: string;
         address: string;
         role: string;
+        user_id: number;
     }>;
 }

@@ -63,6 +63,11 @@ export default {
       errorMessage: ''
     }
   },
+  mounted() {
+    if (this.$route.query.kicked === 'duplicate_session') {
+      this.errorMessage = 'บัญชีของคุณถูกเข้าสู่ระบบจากอุปกรณ์อื่นแล้ว ระบบได้ทำการออกจากระบบโดยอัตโนมัติ';
+    }
+  },
   methods: {
     async handleLogin() {
       this.loading = true;
@@ -76,6 +81,7 @@ export default {
         });
 
         const token = response.data?.access_token || response.data?.token;
+        const sessionId = response.data?.session_id;
 
         if (token) {
           let userProfileData = null;
@@ -91,7 +97,7 @@ export default {
             }
           }
 
-          authStore.setAuth(token, userProfileData);
+          authStore.setAuth(token, userProfileData, sessionId);
 
           alert('เข้าสู่ระบบสำเร็จ!');
           let redirect = this.$route.query.redirect;

@@ -161,7 +161,8 @@ export default {
               address: this.form.address || '',
               email: payload.email || ''
             };
-            authStore.setAuth(token, userProfile);
+            const sessionId = loginRes.data?.session_id;
+            authStore.setAuth(token, userProfile, sessionId);
           }
         } catch (loginErr) {
           console.warn('Auto-login หลังสมัครไม่สำเร็จ:', loginErr);
