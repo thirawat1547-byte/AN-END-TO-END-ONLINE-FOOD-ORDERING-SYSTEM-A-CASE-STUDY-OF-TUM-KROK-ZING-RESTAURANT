@@ -186,15 +186,20 @@ const exportCSV = () => {
     '"' + (s.order_date ? new Date(s.order_date).toLocaleString('th-TH') : '-') + '"'
   ])
 
-  const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
+  const filename = `TumKrokZing_Sales_Report_${new Date().toISOString().slice(0, 10)}.csv`
+  const csvText = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+
+  // ใช้ Data URI พร้อม UTF-8 BOM (%EF%BB%BF) เพื่อให้ Chrome กำหนดชื่อไฟล์ .csv ถูกต้องเสมอ
+  const encodedUri = 'data:text/csv;charset=utf-8,%EF%BB%BF' + encodeURIComponent(csvText)
   const link = document.createElement('a')
-  link.setAttribute('href', url)
-  link.setAttribute('download', `TumKrokZing_Sales_Report_${new Date().toISOString().slice(0, 10)}.csv`)
+  link.href = encodedUri
+  link.setAttribute('download', filename)
+  link.download = filename
   document.body.appendChild(link)
   link.click()
-  document.body.removeChild(link)
+  setTimeout(() => {
+    document.body.removeChild(link)
+  }, 200)
 }
 
 // ฟังก์ชันพิมพ์หรือบันทึกเป็น PDF

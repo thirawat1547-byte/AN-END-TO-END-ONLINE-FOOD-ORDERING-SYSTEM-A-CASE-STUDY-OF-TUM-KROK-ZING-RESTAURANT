@@ -39,8 +39,22 @@ function viewOrderDetails(order) {
 
 <template>
   <div class="space-y-6">
-    <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <!-- Print Only Official Header -->
+    <div class="print-only hidden">
+      <div style="border-bottom: 2px solid #183324; padding-bottom: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end;">
+        <div>
+          <h1 style="font-size: 22px; font-weight: 700; color: #183324; margin: 0;">ร้านตำครกซิ่ง - รายงานประวัติธุรกรรมและใบเสร็จรับเงิน</h1>
+          <p style="font-size: 12px; color: #555; margin: 4px 0 0 0;">ข้อมูลเชื่อมโยงจากฐานข้อมูล TRANSACTION_RECEIPTS_VIEW</p>
+        </div>
+        <div style="text-align: right; font-size: 11px; color: #666;">
+          <div>วันที่พิมพ์: {{ new Date().toLocaleString('th-TH') }}</div>
+          <div>จำนวนรายการ: {{ filteredOrders.length }} รายการ</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Screen Header (ซ่อนเวลาพิมพ์) -->
+    <div class="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
         <h1 class="text-xl font-bold text-slate-900">ตรวจสอบการเงินและประวัติธุรกรรม (Transaction & Audit)</h1>
         <p class="text-xs text-slate-500">ข้อมูลเชื่อมต่อตรงจาก TRANSACTION_RECEIPTS_VIEW ในระบบฐานข้อมูล MySQL</p>
@@ -63,8 +77,8 @@ function viewOrderDetails(order) {
       </div>
     </div>
 
-    <!-- Filter Bar -->
-    <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+    <!-- Filter Bar (ซ่อนเวลาพิมพ์) -->
+    <div class="no-print bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
       <div class="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
         <button 
           @click="selectedStatus = 'All'"
@@ -119,8 +133,8 @@ function viewOrderDetails(order) {
               <th class="p-4">ส่วนลด</th>
               <th class="p-4">ยอดรวมสุทธิ</th>
               <th class="p-4">สถานะการชำระ</th>
-              <th class="p-4 text-center">สลิปโอน</th>
-              <th class="p-4 text-right">รายละเอียด</th>
+              <th class="p-4 text-center no-print">สลิปโอน</th>
+              <th class="p-4 text-right no-print">รายละเอียด</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
@@ -155,7 +169,7 @@ function viewOrderDetails(order) {
                   {{ order.payment_status === 'Completed' ? '✅ ชำระแล้ว' : '⏳ รอชำระ' }}
                 </span>
               </td>
-              <td class="p-4 text-center">
+              <td class="p-4 text-center no-print">
                 <button 
                   v-if="order.payment_slip_url"
                   @click="viewSlip(order.payment_slip_url)"
@@ -165,7 +179,7 @@ function viewOrderDetails(order) {
                 </button>
                 <span v-else class="text-slate-300 text-[11px]">-</span>
               </td>
-              <td class="p-4 text-right">
+              <td class="p-4 text-right no-print">
                 <button 
                   @click="viewOrderDetails(order)"
                   class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] transition"
@@ -252,3 +266,20 @@ function viewOrderDetails(order) {
     </div>
   </div>
 </template>
+
+<style scoped>
+@media screen {
+  .print-only {
+    display: none !important;
+  }
+}
+
+@media print {
+  .print-only {
+    display: block !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+</style>

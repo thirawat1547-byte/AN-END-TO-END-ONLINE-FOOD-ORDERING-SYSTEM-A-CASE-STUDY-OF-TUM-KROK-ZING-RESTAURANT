@@ -242,3 +242,33 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+
+<style>
+@media print {
+  /* ซ่อน Sidebar และ Header ของ Admin เมื่อสั่งพิมพ์หรือเซฟเป็น PDF */
+  aside,
+  header,
+  .no-print {
+    display: none !important;
+  }
+
+  /* ปรับให้เนื้อหาเต็มหน้า A4 ไม่ติด Margin ด้านซ้ายของ Sidebar */
+  .md\:ml-64,
+  .md\:ml-20 {
+    margin-left: 0 !important;
+    padding: 0 !important;
+  }
+
+  body,
+  .min-h-screen,
+  main {
+    background: white !important;
+    color: #111827 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+  }
+}
+</style>
