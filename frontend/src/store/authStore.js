@@ -160,6 +160,8 @@ export const authStore = reactive({
     sessionStorage.removeItem('currentOrder');
     sessionStorage.removeItem('cartData');
     localStorage.removeItem('cartData');
+    sessionStorage.removeItem('active_tracking_order_id');
+    localStorage.removeItem('active_tracking_order_id');
     this.isLoggedIn = false;
     this.userProfile = {};
     this.sessionId = null;

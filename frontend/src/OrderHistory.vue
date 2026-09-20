@@ -179,6 +179,14 @@ export default {
       } else {
         this.orderHistory = [];
       }
+    },
+    'authStore.userProfile.user_id'(newVal, oldVal) {
+      if (newVal !== oldVal) {
+        this.orderHistory = [];
+        if (newVal) {
+          this.fetchOrderHistory();
+        }
+      }
     }
   },
   mounted() {
@@ -255,6 +263,7 @@ export default {
       }
 
       this.isLoading = true;
+      this.orderHistory = [];
       try {
         const res = await axios.get(`${API_BASE}/orders/my-orders`, {
           headers: {

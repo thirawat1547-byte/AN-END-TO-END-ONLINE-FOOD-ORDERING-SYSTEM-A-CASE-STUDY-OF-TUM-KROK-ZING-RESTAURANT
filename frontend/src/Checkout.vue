@@ -670,6 +670,9 @@ async validateAndCheckout() {
 
         const orderPayload = {
           order_type: 'DELIVERY',
+          user_id: (this.authStore?.userProfile?.user_id && !isNaN(Number(this.authStore.userProfile.user_id)))
+            ? Number(this.authStore.userProfile.user_id)
+            : undefined,
           promo_id: this.appliedPromo?.promo_id ? Number(this.appliedPromo.promo_id) : undefined,
           promo_code: this.appliedPromo?.code || undefined,
           items: this.cartItems.map(item => {

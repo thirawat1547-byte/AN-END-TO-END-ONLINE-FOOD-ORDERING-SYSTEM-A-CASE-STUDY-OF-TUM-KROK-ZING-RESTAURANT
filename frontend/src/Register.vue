@@ -107,7 +107,11 @@ export default {
       },
       loading: false,
       errorMessage: ''
-    }
+    };
+  },
+  mounted() {
+    // เคลียร์เซสชันเดิมออกเสมอเมื่อเปิดหน้าสมัครสมาชิก เพื่อไม่ให้ติดสิทธิ์ของบัญชีเดิม
+    authStore.logout(false);
   },
   methods: {
     async handleRegister() {
@@ -129,10 +133,13 @@ export default {
           email: this.form.email.trim() || undefined
         };
 
-        // 1. บันทึกบัญชีผู้ใช้ลงฐานข้อมูล MySQL จริงผ่าน Backend API
-        await axios.post(`${API_BASE}/auth/register`, payload);
+        // เคลียร์เซสชันเดิมก่อนสร้างบัญชีใหม่
+        authStore.logout(false);
 
-        // 2. ล็อกอินอัตโนมัติเพื่อรับ JWT access_token
+        // 1. บันทึกบัญชีผู้ใช้ลงฐานข้อมูล MySQL จริงผ่าน Backend API
+        const regRes = await axios.post(`${API_BASE}/auth/register`, payload);
+
+        // 2. ล็อกอินอัตโนมัติเพื่อรับ JWT access_token ของบัญชีใหม่นี้
         try {
           const loginRes = await axios.post(`${API_BASE}/auth/login`, {
             username: payload.username,
@@ -140,6 +147,9 @@ export default {
           });
 
           const token = loginRes.data?.access_token || loginRes.data?.token;
+          const userObj = loginRes.data?.user || regRes.data || {};
+          const sessionId = loginRes.data?.session_id;
+
           if (token) {
             // 3. ถ้ามีที่อยู่ ให้อัปเดตลง Database
             if (this.form.address && this.form.address.trim()) {
@@ -155,20 +165,27 @@ export default {
             }
 
             const userProfile = {
+              user_id: userObj.user_id,
               username: payload.username,
               name: this.form.name || payload.username,
-              phone: payload.phone_number || '',
-              address: this.form.address || '',
-              email: payload.email || ''
+              phone: payload.phone_number || userObj.phone_number || '',
+              address: this.form.address || userObj.address || '',
+              email: payload.email || userObj.email || '',
+              role: 'CUSTOMER'
             };
-            const sessionId = loginRes.data?.session_id;
+
             authStore.setAuth(token, userProfile, sessionId);
+          } else {
+            throw new Error('ไม่พบ Token');
           }
         } catch (loginErr) {
           console.warn('Auto-login หลังสมัครไม่สำเร็จ:', loginErr);
+          alert('🎉 สมัครสมาชิกสำเร็จ! กรุณาเข้าสู่ระบบด้วยบัญชีใหม่ของคุณครับ');
+          this.$router.push('/login');
+          return;
         }
 
-        alert('🎉 สมัครสมาชิกและเข้าสู่ระบบสำเร็จ!');
+        alert('🎉 สมัครสมาชิกและเข้าสู่ระบบด้วยบัญชีใหม่สำเร็จ!');
         this.$router.push('/');
       } catch (error) {
         console.error('สมัครสมาชิกไม่สำเร็จ:', error);

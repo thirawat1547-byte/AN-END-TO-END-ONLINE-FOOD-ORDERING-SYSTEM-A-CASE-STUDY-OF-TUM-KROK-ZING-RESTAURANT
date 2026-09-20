@@ -222,8 +222,12 @@ export class OrdersService {
     });
   }
 
-  // 3. ดึงประวัติคำสั่งซื้อเฉพาะของ User ที่ล็อกอิน
+  // 3. ดึงประวัติคำสั่งซื้อเฉพาะของ User ที่ล็อกอิน (แยกตาม User อย่างแท้จริง)
   async findByUser(userId: number) {
+    if (!userId || isNaN(userId) || userId <= 0) {
+      return [];
+    }
+
     return this.prisma.order.findMany({
       where: { user_id: userId },
       include: {

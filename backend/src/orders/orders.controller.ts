@@ -61,8 +61,12 @@ export class OrdersController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'ดูคำสั่งซื้อที่กำลังจัดส่งแบบเรียลไทม์ของผู้ใช้งานปัจจุบัน' })
   findMyActiveOrder(@Req() req: any, @Query('orderId') orderId?: string) {
-    const userId = req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub;
-    return this.ordersService.findActiveUserOrder(Number(userId), orderId ? parseInt(orderId, 10) : undefined);
+    const rawUserId = req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub;
+    const userId = Number(rawUserId);
+    if (!userId || isNaN(userId) || userId <= 0) {
+      return null;
+    }
+    return this.ordersService.findActiveUserOrder(userId, orderId ? parseInt(orderId, 10) : undefined);
   }
 
   // ดึงประวัติเฉพาะของ User ปัจจุบัน (ต้องวางไว้ก่อน @Get(':id'))
@@ -71,8 +75,12 @@ export class OrdersController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'ดูประวัติคำสั่งซื้อของผู้ใช้งานปัจจุบัน' })
   findMyOrders(@Req() req: any) {
-    const userId = req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub;
-    return this.ordersService.findByUser(Number(userId));
+    const rawUserId = req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub;
+    const userId = Number(rawUserId);
+    if (!userId || isNaN(userId) || userId <= 0) {
+      return [];
+    }
+    return this.ordersService.findByUser(userId);
   }
 
   @Get(':id')

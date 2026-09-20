@@ -182,9 +182,7 @@ export default {
 
     const handleLogout = () => {
       authStore.logout();
-      if (route.path === '/profile') {
-        router.push('/');
-      }
+      router.push('/login');
     };
 
     const goToProfileEdit = () => {
