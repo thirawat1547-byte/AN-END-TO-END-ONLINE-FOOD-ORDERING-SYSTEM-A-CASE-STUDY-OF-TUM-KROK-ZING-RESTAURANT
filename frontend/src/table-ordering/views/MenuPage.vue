@@ -40,13 +40,15 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import axios from 'axios'
 import OrderHeader from '../components/OrderHeader.vue'
 import CategoryTabs from '../components/CategoryTabs.vue'
 import MenuItemCard from '../components/MenuItemCard.vue'
 import FloatingCartBar from '../components/FloatingCartBar.vue'
 import { useCart } from '../composables/useCart'
+import { API_BASE } from '../../config/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -54,7 +56,39 @@ const tableId = route.params.tableId || '1'
 
 const { addToCart, cartItemCount, cartTotal } = useCart()
 
-// Mock data
+// แผนที่รูปภาพมาตรฐานเพื่อการแสดงผลที่ถูกต้อง
+const imageMap = {
+  'กะเพราหมู': '/images/kapaomu.jpg',
+  'กระเพราหมู': '/images/kapaomu.jpg',
+  'กะเพราทะเล/หมึก/กุ้ง': '/images/kapaotaley.jpg',
+  'กระเพราทะเล/หมึก/กุ้ง': '/images/kapaotaley.jpg',
+  'ข้าวผัดหมู': '/images/khaopadmu.jpg',
+  'ข้าวผัดทะเล/หมึก/กุ้ง': '/images/khaopadtalay.jpg',
+  'ผัดพริกแกงหมู': '/images/pikkangmu.jpg',
+  'ผัดพริกแกงทะเล/หมึก/กุ้ง': '/images/prikkangtalay.jpg',
+  'ผัดคะน้าหมูกรอบ': '/images/kanamokrop.jpg',
+  'ผัดคะน้าหมู': '/images/kanamokrop.jpg',
+  'ผัดคะน้าทะเล/หมึก/กุ้ง': '/images/kanatalay.jpg',
+  'ข้าวหมูกระเทียม': '/images/mookratiem.jpg',
+  'ข้าวไข่เจียวหมูสับ': '/images/kaijeawmoosub.jpg',
+  'ข้าวไข่เจียวกุ้ง': '/images/kaikung.jpg',
+  'ส้มตำปูปลาร้า': '/images/tumprara.jpg',
+  'ส้มตำไทย': '/images/tumtai.jpg',
+  'ลาบหมู': '/images/larbmoo.jpg',
+  'ยำวุ้นเส้นทะเล': '/images/yumtalay.jpg',
+  'ไก่ทอด (สะโพก)': '/images/chick.jpg',
+  'ไก่ทอด (ปีก)': '/images/wingchick.jpg',
+  'ปีกไก่ทอด': '/images/wingchick.jpg',
+  'โค้ก (กระป๋อง)': '/images/coke.jpg',
+  'โค้ก (Coke)': '/images/coke.jpg',
+  'สไปรท์ (Sprite)': '/images/sprite.jpg',
+  'น้ำเก๊กฮวย': '/images/gek.jpg',
+  'น้ำดื่ม': '/images/water.jpg',
+  'น้ำเปล่า': '/images/water.jpg',
+  'ข้าวเปล่า': '/images/kao.jpg',
+  'ข้าวเหนียว': '/images/kaon.jpg'
+}
+
 const categories = [
   { id: 'all', name: 'ทั้งหมด' },
   { id: 'ขายดีที่สุด', name: 'เมนูแนะนำ' },
@@ -64,37 +98,63 @@ const categories = [
 ]
 
 const activeCategory = ref('all')
-const previewItem = ref(null) // ตัวแปรสำหรับเก็บเมนูที่กำลังแสดงใน Modal
+const previewItem = ref(null)
+const menuItems = ref([])
+let menuPollTimer = null
 
-const menuItems = [
-  { id: 1, menu_name: 'กระเพราหมู', price: 40, category: ['เมนูอาหาร', 'ขายดีที่สุด'], desc: 'หอมฟุ้ง อร่อยเด็ดสะใจ!', image_url: '/images/kapaomu.jpg', isPopular: true, isSpicy: true },
-  { id: 2, menu_name: 'กระเพราทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'เผ็ดร้อน ถึงเครื่อง', image_url: '/images/kapaotaley.jpg', isSpicy: true },
-  { id: 3, menu_name: 'ข้าวผัดหมู', price: 40, category: ['เมนูอาหาร'], desc: 'ข้าวผัดหอมกรุ่น', image_url: '/images/khaopadmu.jpg', isSpicy: false },
-  { id: 5, menu_name: 'ข้าวผัดทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'รวมมิตรทะเลผัด', image_url: '/images/khaopadtalay.jpg', isSpicy: false },
-  { id: 6, menu_name: 'ผัดพริกแกงหมู', price: 40, category: ['เมนูอาหาร'], desc: 'พริกแกงเข้มข้น', image_url: '/images/pikkangmu.jpg', isSpicy: true },
-  { id: 7, menu_name: 'ผัดพริกแกงทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'จัดจ้านถึงใจ', image_url: '/images/prikkangtalay.jpg', isSpicy: true },
-  { id: 8, menu_name: 'ผัดคะน้าหมู', price: 40, category: ['เมนูอาหาร'], desc: 'ผักกรอบ หมูนุ่ม', image_url: '/images/kanamokrop.jpg', isSpicy: false },
-  { id: 9, menu_name: 'ผัดคะน้าทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'คะน้ากรอบกับซีฟู้ด', image_url: '/images/kanatalay.jpg', isSpicy: false },
-  { id: 10, menu_name: 'ข้าวหมูกระเทียม', price: 40, category: ['เมนูอาหาร'], desc: 'หอมกระเทียมพริกไทย', image_url: '/images/mookratiem.jpg', isSpicy: false },
-  { id: 11, menu_name: 'ข้าวไข่เจียวหมูสับ', price: 40, category: ['เมนูอาหาร'], desc: 'ไข่เจียวฟูๆ หมูสับแน่นๆ', image_url: '/images/kaijeawmoosub.jpg', isSpicy: false },
-  { id: 12, menu_name: 'ข้าวไข่เจียวกุ้ง', price: 50, category: ['เมนูอาหาร'], desc: 'ไข่เจียวฟูกับกุ้ง', image_url: '/images/kaikung.jpg', isSpicy: false },
-  { id: 13, menu_name: 'ยำวุ้นเส้นทะเล', price: 70, category: ['เมนูอาหาร', 'ขายดีที่สุด'], desc: 'เปรี้ยวเผ็ดแซ่บ', image_url: '/images/yumtalay.jpg', isSpicy: true },
-  { id: 14, menu_name: 'ส้มตำปูปลาร้า', price: 40, category: ['เมนูอาหารอีสาน', 'ขายดีที่สุด'], desc: 'เส้นมะละกอดิบ มะเขือเทศ และพริก', image_url: '/images/tumprara.jpg', isPopular: true, isSpicy: true },
-  { id: 15, menu_name: 'ส้มตำไทย', price: 40, category: ['เมนูอาหารอีสาน'], desc: 'เปรี้ยวหวาน สามรส', image_url: '/images/tumtai.jpg', isSpicy: true },
-  { id: 16, menu_name: 'ลาบหมู', price: 60, category: ['เมนูอาหารอีสาน'], desc: 'หอมข้าวคั่ว แซ่บถึงใจ', image_url: '/images/larbmoo.jpg', isSpicy: true },
-  { id: 17, menu_name: 'ไก่ทอด (ปีก)', price: 20, category: ['เมนูอาหารอีสาน'], desc: 'กรอบนอกนุ่มใน', image_url: '/images/wingchick.jpg', isSpicy: false },
-  { id: 18, menu_name: 'ไก่ทอด (สะโพก)', price: 50, category: ['เมนูอาหารอีสาน', 'ขายดีที่สุด'], desc: 'เนื้อฉ่ำๆ ชิ้นใหญ่', image_url: '/images/chick.jpg', isSpicy: false },
-  { id: 19, menu_name: 'น้ำเก๊กฮวย', price: 20, category: ['เครื่องดื่ม', 'ขายดีที่สุด'], desc: 'หวานเย็น ชื่นใจ', image_url: '/images/gek.jpg' },
-  { id: 20, menu_name: 'โค้ก (Coke)', price: 20, category: ['เครื่องดื่ม'], desc: 'น้ำอัดลมซ่าสดชื่น', image_url: '/images/coke.jpg' },
-  { id: 21, menu_name: 'สไปรท์ (Sprite)', price: 20, category: ['เครื่องดื่ม'], desc: 'ซ่า สดชื่น กลิ่นเลมอน', image_url: '/images/sprite.jpg' },
-  { id: 22, menu_name: 'น้ำเปล่า', price: 10, category: ['เครื่องดื่ม'], desc: 'น้ำดื่มบริสุทธิ์', image_url: '/images/water.jpg' },
-  { id: 23, menu_name: 'ข้าวเปล่า', price: 10, category: ['เมนูอาหาร'], desc: 'ข้าวสวยหอมมะลิ ร้อนๆ นุ่มอร่อย', image_url: '/images/kao.jpg', isSpicy: false },
-  { id: 24, menu_name: 'ข้าวเหนียว', price: 10, category: ['เมนูอาหารอีสาน', 'เมนูอาหาร'], desc: 'ข้าวเหนียวนุ่ม ร้อนๆ หอมอร่อย', image_url: '/images/kaon.jpg', isSpicy: false }
-]
+// โหลดเมนูจริงจากฐานข้อมูล Backend
+const fetchMenus = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/menus`)
+    if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+      menuItems.value = res.data.map(m => {
+        const catName = m.category?.category_name || ''
+        const cats = ['เมนูอาหาร']
+        if (catName.includes('อีสาน') || catName.includes('ส้มตำ') || catName.includes('ลาบ') || catName.includes('ของทอด') || [2, 3, 4].includes(m.category_id)) {
+          cats.push('เมนูอาหารอีสาน')
+        }
+        if (catName.includes('เครื่องดื่ม') || m.category_id === 5) {
+          cats.push('เครื่องดื่ม')
+        }
+        if (['กะเพราหมู', 'กระเพราหมู', 'ส้มตำปูปลาร้า', 'ยำวุ้นเส้นทะเล', 'ไก่ทอด (สะโพก)', 'น้ำเก๊กฮวย'].includes(m.menu_name)) {
+          cats.push('ขายดีที่สุด')
+        }
+
+        const isSpicy = m.menu_name.includes('กะเพรา') || m.menu_name.includes('กระเพรา') || m.menu_name.includes('พริกแกง') || m.menu_name.includes('ส้มตำ') || m.menu_name.includes('ลาบ') || m.menu_name.includes('ยำ')
+
+        return {
+          id: m.menu_id,
+          menu_id: m.menu_id,
+          menu_name: m.menu_name,
+          price: Number(m.price),
+          category: cats,
+          desc: m.description || '',
+          image_url: m.image_url || imageMap[m.menu_name] || '/images/kapaomu.jpg',
+          calories: m.calories || 350,
+          isPopular: cats.includes('ขายดีที่สุด'),
+          isSpicy,
+          is_available: m.is_available !== false
+        }
+      })
+    }
+  } catch (err) {
+    console.warn('โหลดเมนูจาก API ไม่สำเร็จ กำลังใช้ข้อมูลสำรอง:', err)
+  }
+}
+
+onMounted(async () => {
+  await fetchMenus()
+  // ซิงค์สถานะเปิด-ปิดเมนูอัตโนมัติทุกๆ 6 วินาที
+  menuPollTimer = setInterval(fetchMenus, 6000)
+})
+
+onBeforeUnmount(() => {
+  if (menuPollTimer) clearInterval(menuPollTimer)
+})
 
 const filteredMenu = computed(() => {
-  if (activeCategory.value === 'all') return menuItems
-  return menuItems.filter(item => item.category && item.category.includes(activeCategory.value))
+  if (activeCategory.value === 'all') return menuItems.value
+  return menuItems.value.filter(item => item.category && item.category.includes(activeCategory.value))
 })
 
 // ฟังก์ชันตรวจสอบว่าเมนูนี้มีตัวเลือก/ส่วนเสริมที่ต้องเลือกหรือไม่
@@ -102,32 +162,29 @@ const checkHasOptions = (item) => {
   const name = item.menu_name || '';
   const cats = item.category || [];
   
-  // ตรวจสอบว่าได้รับการยกเว้นกับข้าว/ราดข้าว หรือไม่
   const isExempt = cats.includes('เครื่องดื่ม') || name.includes('น้ำ') || name.includes('โค้ก') || name.includes('สไปรท์') || name.includes('ลาบ') || name.includes('ไก่ทอด') || name.includes('ส้มตำ') || name.includes('ข้าวผัด') || name.includes('ข้าวเปล่า') || name.includes('ข้าวเหนียว') || name.includes('ยำ');
 
-  // ถ้าไม่ใช่เมนูที่ได้รับการยกเว้น แสดงว่าต้องเลือกกับข้าวหรือราดข้าว -> ต้องไปหน้า ItemDetailPage
   if (!isExempt) return true;
-
-  if (item.isSpicy) return true; // ถ้าเป็นเมนูรสจัดต้องเลือกความเผ็ด
-  if (name.includes('ทะเล')) return true; // ถ้าเป็นทะเลต้องเลือกกุ้ง/หมึก
+  if (item.isSpicy) return true;
+  if (name.includes('ทะเล')) return true;
   
-  // เช็คว่าเป็นเมนูที่ถูกยกเว้นส่วนเสริมหรือไม่ (เช่น น้ำ, ไก่ทอด, ข้าวเปล่า, ข้าวเหนียว)
   const isNoAddonCategory = cats.includes('เครื่องดื่ม') || name.includes('ไก่ทอด') || name.includes('ข้าวเปล่า') || name.includes('ข้าวเหนียว');
-  
   return !isNoAddonCategory;
 }
 
-// ฟังก์ชันจัดการเมื่อคลิกรูป หรือ กดปุ่ม +
+// จัดการคลิกเลือกเมนู
 const handleAction = (item, isQuickAdd = false) => {
+  if (item.is_available === false) {
+    alert(`ขออภัยครับ เมนู "${item.menu_name}" หมดชั่วคราว ไม่สามารถสั่งได้ครับ`)
+    return
+  }
   if (checkHasOptions(item)) {
-    // ถ้าเมนูมีส่วนเสริม ให้เด้งไปหน้า ItemDetailPage
     router.push(`/table/${tableId}/item/${item.id}`)
   } else {
-    // ถ้าไม่มีส่วนเสริม (เช่น น้ำ, ไก่ทอด)
     if (isQuickAdd) {
-      addToCartQuick(item) // กดปุ่ม + ให้ลงตะกร้าเลย
+      addToCartQuick(item)
     } else {
-      previewItem.value = item // กดที่รูป ให้เปิด Popup Modal ขึ้นมาแสดงภาพ
+      previewItem.value = item
     }
   }
 }
@@ -138,12 +195,21 @@ const closePreview = () => {
 
 const addFromPreview = () => {
   if (previewItem.value) {
+    if (previewItem.value.is_available === false) {
+      alert(`ขออภัยครับ เมนู "${previewItem.value.menu_name}" หมดชั่วคราวครับ`)
+      closePreview()
+      return
+    }
     addToCartQuick(previewItem.value)
     closePreview()
   }
 }
 
 const addToCartQuick = (item) => {
+  if (item.is_available === false) {
+    alert(`ขออภัยครับ เมนู "${item.menu_name}" หมดชั่วคราวครับ`)
+    return
+  }
   addToCart(item, 1, null, '', [])
 }
 

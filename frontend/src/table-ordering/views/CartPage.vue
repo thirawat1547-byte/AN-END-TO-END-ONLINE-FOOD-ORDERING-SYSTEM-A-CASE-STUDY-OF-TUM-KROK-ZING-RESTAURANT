@@ -65,6 +65,14 @@ const goToMenu = () => {
 
 const placeOrder = async () => {
   if (cart.value.length === 0 || isSubmitting.value) return
+
+  // ตรวจสอบว่ามีเมนูที่ปิดการขายอยู่ในตะกร้าหรือไม่
+  const unavailableItem = cart.value.find(item => item.is_available === false)
+  if (unavailableItem) {
+    alert(`ขออภัยครับ เมนู "${unavailableItem.menu_name || 'อาหารบางรายการ'}" ปิดรับออเดอร์ชั่วคราว กรุณาลบออกจากตะกร้าก่อนสั่งซื้อครับ`)
+    return
+  }
+
   isSubmitting.value = true
   const finalTotal = cartTotal.value
 
@@ -78,14 +86,15 @@ const placeOrder = async () => {
       order_type: 'DINE_IN',
       items: cart.value.map(item => {
         const notesList = []
-        if (item.spicyLevel) notesList.push(`เผ็ด: ${item.spicyLevel}`)
+        if (item.spicyLevel && item.spicyLevel !== 'normal') notesList.push(`เผ็ด: ${item.spicyLevel}`)
         if (item.specialInstructions) notesList.push(item.specialInstructions)
         if (item.addons && item.addons.length > 0) {
           notesList.push('เพิ่ม: ' + item.addons.map(a => a.name).join(', '))
         }
 
+        const validMenuId = Number(item.menu_id || item.id)
         return {
-          menu_id: Number(item.id || item.menu_id || 1),
+          menu_id: validMenuId,
           quantity: Number(item.quantity || 1),
           notes: notesList.join(' | ') || undefined
         }
@@ -93,15 +102,14 @@ const placeOrder = async () => {
     }
 
     // ส่งคำสั่งซื้อเข้า Backend เพื่อส่งต่อไปยังห้องครัว (Kitchen KDS) ทันที
-    await axios.post(`${API_BASE}/orders`, orderPayload, { headers })
+    const res = await axios.post(`${API_BASE}/orders`, orderPayload, { headers })
 
     placeOrderToHistory()
-    router.push({ path: `/table/${tableId}/success`, query: { total: finalTotal } })
+    router.push({ path: `/table/${tableId}/success`, query: { total: finalTotal, orderId: res.data?.order_id } })
   } catch (err) {
-    console.warn('ส่งออเดอร์เข้า Backend ไม่สำเร็จ กำลังบันทึกในระบบท้องถิ่น:', err)
-    // Fallback: บันทึกเข้าประวัติท้องถิ่น
-    placeOrderToHistory()
-    router.push({ path: `/table/${tableId}/success`, query: { total: finalTotal } })
+    console.error('ส่งออเดอร์เข้า Backend ไม่สำเร็จ:', err)
+    const errMessage = err.response?.data?.message || err.message || 'เกิดข้อผิดพลาดในการส่งคำสั่งซื้อ'
+    alert(`ไม่สามารถส่งคำสั่งซื้อเข้าห้องครัวได้:\n${errMessage}`)
   } finally {
     isSubmitting.value = false
   }

@@ -27,6 +27,10 @@ export class OrdersService {
           throw new NotFoundException(`ไม่พบเมนูอาหารรหัส #${item.menu_id}`);
         }
 
+        if (menu.is_available === false) {
+          throw new BadRequestException(`ขออภัย เมนู "${menu.menu_name}" ปิดรับออเดอร์ชั่วคราว`);
+        }
+
         const unitPrice = Number(menu.price);
         totalAmount += unitPrice * item.quantity;
 

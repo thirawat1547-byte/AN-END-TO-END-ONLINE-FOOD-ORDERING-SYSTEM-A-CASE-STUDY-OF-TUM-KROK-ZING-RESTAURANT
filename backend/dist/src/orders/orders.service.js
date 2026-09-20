@@ -30,6 +30,9 @@ let OrdersService = class OrdersService {
                 if (!menu) {
                     throw new common_1.NotFoundException(`ไม่พบเมนูอาหารรหัส #${item.menu_id}`);
                 }
+                if (menu.is_available === false) {
+                    throw new common_1.BadRequestException(`ขออภัย เมนู "${menu.menu_name}" ปิดรับออเดอร์ชั่วคราว`);
+                }
                 const unitPrice = Number(menu.price);
                 totalAmount += unitPrice * item.quantity;
                 orderItemsData.push({

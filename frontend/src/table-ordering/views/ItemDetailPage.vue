@@ -89,10 +89,14 @@
       
       <button 
         class="add-to-cart-btn" 
-        :style="!isExemptDishType(item) && !dishType ? 'background: #b0bec5; cursor: not-allowed;' : ''"
+        :disabled="item.is_available === false || (!isExemptDishType(item) && !dishType)"
+        :style="item.is_available === false ? 'background: #9ca3af; cursor: not-allowed;' : (!isExemptDishType(item) && !dishType ? 'background: #b0bec5; cursor: not-allowed;' : '')"
         @click="handleAddToCart"
       >
-        <template v-if="!isExemptDishType(item) && !dishType">
+        <template v-if="item.is_available === false">
+          ❌ เมนูนี้หมดชั่วคราว
+        </template>
+        <template v-else-if="!isExemptDishType(item) && !dishType">
           กรุณาเลือกกับข้าวหรือราดข้าว
         </template>
         <template v-else>
@@ -106,8 +110,10 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import axios from 'axios'
 import OrderHeader from '../components/OrderHeader.vue'
 import { useCart } from '../composables/useCart'
+import { API_BASE } from '../../config/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -116,7 +122,6 @@ const itemId = route.params.itemId
 
 const { addToCart } = useCart()
 
-// Mock fetching item
 const item = ref(null)
 const dishType = ref(null)
 const spicyLevel = ref('เผ็ดกลาง')
@@ -154,34 +159,71 @@ const spicyOptions = [
   { value: 'very', label: 'เผ็ดมาก' }
 ]
 
-onMounted(() => {
-  // Mock data simulationพร้อมแคลอรีที่คำนวณไว้
-  const menuItems = [
-    { id: 1, menu_name: 'กระเพราหมู', price: 40, category: ['เมนูอาหาร', 'ขายดีที่สุด'], desc: 'หอมฟุ้ง อร่อยเด็ดสะใจ!', image_url: '/images/kapaomu.jpg', isPopular: true, isSpicy: true, calories: 520 },
-    { id: 2, menu_name: 'กระเพราทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'เผ็ดร้อน ถึงเครื่อง', image_url: '/images/kapaotaley.jpg', isSpicy: true, calories: 450 },
-    { id: 3, menu_name: 'ข้าวผัดหมู', price: 40, category: ['เมนูอาหาร'], desc: 'ข้าวผัดหอมกรุ่น', image_url: '/images/khaopadmu.jpg', isSpicy: false, calories: 550 },
-    { id: 5, menu_name: 'ข้าวผัดทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'รวมมิตรทะเลผัด', image_url: '/images/khaopadtalay.jpg', isSpicy: false, calories: 490 },
-    { id: 6, menu_name: 'ผัดพริกแกงหมู', price: 40, category: ['เมนูอาหาร'], desc: 'พริกแกงเข้มข้น', image_url: '/images/pikkangmu.jpg', isSpicy: true, calories: 500 },
-    { id: 7, menu_name: 'ผัดพริกแกงทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'จัดจ้านถึงใจ', image_url: '/images/prikkangtalay.jpg', isSpicy: true, calories: 430 },
-    { id: 8, menu_name: 'ผัดคะน้าหมู', price: 40, category: ['เมนูอาหาร'], desc: 'ผักกรอบ หมูนุ่ม', image_url: '/images/kanamokrop.jpg', isSpicy: false, calories: 420 },
-    { id: 9, menu_name: 'ผัดคะน้าทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'คะน้ากรอบกับซีฟู้ด', image_url: '/images/kanatalay.jpg', isSpicy: false, calories: 380 },
-    { id: 10, menu_name: 'ข้าวหมูกระเทียม', price: 40, category: ['เมนูอาหาร'], desc: 'หอมกระเทียมพริกไทย', image_url: '/images/mookratiem.jpg', isSpicy: false, calories: 530 },
-    { id: 11, menu_name: 'ข้าวไข่เจียวหมูสับ', price: 40, category: ['เมนูอาหาร'], desc: 'ไข่เจียวฟูๆ หมูสับแน่นๆ', image_url: '/images/kaijeawmoosub.jpg', isSpicy: false, calories: 600 },
-    { id: 12, menu_name: 'ข้าวไข่เจียวกุ้ง', price: 50, category: ['เมนูอาหาร'], desc: 'ไข่เจียวฟูกับกุ้ง', image_url: '/images/kaikung.jpg', isSpicy: false, calories: 580 },
-    { id: 13, menu_name: 'ยำวุ้นเส้นทะเล', price: 70, category: ['เมนูอาหาร', 'ขายดีที่สุด'], desc: 'เปรี้ยวเผ็ดแซ่บ', image_url: '/images/yumtalay.jpg', isSpicy: true, calories: 320 },
-    { id: 14, menu_name: 'ส้มตำปูปลาร้า', price: 40, category: ['เมนูอาหารอีสาน', 'ขายดีที่สุด'], desc: 'เส้นมะละกอดิบ มะเขือเทศ และพริก', image_url: '/images/tumprara.jpg', isPopular: true, isSpicy: true, calories: 150 },
-    { id: 15, menu_name: 'ส้มตำไทย', price: 40, category: ['เมนูอาหารอีสาน'], desc: 'เปรี้ยวหวาน สามรส', image_url: '/images/tumtai.jpg', isSpicy: true, calories: 180 },
-    { id: 16, menu_name: 'ลาบหมู', price: 60, category: ['เมนูอาหารอีสาน'], desc: 'หอมข้าวคั่ว แซ่บถึงใจ', image_url: '/images/larbmoo.jpg', isSpicy: true, calories: 350 },
-    { id: 17, menu_name: 'ไก่ทอด (ปีก)', price: 20, category: ['เมนูอาหารอีสาน'], desc: 'กรอบนอกนุ่มใน', image_url: '/images/wingchick.jpg', isSpicy: false, calories: 190 },
-    { id: 18, menu_name: 'ไก่ทอด (สะโพก)', price: 50, category: ['เมนูอาหารอีสาน', 'ขายดีที่สุด'], desc: 'เนื้อฉ่ำๆ ชิ้นใหญ่', image_url: '/images/chick.jpg', isSpicy: false, calories: 380 },
-    { id: 19, menu_name: 'น้ำเก๊กฮวย', price: 20, category: ['เครื่องดื่ม', 'ขายดีที่สุด'], desc: 'หวานเย็น ชื่นใจ', image_url: '/images/gek.jpg', calories: 120 },
-    { id: 20, menu_name: 'โค้ก (Coke)', price: 20, category: ['เครื่องดื่ม'], desc: 'น้ำอัดลมซ่าสดชื่น', image_url: '/images/coke.jpg', calories: 140 },
-    { id: 21, menu_name: 'สไปรท์ (Sprite)', price: 20, category: ['เครื่องดื่ม'], desc: 'ซ่า สดชื่น กลิ่นเลมอน', image_url: '/images/sprite.jpg', calories: 140 },
-    { id: 22, menu_name: 'น้ำเปล่า', price: 10, category: ['เครื่องดื่ม'], desc: 'น้ำดื่มบริสุทธิ์', image_url: '/images/water.jpg', calories: 0 },
-    { id: 23, menu_name: 'ข้าวเปล่า', price: 10, category: ['เมนูอาหาร'], desc: 'ข้าวสวยหอมมะลิ ร้อนๆ นุ่มอร่อย', image_url: '/images/kao.jpg', isSpicy: false, calories: 150 },
-    { id: 24, menu_name: 'ข้าวเหนียว', price: 10, category: ['เมนูอาหารอีสาน', 'เมนูอาหาร'], desc: 'ข้าวเหนียวนุ่ม ร้อนๆ หอมอร่อย', image_url: '/images/kaon.jpg', isSpicy: false, calories: 150 }
-  ]
-  item.value = menuItems.find(i => i.id == itemId)
+const imageMap = {
+  'กะเพราหมู': '/images/kapaomu.jpg',
+  'กระเพราหมู': '/images/kapaomu.jpg',
+  'กะเพราทะเล/หมึก/กุ้ง': '/images/kapaotaley.jpg',
+  'กระเพราทะเล/หมึก/กุ้ง': '/images/kapaotaley.jpg',
+  'ข้าวผัดหมู': '/images/khaopadmu.jpg',
+  'ข้าวผัดทะเล/หมึก/กุ้ง': '/images/khaopadtalay.jpg',
+  'ผัดพริกแกงหมู': '/images/pikkangmu.jpg',
+  'ผัดพริกแกงทะเล/หมึก/กุ้ง': '/images/prikkangtalay.jpg',
+  'ผัดคะน้าหมูกรอบ': '/images/kanamokrop.jpg',
+  'ผัดคะน้าหมู': '/images/kanamokrop.jpg',
+  'ผัดคะน้าทะเล/หมึก/กุ้ง': '/images/kanatalay.jpg',
+  'ข้าวหมูกระเทียม': '/images/mookratiem.jpg',
+  'ข้าวไข่เจียวหมูสับ': '/images/kaijeawmoosub.jpg',
+  'ข้าวไข่เจียวกุ้ง': '/images/kaikung.jpg',
+  'ส้มตำปูปลาร้า': '/images/tumprara.jpg',
+  'ส้มตำไทย': '/images/tumtai.jpg',
+  'ลาบหมู': '/images/larbmoo.jpg',
+  'ยำวุ้นเส้นทะเล': '/images/yumtalay.jpg',
+  'ไก่ทอด (สะโพก)': '/images/chick.jpg',
+  'ไก่ทอด (ปีก)': '/images/wingchick.jpg',
+  'ปีกไก่ทอด': '/images/wingchick.jpg',
+  'โค้ก (กระป๋อง)': '/images/coke.jpg',
+  'โค้ก (Coke)': '/images/coke.jpg',
+  'สไปรท์ (Sprite)': '/images/sprite.jpg',
+  'น้ำเก๊กฮวย': '/images/gek.jpg',
+  'น้ำดื่ม': '/images/water.jpg',
+  'น้ำเปล่า': '/images/water.jpg',
+  'ข้าวเปล่า': '/images/kao.jpg',
+  'ข้าวเหนียว': '/images/kaon.jpg'
+}
+
+onMounted(async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/menus/${itemId}`)
+    if (res.data) {
+      const m = res.data
+      const catName = m.category?.category_name || ''
+      const cats = ['เมนูอาหาร']
+      if (catName.includes('อีสาน') || catName.includes('ส้มตำ') || catName.includes('ลาบ') || catName.includes('ของทอด') || [2, 3, 4].includes(m.category_id)) {
+        cats.push('เมนูอาหารอีสาน')
+      }
+      if (catName.includes('เครื่องดื่ม') || m.category_id === 5) {
+        cats.push('เครื่องดื่ม')
+      }
+
+      const isSpicy = m.menu_name.includes('กะเพรา') || m.menu_name.includes('กระเพรา') || m.menu_name.includes('พริกแกง') || m.menu_name.includes('ส้มตำ') || m.menu_name.includes('ลาบ') || m.menu_name.includes('ยำ')
+
+      item.value = {
+        id: m.menu_id,
+        menu_id: m.menu_id,
+        menu_name: m.menu_name,
+        price: Number(m.price),
+        category: cats,
+        desc: m.description || '',
+        image_url: m.image_url || imageMap[m.menu_name] || '/images/kapaomu.jpg',
+        calories: m.calories || 350,
+        isSpicy,
+        is_available: m.is_available !== false
+      }
+      return
+    }
+  } catch (err) {
+    console.warn('โหลดรายละเอียดเมนูจาก API ไม่สำเร็จ ใช้สำรอง:', err)
+  }
 })
 
 // เช็คว่าเป็นเมนูทะเลหรือไม่ (อิงจากชื่อเมนูมีคำว่า "ทะเล")
@@ -238,6 +280,10 @@ const goBack = () => {
 
 const handleAddToCart = () => {
   if (item.value) {
+    if (item.value.is_available === false) {
+      alert('ขออภัยครับ เมนูนี้ปิดการขายชั่วคราว');
+      return;
+    }
     if (!isExemptDishType(item.value) && !dishType.value) {
       alert('กรุณาเลือกว่าเป็น "กับข้าว" หรือ "ราดข้าว" ก่อนเพิ่มลงในตะกร้าครับ');
       return;

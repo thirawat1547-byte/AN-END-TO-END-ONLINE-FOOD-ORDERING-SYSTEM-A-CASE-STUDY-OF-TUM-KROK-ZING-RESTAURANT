@@ -97,6 +97,57 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
           // ignore
         }
       }
+
+      // ตรวจสอบและเพิ่มเมนูอาหารมาตรฐานให้ครบถ้วนในฐานข้อมูล MySQL
+      const defaultMenus = [
+        { category_id: 1, menu_name: 'กะเพราหมู', description: 'กะเพราหมูสับผัดพริกแห้ง หอมฟุ้ง อร่อยเด็ดสะใจ', price: 40, calories: 320, image_url: '/images/kapaomu.jpg' },
+        { category_id: 1, menu_name: 'กะเพราทะเล/หมึก/กุ้ง', description: 'กะเพราซีฟู้ดสดใหม่ กุ้งปลาหมึกเด้ง เผ็ดร้อน ถึงเครื่อง', price: 60, calories: 280, image_url: '/images/kapaotaley.jpg' },
+        { category_id: 1, menu_name: 'ข้าวผัดหมู', description: 'ข้าวผัดหอมกรุ่นกระทะ เมล็ดข้าวร่วนสวย ใส่หมูนุ่ม', price: 40, calories: 350, image_url: '/images/khaopadmu.jpg' },
+        { category_id: 1, menu_name: 'ข้าวผัดทะเล/หมึก/กุ้ง', description: 'รวมมิตรทะเลผัดข้าวหอมมะลิ รสชาติกลมกล่อม', price: 60, calories: 340, image_url: '/images/khaopadtalay.jpg' },
+        { category_id: 1, menu_name: 'ผัดพริกแกงหมู', description: 'พริกแกงเข้มข้นถึงเครื่องแกงใต้ ผัดถั่วฝักยาวและหมูนุ่ม', price: 40, calories: 310, image_url: '/images/pikkangmu.jpg' },
+        { category_id: 1, menu_name: 'ผัดพริกแกงทะเล/หมึก/กุ้ง', description: 'ผัดพริกแกงรวมมิตรทะเล รสชาติจัดจ้านถึงใจ', price: 60, calories: 290, image_url: '/images/prikkangtalay.jpg' },
+        { category_id: 1, menu_name: 'ผัดคะน้าหมูกรอบ', description: 'คะน้าสดกรอบผัดหมูกรอบชิ้นโต รสชาติกลมกล่อมหอมน้ำมันหอย', price: 40, calories: 380, image_url: '/images/kanamokrop.jpg' },
+        { category_id: 1, menu_name: 'ผัดคะน้าทะเล/หมึก/กุ้ง', description: 'คะน้าสดกรอบผัดซีฟู้ดเนื้อแน่น ปรุงร้อนๆ จานต่อจาน', price: 60, calories: 270, image_url: '/images/kanatalay.jpg' },
+        { category_id: 1, menu_name: 'ข้าวหมูกระเทียม', description: 'หมูหมักนุ่มผัดกระเทียมพริกไทยดำหอมเตะจมูก', price: 40, calories: 360, image_url: '/images/mookratiem.jpg' },
+        { category_id: 1, menu_name: 'ข้าวไข่เจียวหมูสับ', description: 'ไข่เจียวฟูกรอบนอกนุ่มใน หมูสับแน่นๆ ทอดร้อนๆ', price: 40, calories: 390, image_url: '/images/kaijeawmoosub.jpg' },
+        { category_id: 1, menu_name: 'ข้าวไข่เจียวกุ้ง', description: 'ไข่เจียวฟูใส่กุ้งสดเด้ง ทานคู่น้ำปลาพริกมะนาว', price: 50, calories: 380, image_url: '/images/kaikung.jpg' },
+        { category_id: 2, menu_name: 'ส้มตำปูปลาร้า', description: 'ส้มตำปลาร้าต้มสุกสูตรเฉพาะ หอม นัว ถึงเครื่อง ปรุงรสตามสั่ง', price: 40, calories: 145, image_url: '/images/tumprara.jpg' },
+        { category_id: 2, menu_name: 'ส้มตำไทย', description: 'ตำไทยรสกลมกล่อม เปรี้ยวหวานกำลังดี โรยถั่วคั่วหอมสดใหม่', price: 40, calories: 180, image_url: '/images/tumtai.jpg' },
+        { category_id: 3, menu_name: 'ลาบหมู', description: 'หมูสับนุ่ม คลุกเคล้าข้าวคั่ว พริกป่น มะนาวแท้รสจัดจ้าน', price: 50, calories: 220, image_url: '/images/larbmoo.jpg' },
+        { category_id: 3, menu_name: 'ยำวุ้นเส้นทะเล', description: 'ยำวุ้นเส้นใส่กุ้ง หมึก หมูสับ รสแซ่บครบรส', price: 70, calories: 240, image_url: '/images/yumtalay.jpg' },
+        { category_id: 4, menu_name: 'ไก่ทอด (ปีก)', description: 'ปีกไก่ทอดกรอบนอกนุ่มใน หมักเครื่องเทศเข้าเนื้อ', price: 50, calories: 320, image_url: '/images/wingchick.jpg' },
+        { category_id: 4, menu_name: 'ไก่ทอด (สะโพก)', description: 'สะโพกไก่ชิ้นโต ทอดกรอบไม่อมน้ำมัน เนื้อฉ่ำนุ่ม', price: 50, calories: 360, image_url: '/images/chick.jpg' },
+        { category_id: 5, menu_name: 'น้ำเก๊กฮวย', description: 'น้ำเก๊กฮวยต้มสด หวานกำลังดี หอมเย็นชื่นใจ', price: 20, calories: 120, image_url: '/images/gek.jpg' },
+        { category_id: 5, menu_name: 'โค้ก (กระป๋อง)', description: 'น้ำอัดลมโค้ก เย็นซ่าสดชื่น', price: 20, calories: 140, image_url: '/images/coke.jpg' },
+        { category_id: 5, menu_name: 'สไปรท์ (Sprite)', description: 'น้ำอัดลมกลิ่นเลมอนไลม์ ซ่าสดชื่น', price: 20, calories: 140, image_url: '/images/sprite.jpg' },
+        { category_id: 5, menu_name: 'น้ำดื่ม', description: 'น้ำดื่มสะอาด ตราตำครกซิ่ง', price: 10, calories: 0, image_url: '/images/water.jpg' },
+        { category_id: 1, menu_name: 'ข้าวเปล่า', description: 'ข้าวสวยหอมมะลิ ร้อนๆ นุ่มอร่อย', price: 10, calories: 150, image_url: '/images/kao.jpg' },
+        { category_id: 2, menu_name: 'ข้าวเหนียว', description: 'ข้าวเหนียวนุ่ม ร้อนๆ หอมอร่อย', price: 10, calories: 150, image_url: '/images/kaon.jpg' },
+      ];
+
+      for (const dm of defaultMenus) {
+        try {
+          const exists = await this.menu.findFirst({
+            where: { menu_name: dm.menu_name }
+          });
+          if (!exists) {
+            await this.menu.create({
+              data: {
+                category_id: dm.category_id,
+                menu_name: dm.menu_name,
+                description: dm.description,
+                price: dm.price,
+                calories: dm.calories,
+                image_url: dm.image_url,
+                is_available: true
+              }
+            });
+            this.logger.log(`✅ เพิ่มเมนูอาหารเริ่มต้นสำเร็จ: ${dm.menu_name}`);
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
     } catch (err) {
       this.logger.error(`⚠️ ไม่สามารถเชื่อมต่อฐานข้อมูล MySQL (${err.message}) - โปรดตรวจสอบว่า MySQL รันอยู่`);
     }

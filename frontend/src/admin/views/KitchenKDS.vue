@@ -1,10 +1,24 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, onBeforeUnmount } from 'vue'
 import { adminStore } from '../store/adminData'
+
+let kdsPollTimer = null
 
 onMounted(async () => {
   if (typeof adminStore.fetchOrdersFromAPI === 'function') {
     await adminStore.fetchOrdersFromAPI()
+  }
+  // ซิงค์คำสั่งซื้อใหม่เข้าจอ KDS อัตโนมัติทุกๆ 4 วินาที
+  kdsPollTimer = setInterval(() => {
+    if (typeof adminStore.fetchOrdersFromAPI === 'function') {
+      adminStore.fetchOrdersFromAPI()
+    }
+  }, 4000)
+})
+
+onBeforeUnmount(() => {
+  if (kdsPollTimer) {
+    clearInterval(kdsPollTimer)
   }
 })
 

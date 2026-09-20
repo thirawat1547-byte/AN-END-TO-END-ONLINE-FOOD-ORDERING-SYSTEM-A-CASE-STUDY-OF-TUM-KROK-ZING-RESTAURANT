@@ -6,16 +6,16 @@ export declare class OrdersService {
     constructor(prisma: PrismaService);
     create(createOrderDto: CreateOrderDto): Promise<{
         table: {
-            table_number: string;
             status: string;
             table_id: number;
+            table_number: string;
             capacity: number;
         };
         order_items: ({
             menu: {
                 menu_id: number;
-                menu_name: string;
                 category_id: number;
+                menu_name: string;
                 description: string | null;
                 price: import("@prisma/client/runtime/library").Decimal;
                 image_url: string | null;
@@ -23,30 +23,24 @@ export declare class OrdersService {
                 is_available: boolean;
             };
         } & {
-            order_id: number;
             menu_id: number;
             created_at: Date;
+            order_id: number;
             quantity: number;
-            order_item_id: number;
             unit_price: number;
+            order_item_id: number;
         })[];
     } & {
-        order_id: number;
-        total_price: import("@prisma/client/runtime/library").Decimal;
-        status: string;
-        promo_id: number | null;
-        created_at: Date;
-        table_id: number | null;
-        user_id: number | null;
         order_type: string;
+        status: string;
+        total_price: import("@prisma/client/runtime/library").Decimal;
+        created_at: Date;
+        order_id: number;
+        user_id: number | null;
+        table_id: number | null;
+        promo_id: number | null;
     }>;
     findAll(status?: string, tableId?: number, orderType?: string): Promise<({
-        table: {
-            table_number: string;
-            status: string;
-            table_id: number;
-            capacity: number;
-        };
         user: {
             user_id: number;
             username: string;
@@ -54,19 +48,25 @@ export declare class OrdersService {
             phone_number: string;
             address: string;
         };
+        table: {
+            status: string;
+            table_id: number;
+            table_number: string;
+            capacity: number;
+        };
         transaction: {
             order_id: number;
             transaction_id: number;
+            amount: import("@prisma/client/runtime/library").Decimal;
             payment_method: string;
             payment_status: string;
-            amount: import("@prisma/client/runtime/library").Decimal;
             payment_slip_url: string | null;
         }[];
         order_items: ({
             menu: {
                 menu_id: number;
-                menu_name: string;
                 category_id: number;
+                menu_name: string;
                 description: string | null;
                 price: import("@prisma/client/runtime/library").Decimal;
                 image_url: string | null;
@@ -74,43 +74,43 @@ export declare class OrdersService {
                 is_available: boolean;
             };
         } & {
-            order_id: number;
             menu_id: number;
             created_at: Date;
+            order_id: number;
             quantity: number;
-            order_item_id: number;
             unit_price: number;
+            order_item_id: number;
         })[];
     } & {
-        order_id: number;
-        total_price: import("@prisma/client/runtime/library").Decimal;
-        status: string;
-        promo_id: number | null;
-        created_at: Date;
-        table_id: number | null;
-        user_id: number | null;
         order_type: string;
+        status: string;
+        total_price: import("@prisma/client/runtime/library").Decimal;
+        created_at: Date;
+        order_id: number;
+        user_id: number | null;
+        table_id: number | null;
+        promo_id: number | null;
     })[]>;
     findByUser(userId: number): Promise<({
         table: {
-            table_number: string;
             status: string;
             table_id: number;
+            table_number: string;
             capacity: number;
         };
         transaction: {
             order_id: number;
             transaction_id: number;
+            amount: import("@prisma/client/runtime/library").Decimal;
             payment_method: string;
             payment_status: string;
-            amount: import("@prisma/client/runtime/library").Decimal;
             payment_slip_url: string | null;
         }[];
         order_items: ({
             menu: {
                 menu_id: number;
-                menu_name: string;
                 category_id: number;
+                menu_name: string;
                 description: string | null;
                 price: import("@prisma/client/runtime/library").Decimal;
                 image_url: string | null;
@@ -118,49 +118,49 @@ export declare class OrdersService {
                 is_available: boolean;
             };
         } & {
-            order_id: number;
             menu_id: number;
             created_at: Date;
+            order_id: number;
             quantity: number;
-            order_item_id: number;
             unit_price: number;
+            order_item_id: number;
         })[];
     } & {
-        order_id: number;
-        total_price: import("@prisma/client/runtime/library").Decimal;
-        status: string;
-        promo_id: number | null;
-        created_at: Date;
-        table_id: number | null;
-        user_id: number | null;
         order_type: string;
+        status: string;
+        total_price: import("@prisma/client/runtime/library").Decimal;
+        created_at: Date;
+        order_id: number;
+        user_id: number | null;
+        table_id: number | null;
+        promo_id: number | null;
     })[]>;
     findOne(id: number): Promise<{
-        table: {
-            table_number: string;
-            status: string;
-            table_id: number;
-            capacity: number;
-        };
         user: {
             user_id: number;
             username: string;
             phone_number: string;
             address: string;
         };
+        table: {
+            status: string;
+            table_id: number;
+            table_number: string;
+            capacity: number;
+        };
         transaction: {
             order_id: number;
             transaction_id: number;
+            amount: import("@prisma/client/runtime/library").Decimal;
             payment_method: string;
             payment_status: string;
-            amount: import("@prisma/client/runtime/library").Decimal;
             payment_slip_url: string | null;
         }[];
         order_items: ({
             menu: {
                 menu_id: number;
-                menu_name: string;
                 category_id: number;
+                menu_name: string;
                 description: string | null;
                 price: import("@prisma/client/runtime/library").Decimal;
                 image_url: string | null;
@@ -168,31 +168,31 @@ export declare class OrdersService {
                 is_available: boolean;
             };
         } & {
-            order_id: number;
             menu_id: number;
             created_at: Date;
+            order_id: number;
             quantity: number;
-            order_item_id: number;
             unit_price: number;
+            order_item_id: number;
         })[];
     } & {
-        order_id: number;
-        total_price: import("@prisma/client/runtime/library").Decimal;
-        status: string;
-        promo_id: number | null;
-        created_at: Date;
-        table_id: number | null;
-        user_id: number | null;
         order_type: string;
+        status: string;
+        total_price: import("@prisma/client/runtime/library").Decimal;
+        created_at: Date;
+        order_id: number;
+        user_id: number | null;
+        table_id: number | null;
+        promo_id: number | null;
     }>;
     updateStatus(id: number, updateOrderStatusDto: UpdateOrderStatusDto): Promise<{
-        order_id: number;
-        total_price: import("@prisma/client/runtime/library").Decimal;
-        status: string;
-        promo_id: number | null;
-        created_at: Date;
-        table_id: number | null;
-        user_id: number | null;
         order_type: string;
+        status: string;
+        total_price: import("@prisma/client/runtime/library").Decimal;
+        created_at: Date;
+        order_id: number;
+        user_id: number | null;
+        table_id: number | null;
+        promo_id: number | null;
     }>;
 }
