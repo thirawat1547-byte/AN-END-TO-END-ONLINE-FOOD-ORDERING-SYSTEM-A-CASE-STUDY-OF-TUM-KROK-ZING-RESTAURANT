@@ -604,12 +604,6 @@ async validateAndCheckout() {
 
         for (const cartItem of this.cartItems) {
           const itemName = (cartItem.name || '').trim().toLowerCase();
-          
-          // 🛑 ดักจับชื่อเมนู "กระเพราหมู" ที่ถูกปิดการขายอยู่บนหน้าจอแอดมินตอนนี้ทันที
-          if (itemName.includes('กระเพราหมู')) {
-            alert(`❌ ขออภัย เมนู "${cartItem.name}" ถูกปิดการขายชั่วคราว กรุณาลบออกจากตะกร้าก่อนสั่งซื้อครับ`);
-            return false;
-          }
 
           const found = dbMenus.find(m => {
             const dbName = (m.name || m.menu_name || '').trim().toLowerCase();
@@ -617,7 +611,7 @@ async validateAndCheckout() {
           });
 
           if (found && (found.is_available === false || found.is_available === 0)) {
-            alert(`❌ ขออภัย เมนู "${cartItem.name}" เพิ่งถูกปิดการขายชั่วคราว กรุณาลบออกจากตะกร้าก่อนสั่งซื้อครับ`);
+            alert(`❌ ขออภัย เมนู "${cartItem.name}" ปิดการขายชั่วคราว กรุณาลบออกจากตะกร้าก่อนสั่งซื้อครับ`);
             return false;
           }
         }
