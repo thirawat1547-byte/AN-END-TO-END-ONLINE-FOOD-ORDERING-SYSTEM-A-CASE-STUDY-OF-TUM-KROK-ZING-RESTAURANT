@@ -232,6 +232,77 @@ async function main() {
         }
     }
     console.log(`✅ เตรียมรายการอาหารเรียบร้อยแล้ว (${menus.length} รายการ)`);
+    const ingredients = [
+        { name: 'หมูสด / หมูสับ', quantity: 20.0, unit: 'กก.', min_quantity: 5.0 },
+        { name: 'กุ้ง / หมึกสด', quantity: 15.0, unit: 'กก.', min_quantity: 3.0 },
+        { name: 'เนื้อไก่สด', quantity: 18.0, unit: 'กก.', min_quantity: 4.0 },
+        { name: 'มะละกอดิบขูด', quantity: 25.0, unit: 'กก.', min_quantity: 5.0 },
+        { name: 'พริกสดจินดาแดง', quantity: 8.0, unit: 'กก.', min_quantity: 2.0 },
+        { name: 'น้ำปลาร้าปรุงสุก', quantity: 15.0, unit: 'ขวด', min_quantity: 3.0 },
+        { name: 'ข้าวสารหอมมะลิ', quantity: 30.0, unit: 'กก.', min_quantity: 5.0 },
+        { name: 'ใบกะเพราสด', quantity: 5.0, unit: 'กก.', min_quantity: 1.0 },
+        { name: 'ปูเค็ม/ปูดอง', quantity: 10.0, unit: 'กก.', min_quantity: 2.0 },
+    ];
+    for (const ing of ingredients) {
+        const existingIng = await prisma.ingredient.findFirst({
+            where: { name: ing.name },
+        });
+        if (!existingIng) {
+            await prisma.ingredient.create({
+                data: ing,
+            });
+        }
+    }
+    console.log(`✅ เตรียมข้อมูลวัตถุดิบเรียบร้อยแล้ว (${ingredients.length} รายการ)`);
+    const allMenus = await prisma.menu.findMany();
+    const allIngredients = await prisma.ingredient.findMany();
+    const getMenuId = (name) => allMenus.find((m) => m.menu_name === name)?.menu_id;
+    const getIngId = (name) => allIngredients.find((i) => i.name === name)?.ingredient_id;
+    const recipes = [
+        { menuName: 'กะเพราหมู', ingName: 'หมูสด / หมูสับ', qty: 0.15 },
+        { menuName: 'กะเพราหมู', ingName: 'ใบกะเพราสด', qty: 0.02 },
+        { menuName: 'กะเพราหมู', ingName: 'พริกสดจินดาแดง', qty: 0.01 },
+        { menuName: 'กะเพราหมู', ingName: 'ข้าวสารหอมมะลิ', qty: 0.10 },
+        { menuName: 'กะเพราทะเล/หมึก/กุ้ง', ingName: 'กุ้ง / หมึกสด', qty: 0.15 },
+        { menuName: 'กะเพราทะเล/หมึก/กุ้ง', ingName: 'ใบกะเพราสด', qty: 0.02 },
+        { menuName: 'กะเพราทะเล/หมึก/กุ้ง', ingName: 'ข้าวสารหอมมะลิ', qty: 0.10 },
+        { menuName: 'ข้าวผัดหมู', ingName: 'หมูสด / หมูสับ', qty: 0.10 },
+        { menuName: 'ข้าวผัดหมู', ingName: 'ข้าวสารหอมมะลิ', qty: 0.15 },
+        { menuName: 'ส้มตำปูปลาร้า', ingName: 'มะละกอดิบขูด', qty: 0.20 },
+        { menuName: 'ส้มตำปูปลาร้า', ingName: 'น้ำปลาร้าปรุงสุก', qty: 0.05 },
+        { menuName: 'ส้มตำปูปลาร้า', ingName: 'พริกสดจินดาแดง', qty: 0.02 },
+        { menuName: 'ส้มตำปูปลาร้า', ingName: 'ปูเค็ม/ปูดอง', qty: 0.05 },
+        { menuName: 'ส้มตำไทย', ingName: 'มะละกอดิบขูด', qty: 0.20 },
+        { menuName: 'ส้มตำไทย', ingName: 'พริกสดจินดาแดง', qty: 0.02 },
+        { menuName: 'ลาบหมู', ingName: 'หมูสด / หมูสับ', qty: 0.15 },
+        { menuName: 'ลาบหมู', ingName: 'พริกสดจินดาแดง', qty: 0.02 },
+        { menuName: 'ไก่ทอด (สะโพก)', ingName: 'เนื้อไก่สด', qty: 0.25 },
+        { menuName: 'ปีกไก่ทอด', ingName: 'เนื้อไก่สด', qty: 0.20 },
+    ];
+    for (const r of recipes) {
+        const mId = getMenuId(r.menuName);
+        const iId = getIngId(r.ingName);
+        if (mId && iId) {
+            const existingMI = await prisma.menuIngredient.findUnique({
+                where: {
+                    menu_id_ingredient_id: {
+                        menu_id: mId,
+                        ingredient_id: iId,
+                    },
+                },
+            });
+            if (!existingMI) {
+                await prisma.menuIngredient.create({
+                    data: {
+                        menu_id: mId,
+                        ingredient_id: iId,
+                        quantity_used: r.qty,
+                    },
+                });
+            }
+        }
+    }
+    console.log(`✅ เตรียมสูตรอาหารและการใช้วัตถุดิบเรียบร้อยแล้ว (${recipes.length} สูตร)`);
     console.log('🎉 Seeding ข้อมูลพื้นฐานเสร็จสิ้นสมบูรณ์!');
 }
 main()

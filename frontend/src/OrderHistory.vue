@@ -36,7 +36,7 @@
               <th>จำนวนเงินรวม</th>
               <th>วิธีการชำระเงิน</th>
               <th>สถานะการทำรายการ</th>
-              <th></th>
+              <th style="text-align: right;">จัดการ</th>
             </tr>
           </thead>
           <tbody>
@@ -64,7 +64,12 @@
                 </span>
               </td>
               <td>
-                <button class="search-icon-btn" @click="viewOrderDetails(order)" title="ดูรายละเอียด">🔍</button>
+                <div class="action-cell">
+                  <button class="search-icon-btn" @click="viewOrderDetails(order)" title="ดูรายละเอียด">🔍</button>
+                  <button class="reorder-btn" @click="reorder(order)" title="สั่งรายการนี้อีกครั้ง">
+                    <span>🔁</span> สั่งอีกครั้ง
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -128,6 +133,12 @@
           <div>สถานะ: <span style="font-weight: 600; color: #557c61;">{{ selectedOrder.status }}</span></div>
           <div>วิธีชำระ: {{ selectedOrder.paymentMethod }}</div>
         </div>
+
+        <div class="modal-actions-box">
+          <button class="modal-reorder-btn" @click="reorder(selectedOrder)">
+            <span>🔁</span> สั่งรายการนี้อีกครั้ง
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -182,6 +193,54 @@ export default {
     viewOrderDetails(order) {
       this.selectedOrder = order;
       this.showReceiptModal = true;
+    },
+    reorder(order) {
+      if (!order || !order.items || order.items.length === 0) {
+        alert('ไม่พบรายการอาหารในคำสั่งซื้อนี้');
+        return;
+      }
+
+      // แปลงรายการสินค้าให้อยู่ในรูปแบบของ Cart
+      const cartItems = order.items.map(item => {
+        let dishType = null;
+        let spiceLevel = null;
+        let seafoodChoice = null;
+        const addons = [];
+
+        if (item.options) {
+          const parts = String(item.options).split(',').map(s => s.trim());
+          for (const p of parts) {
+            if (p === 'ราดข้าว' || p === 'กับข้าว') {
+              dishType = p;
+            } else if (p.startsWith('เผ็ด:')) {
+              spiceLevel = p.replace('เผ็ด:', '').trim();
+            } else if (p.includes('หมึก') || p.includes('กุ้ง') || p.includes('รวม')) {
+              seafoodChoice = p;
+            } else if (p.startsWith('+')) {
+              addons.push({ name: p.replace('+', '').trim(), price: 10 });
+            } else if (p.startsWith('เพิ่ม')) {
+              addons.push({ name: p.trim(), price: 10 });
+            }
+          }
+        }
+
+        return {
+          name: item.name,
+          price: Number(item.price) || 0,
+          qty: Number(item.qty) || 1,
+          dishType: dishType,
+          spiceLevel: spiceLevel,
+          seafoodChoice: seafoodChoice,
+          addons: addons
+        };
+      });
+
+      // บันทึกใส่ localStorage และ sessionStorage
+      localStorage.setItem('cartData', JSON.stringify(cartItems));
+      sessionStorage.setItem('cartData', JSON.stringify(cartItems));
+
+      this.showReceiptModal = false;
+      this.$router.push('/checkout');
     },
     async fetchOrderHistory() {
       if (!this.authStore.isLoggedIn) {
@@ -291,6 +350,53 @@ export default {
 .status-badge.cancelled { background: #fee2e2; color: #dc2626; }
 .search-icon-btn { background: #fdfbf7; border: 1px solid #e0dfd5; border-radius: 8px; width: 32px; height: 32px; font-size: 14px; cursor: pointer; color: #555; transition: 0.2s; display: flex; justify-content: center; align-items: center;}
 .search-icon-btn:hover { background: #eef2ed; border-color: #557c61; }
+
+.action-cell { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.reorder-btn {
+  background: #557c61;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.reorder-btn:hover {
+  background: #405e49;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(85, 124, 97, 0.3);
+}
+.modal-actions-box {
+  margin-top: 15px;
+  display: flex;
+  justify-content: center;
+}
+.modal-reorder-btn {
+  width: 100%;
+  background: #557c61;
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.modal-reorder-btn:hover {
+  background: #405e49;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(85, 124, 97, 0.3);
+}
 
 .pagination-row { display: flex; justify-content: space-between; align-items: center; padding: 20px 30px; font-size: 13px; color: #666; background: #faf9f5; }
 .pagination-btns { display: flex; gap: 6px; align-items: center; }

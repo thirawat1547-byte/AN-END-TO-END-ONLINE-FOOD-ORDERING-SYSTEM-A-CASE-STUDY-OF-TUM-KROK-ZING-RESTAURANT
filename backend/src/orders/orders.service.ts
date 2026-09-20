@@ -90,6 +90,29 @@ export class OrdersService {
         }
       }
 
+      // ตัดสต็อกวัตถุดิบอัตโนมัติตามสูตรอาหาร (MenuIngredient) ตรงตาม Sequence Diagram
+      for (const item of createOrderDto.items) {
+        const menuIngredients = await tx.menuIngredient.findMany({
+          where: { menu_id: item.menu_id },
+        });
+
+        for (const mi of menuIngredients) {
+          const deductAmount = Number(mi.quantity_used) * item.quantity;
+          if (deductAmount > 0) {
+            await tx.ingredient.update({
+              where: { ingredient_id: mi.ingredient_id },
+              data: {
+                quantity: {
+                  decrement: deductAmount,
+                },
+              },
+            }).catch((err) => {
+              console.warn(`[Stock Deduction] ไม่สามารถตัดสต็อกวัตถุดิบ #${mi.ingredient_id}:`, err?.message);
+            });
+          }
+        }
+      }
+
       return order;
     });
   }
@@ -193,6 +216,29 @@ export class OrdersService {
             where: { table_id: order.table_id },
             data: { status: 'AVAILABLE' },
           }).catch(() => {});
+        }
+      }
+    }
+
+    // คืนสต็อกวัตถุดิบกรณีออเดอร์ถูกยกเลิก (CANCELLED)
+    const statusUpper = updateOrderStatusDto.status.toUpperCase();
+    if (statusUpper === 'CANCELLED' && order.status.toUpperCase() !== 'CANCELLED') {
+      for (const item of order.order_items) {
+        const menuIngredients = await this.prisma.menuIngredient.findMany({
+          where: { menu_id: item.menu_id },
+        });
+        for (const mi of menuIngredients) {
+          const restoreAmount = Number(mi.quantity_used) * item.quantity;
+          if (restoreAmount > 0) {
+            await this.prisma.ingredient.update({
+              where: { ingredient_id: mi.ingredient_id },
+              data: {
+                quantity: {
+                  increment: restoreAmount,
+                },
+              },
+            }).catch(() => {});
+          }
         }
       }
     }
