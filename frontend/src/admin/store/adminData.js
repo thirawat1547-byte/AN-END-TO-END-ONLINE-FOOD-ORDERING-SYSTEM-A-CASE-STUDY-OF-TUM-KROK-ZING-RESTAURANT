@@ -798,26 +798,58 @@ export const adminStore = reactive({
     }
   },
 
-  async updateStockAPI(ingredientId, newQty) {
+  async updateIngredientAPI(ingredientId, updateData = {}) {
     const item = this.ingredients.find(i => i.ingredient_id === ingredientId)
-    if (!item) return
-    item.quantity_in_stock = Math.max(0, Number(newQty))
+    if (!item) return false
+
+    if (updateData.ingredient_name !== undefined) item.ingredient_name = updateData.ingredient_name
+    if (updateData.unit !== undefined) item.unit = updateData.unit
+    if (updateData.quantity_in_stock !== undefined) item.quantity_in_stock = Math.max(0, Number(updateData.quantity_in_stock))
+    if (updateData.reorder_level !== undefined) item.reorder_level = Number(updateData.reorder_level)
+    if (updateData.cost_per_unit !== undefined) item.cost_per_unit = Number(updateData.cost_per_unit)
     item.last_updated = new Date().toISOString().replace('T', ' ').substring(0, 16)
 
     try {
       const res = await fetch(`${API_BASE}/ingredients/${ingredientId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quantity: item.quantity_in_stock })
+        body: JSON.stringify({
+          name: item.ingredient_name,
+          unit: item.unit,
+          quantity: item.quantity_in_stock,
+          min_quantity: item.reorder_level
+        })
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      console.log(`✅ อัปเดตสต็อกวัตถุดิบ #${ingredientId} สำเร็จ: ${item.quantity_in_stock}`)
+      console.log(`✅ อัปเดตข้อมูลวัตถุดิบ #${ingredientId} สำเร็จ`)
+      return true
     } catch (err) {
-      console.warn('⚠️ อัปเดตสต็อก API ไม่สำเร็จ:', err.message)
+      console.warn('⚠️ อัปเดตข้อมูลวัตถุดิบ API ไม่สำเร็จ:', err.message)
+      return false
     }
+  },
+
+  async updateStockAPI(ingredientId, newQty) {
+    return this.updateIngredientAPI(ingredientId, { quantity_in_stock: newQty })
   },
   updateStock(ingredientId, newQty) {
     return this.updateStockAPI(ingredientId, newQty)
+  },
+
+  async translateIngredientsToThaiAPI() {
+    try {
+      const res = await fetch(`${API_BASE}/ingredients/translate-thai`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      if (res.ok) {
+        await this.fetchInventoryFromAPI()
+        return true
+      }
+    } catch (e) {
+      console.warn('Translate ingredients error:', e)
+    }
+    return false
   },
 
   async addIngredientAPI(item) {

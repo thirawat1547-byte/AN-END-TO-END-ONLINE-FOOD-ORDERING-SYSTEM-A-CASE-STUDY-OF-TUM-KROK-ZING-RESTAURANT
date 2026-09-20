@@ -24,6 +24,12 @@ export class IngredientsController {
     return this.ingredientsService.findAll();
   }
 
+  @Post('translate-thai')
+  @ApiOperation({ summary: 'แปลงชื่อและหน่วยวัตถุดิบทั้งหมดในฐานข้อมูลเป็นภาษาไทย' })
+  translateAllToThai() {
+    return this.ingredientsService.translateAllToThai();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'ดูรายละเอียดวัตถุดิบตาม ID' })
   findOne(@Param('id', ParseIntPipe) id: number) {
