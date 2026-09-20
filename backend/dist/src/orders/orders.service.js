@@ -57,6 +57,50 @@ let OrdersService = class OrdersService {
                     validUserId = existingUser.user_id;
                 }
             }
+            let appliedPromoId = undefined;
+            let discountAmount = 0;
+            if (createOrderDto.promo_id || createOrderDto.promo_code) {
+                if (createOrderDto.order_type === 'DINE_IN') {
+                    throw new common_1.BadRequestException('ขออภัย โค้ดส่วนลดและโปรโมชันสามารถใช้ได้เฉพาะการสั่งออนไลน์ (เดลิเวอรี่) ผ่านเว็บไซต์เท่านั้น');
+                }
+                let promo = null;
+                if (createOrderDto.promo_id) {
+                    promo = await tx.promotion.findUnique({
+                        where: { promo_id: createOrderDto.promo_id },
+                    });
+                }
+                else if (createOrderDto.promo_code) {
+                    promo = await tx.promotion.findUnique({
+                        where: { code: createOrderDto.promo_code.trim().toUpperCase() },
+                    });
+                }
+                if (!promo) {
+                    throw new common_1.BadRequestException('ไม่พบโค้ดส่วนลดนี้ในระบบ');
+                }
+                if (new Date(promo.expiry_date) < new Date()) {
+                    throw new common_1.BadRequestException('ขออภัย โค้ดส่วนลดนี้หมดอายุการใช้งานแล้ว');
+                }
+                if (totalAmount < Number(promo.min_order_price || 0)) {
+                    throw new common_1.BadRequestException(`ยอดสั่งซื้ออาหารขั้นต่ำต้องครบ ฿${Number(promo.min_order_price)} จึงจะสามารถใช้โค้ด "${promo.code}" ได้`);
+                }
+                const promoType = (promo.discount_type || '').toUpperCase();
+                if (promoType === 'PERCENTAGE' || promoType === 'PERCENT') {
+                    discountAmount = (totalAmount * Number(promo.discount_value)) / 100;
+                }
+                else {
+                    discountAmount = Number(promo.discount_value);
+                }
+                discountAmount = Math.min(discountAmount, totalAmount);
+                totalAmount = Math.max(0, totalAmount - discountAmount);
+                appliedPromoId = promo.promo_id;
+                if (validUserId) {
+                    try {
+                        await tx.$executeRawUnsafe(`UPDATE USER_CLAIMED_PROMOTIONS SET is_used = TRUE, used_at = NOW() 
+               WHERE user_id = ? AND promo_id = ?;`, validUserId, appliedPromoId);
+                    }
+                    catch (e) { }
+                }
+            }
             const order = await tx.order.create({
                 data: {
                     order_type: createOrderDto.order_type || 'DINE_IN',
@@ -72,6 +116,11 @@ let OrdersService = class OrdersService {
                             connect: { user_id: validUserId },
                         },
                     }),
+                    ...(appliedPromoId && {
+                        promotion: {
+                            connect: { promo_id: appliedPromoId },
+                        },
+                    }),
                     order_items: {
                         create: orderItemsData,
                     },
@@ -83,6 +132,7 @@ let OrdersService = class OrdersService {
                         },
                     },
                     table: true,
+                    promotion: true,
                 },
             });
             if (createOrderDto.table_id) {

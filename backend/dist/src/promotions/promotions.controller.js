@@ -18,6 +18,8 @@ const swagger_1 = require("@nestjs/swagger");
 const promotions_service_1 = require("./promotions.service");
 const create_promotion_dto_1 = require("./dto/create-promotion.dto");
 const update_promotion_dto_1 = require("./dto/update-promotion.dto");
+const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
+const current_user_decorator_1 = require("../auth/decorators/current-user.decorator");
 let PromotionsController = class PromotionsController {
     constructor(promotionsService) {
         this.promotionsService = promotionsService;
@@ -27,6 +29,14 @@ let PromotionsController = class PromotionsController {
     }
     findActive() {
         return this.promotionsService.findActive();
+    }
+    getMyPromotions(user) {
+        const userId = user.userId || user.sub || user.user_id;
+        return this.promotionsService.getMyPromotions(Number(userId));
+    }
+    claimPromotion(id, user) {
+        const userId = user.userId || user.sub || user.user_id;
+        return this.promotionsService.claimPromotion(Number(userId), id);
     }
     findByCode(code) {
         return this.promotionsService.findByCode(code);
@@ -59,6 +69,27 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], PromotionsController.prototype, "findActive", null);
+__decorate([
+    (0, common_1.Get)('my/list'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)('JWT-auth'),
+    (0, swagger_1.ApiOperation)({ summary: 'ดูรายการคูปองโปรโมชันที่ User คนนี้กดเก็บไว้' }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], PromotionsController.prototype, "getMyPromotions", null);
+__decorate([
+    (0, common_1.Post)('claim/:id'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)('JWT-auth'),
+    (0, swagger_1.ApiOperation)({ summary: 'กดเก็บโค้ดส่วนลดเข้ากระเป๋าของ User ปัจจุบัน' }),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:returntype", void 0)
+], PromotionsController.prototype, "claimPromotion", null);
 __decorate([
     (0, common_1.Get)('code/:code'),
     (0, swagger_1.ApiOperation)({ summary: 'ตรวจสอบและดึงรายละเอียดโปรโมชันตามรหัสโค้ดส่วนลด' }),

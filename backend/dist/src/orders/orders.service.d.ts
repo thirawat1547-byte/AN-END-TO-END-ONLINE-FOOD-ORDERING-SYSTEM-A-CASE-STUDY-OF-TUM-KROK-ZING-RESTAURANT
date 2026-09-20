@@ -7,6 +7,15 @@ export declare class OrdersService {
     private readonly settingsService;
     constructor(prisma: PrismaService, settingsService: SettingsService);
     create(createOrderDto: CreateOrderDto): Promise<{
+        promotion: {
+            created_at: Date;
+            promo_id: number;
+            code: string;
+            discount_type: string;
+            discount_value: import("@prisma/client/runtime/library").Decimal;
+            min_order_price: import("@prisma/client/runtime/library").Decimal;
+            expiry_date: Date;
+        };
         table: {
             status: string;
             table_id: number;

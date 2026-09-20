@@ -104,6 +104,80 @@
             </div>
           </div>
 
+          <!-- ส่วนโปรโมชันและคูปองส่วนลด (เฉพาะสั่งออนไลน์) -->
+          <div class="promo-section">
+            <div class="promo-header">
+              <span class="promo-title">🎟️ โค้ดส่วนลด (เฉพาะสั่งออนไลน์)</span>
+              <router-link to="/promotions" class="promo-view-all">ดูโปรทั้งหมด ➔</router-link>
+            </div>
+
+            <!-- กล่องกรอกโค้ดส่วนลด -->
+            <div class="promo-input-group">
+              <input 
+                type="text" 
+                v-model="inputPromoCode" 
+                placeholder="กรอกโค้ด เช่น ZING50" 
+                class="promo-input"
+                :disabled="!!appliedPromo"
+                @keyup.enter="applyCustomPromoCode"
+              />
+              <button 
+                v-if="!appliedPromo" 
+                class="promo-apply-btn" 
+                @click="applyCustomPromoCode"
+                :disabled="isValidatingPromo || !inputPromoCode.trim()"
+              >
+                {{ isValidatingPromo ? 'ตรวจ...' : 'ใช้โค้ด' }}
+              </button>
+              <button 
+                v-else 
+                class="promo-remove-btn" 
+                @click="removeCoupon"
+                title="ยกเลิกการใช้โค้ดนี้"
+              >
+                ✕ ยกเลิก
+              </button>
+            </div>
+
+            <!-- ข้อความแจ้งเตือนข้อผิดพลาดหรือสำเร็จ -->
+            <div v-if="promoError" class="promo-alert error">
+              ⚠️ {{ promoError }}
+            </div>
+            <div v-if="promoSuccess" class="promo-alert success">
+              ✓ {{ promoSuccess }}
+            </div>
+
+            <!-- คูปองที่เก็บไว้ในบัญชีของผู้ใช้ -->
+            <div v-if="myClaimedCoupons.length > 0" class="my-coupons-box">
+              <div class="my-coupons-title">คูปองที่คุณกดเก็บไว้:</div>
+              <div class="coupon-chips-list">
+                <div 
+                  v-for="coupon in myAvailableCoupons" 
+                  :key="coupon.promo_id" 
+                  class="coupon-chip"
+                  :class="{ 
+                    'chip-selected': appliedPromo && appliedPromo.promo_id === coupon.promo_id,
+                    'chip-disabled': subtotal < (coupon.min_order_price || 0)
+                  }"
+                  @click="selectCoupon(coupon)"
+                >
+                  <div class="chip-main">
+                    <span class="chip-code">{{ coupon.code }}</span>
+                    <span class="chip-desc">
+                      {{ coupon.discount_type === 'PERCENTAGE' ? `ลด ${coupon.discount_value}%` : `ลด B${coupon.discount_value}` }}
+                    </span>
+                  </div>
+                  <div class="chip-sub">
+                    ขั้นต่ำ B{{ coupon.min_order_price || 0 }}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-else-if="!isLoggedIn" class="promo-login-hint">
+              <span>💡 <router-link to="/login">เข้าสู่ระบบ</router-link> เพื่อใช้คูปองที่คุณกดเก็บไว้</span>
+            </div>
+          </div>
+
           <div class="price-breakdown">
             <div class="breakdown-row">
               <span>ยอดรวม</span>
@@ -116,6 +190,10 @@
               </span>
               <span v-if="!isFreeShipping">B20</span>
               <span v-else class="free-shipping-price">ฟรี</span>
+            </div>
+            <div v-if="appliedPromo && discountAmount > 0" class="breakdown-row discount-row">
+              <span>ส่วนลดโปรโมชัน ({{ appliedPromo.code }})</span>
+              <span class="discount-price">-B{{ discountAmount }}</span>
             </div>
           </div>
 
@@ -259,7 +337,13 @@ export default {
       qrCodeUrl: '',
       isGeneratingQr: false,
       isSubmitting: false,
-      isStoreOpen: true
+      isStoreOpen: true,
+      myClaimedCoupons: [],
+      inputPromoCode: '',
+      appliedPromo: null,
+      promoError: '',
+      promoSuccess: '',
+      isValidatingPromo: false
     }
   },
   computed: {
@@ -272,8 +356,29 @@ export default {
     shippingFee() {
       return this.isFreeShipping ? 0 : 20;
     },
+    myAvailableCoupons() {
+      return this.myClaimedCoupons.filter(c => !c.is_used);
+    },
+    discountAmount() {
+      if (!this.appliedPromo) return 0;
+      const minOrder = Number(this.appliedPromo.min_order_price || 0);
+      if (this.subtotal < minOrder) return 0;
+
+      let discount = 0;
+      const val = Number(this.appliedPromo.discount_value || 0);
+      if (this.appliedPromo.discount_type === 'PERCENTAGE') {
+        discount = (this.subtotal * val) / 100;
+        if (this.appliedPromo.max_discount) {
+          discount = Math.min(discount, Number(this.appliedPromo.max_discount));
+        }
+      } else {
+        discount = val;
+      }
+      return Math.min(Math.round(discount), this.subtotal);
+    },
     total() {
-      return this.subtotal + this.shippingFee;
+      const raw = this.subtotal + this.shippingFee - this.discountAmount;
+      return Math.max(0, raw);
     },
     mapUrl() {
       const address = this.userProfile.address || 'ตลาดปากเกร็ด นนทบุรี'; 
@@ -310,6 +415,11 @@ export default {
       this.cartItems = JSON.parse(savedCart);
     }
 
+    // โหลดคูปองโปรโมชันที่ผู้ใช้กดรับไว้ (เฉพาะสมาชิก)
+    if (this.isLoggedIn) {
+      await this.loadMyCoupons();
+    }
+
     // ตรวจสอบสถานะเปิด-ปิดร้านค้าล่าสุดจากเซิร์ฟเวอร์
     try {
       const res = await axios.get(`${API_BASE}/settings`);
@@ -328,6 +438,94 @@ export default {
       sessionStorage.removeItem('cartData');
       sessionStorage.removeItem('currentOrder');
       this.$router.push('/');
+    },
+
+    async loadMyCoupons() {
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+      try {
+        const res = await axios.get(`${API_BASE}/promotions/my/list`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        this.myClaimedCoupons = res.data || [];
+      } catch (err) {
+        console.warn('โหลดคูปองที่เก็บไว้ไม่สำเร็จ:', err);
+      }
+    },
+
+    selectCoupon(coupon) {
+      if (this.appliedPromo && this.appliedPromo.promo_id === coupon.promo_id) {
+        this.removeCoupon();
+        return;
+      }
+      this.promoError = '';
+      this.promoSuccess = '';
+      const minOrder = Number(coupon.min_order_price || 0);
+      if (this.subtotal < minOrder) {
+        this.promoError = `คูปอง "${coupon.code}" ต้องมียอดสั่งซื้อขั้นต่ำ ฿${minOrder}`;
+        return;
+      }
+      this.appliedPromo = coupon;
+      this.inputPromoCode = coupon.code;
+      this.promoSuccess = `ใช้คูปองส่วนลด "${coupon.code}" เรียบร้อยแล้ว!`;
+    },
+
+    removeCoupon() {
+      this.appliedPromo = null;
+      this.inputPromoCode = '';
+      this.promoError = '';
+      this.promoSuccess = '';
+    },
+
+    async applyCustomPromoCode() {
+      const code = (this.inputPromoCode || '').trim().toUpperCase();
+      if (!code) {
+        this.promoError = 'กรุณาระบุโค้ดส่วนลด';
+        return;
+      }
+      this.promoError = '';
+      this.promoSuccess = '';
+      this.isValidatingPromo = true;
+
+      try {
+        // ตรวจสอบในคูปองที่ผู้ใช้เคยกดเก็บไว้
+        const existingClaim = this.myClaimedCoupons.find(c => (c.code || '').toUpperCase() === code && !c.is_used);
+        if (existingClaim) {
+          this.selectCoupon(existingClaim);
+          this.isValidatingPromo = false;
+          return;
+        }
+
+        // ดึงรายการโปรโมชันจากเซิร์ฟเวอร์
+        const res = await axios.get(`${API_BASE}/promotions`);
+        const allPromos = res.data || [];
+        const found = allPromos.find(p => (p.code || '').toUpperCase() === code && p.is_active);
+
+        if (!found) {
+          this.promoError = 'ไม่พบคูปองนี้ หรือคูปองหมดอายุการใช้งานแล้ว';
+          return;
+        }
+
+        // บันทึกเก็บคูปองเข้าบัญชีผู้ใช้ทันที
+        const token = localStorage.getItem('access_token');
+        if (token) {
+          try {
+            await axios.post(`${API_BASE}/promotions/claim/${found.promo_id}`, {}, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            await this.loadMyCoupons();
+          } catch (claimErr) {
+            // ละเว้นหากเก็บไปแล้ว
+          }
+        }
+
+        this.selectCoupon(found);
+      } catch (err) {
+        console.warn('เกิดข้อผิดพลาดในการตรวจสอบคูปอง:', err);
+        this.promoError = 'ไม่สามารถตรวจสอบโค้ดส่วนลดได้ในขณะนี้';
+      } finally {
+        this.isValidatingPromo = false;
+      }
     },
     
     startEditAddress() {
@@ -478,6 +676,8 @@ async validateAndCheckout() {
 
         const orderPayload = {
           order_type: 'DELIVERY',
+          promo_id: this.appliedPromo?.promo_id ? Number(this.appliedPromo.promo_id) : undefined,
+          promo_code: this.appliedPromo?.code || undefined,
           items: this.cartItems.map(item => {
             const cleanItemName = (item.name || '').trim().toLowerCase();
             const matched = dbMenus.find(m => {
@@ -936,5 +1136,235 @@ async validateAndCheckout() {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+}
+
+/* ===================================================
+   PROMOTION & COUPON STYLES (ONLINE DELIVERY ONLY)
+   =================================================== */
+.promo-section {
+  margin: 16px 0;
+  padding: 14px;
+  background: #fdfbf7;
+  border: 1px dashed #d9d4c7;
+  border-radius: 12px;
+}
+
+.promo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.promo-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2c3e50;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.promo-view-all {
+  font-size: 12px;
+  color: #ff6b35;
+  text-decoration: none;
+  font-weight: 500;
+  transition: opacity 0.2s;
+}
+
+.promo-view-all:hover {
+  text-decoration: underline;
+  opacity: 0.85;
+}
+
+.promo-input-group {
+  display: flex;
+  gap: 8px;
+}
+
+.promo-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #dcd8cd;
+  border-radius: 8px;
+  font-size: 13px;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  background: white;
+  transition: border-color 0.2s;
+}
+
+.promo-input:focus {
+  outline: none;
+  border-color: #557c61;
+}
+
+.promo-input:disabled {
+  background: #f0eee6;
+  color: #777;
+}
+
+.promo-apply-btn {
+  background: #557c61;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+
+.promo-apply-btn:hover:not(:disabled) {
+  background: #405e49;
+}
+
+.promo-apply-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.promo-remove-btn {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.promo-remove-btn:hover {
+  background: #fecaca;
+}
+
+.promo-alert {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.promo-alert.error {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fee2e2;
+}
+
+.promo-alert.success {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+  font-weight: 500;
+}
+
+.my-coupons-box {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #ece7dc;
+}
+
+.my-coupons-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.coupon-chips-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.coupon-chip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 10px;
+  background: white;
+  border: 1px solid #e2ddd3;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.coupon-chip:hover:not(.chip-disabled) {
+  border-color: #557c61;
+  background: #fbfdfc;
+  transform: translateX(2px);
+}
+
+.coupon-chip.chip-selected {
+  border-color: #557c61;
+  background: #eef7f1;
+  box-shadow: 0 0 0 1px #557c61;
+}
+
+.coupon-chip.chip-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f5f4f0;
+}
+
+.chip-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chip-code {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ff6b35;
+  background: #fff3ed;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.chip-desc {
+  font-size: 12px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.chip-sub {
+  font-size: 11px;
+  color: #888;
+}
+
+.promo-login-hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #666;
+}
+
+.promo-login-hint a {
+  color: #ff6b35;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.breakdown-row.discount-row {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.discount-price {
+  color: #16a34a;
+  font-weight: 700;
 }
 </style>

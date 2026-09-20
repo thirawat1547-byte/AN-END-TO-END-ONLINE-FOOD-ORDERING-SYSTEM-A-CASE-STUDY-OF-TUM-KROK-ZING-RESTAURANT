@@ -8,4 +8,6 @@ export declare class CreateOrderDto {
     user_id?: number;
     items: OrderItemDto[];
     order_type?: string;
+    promo_id?: number;
+    promo_code?: string;
 }

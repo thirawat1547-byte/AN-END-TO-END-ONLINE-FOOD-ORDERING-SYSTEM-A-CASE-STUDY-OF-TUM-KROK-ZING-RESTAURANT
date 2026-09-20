@@ -44,7 +44,6 @@ export class CreateOrderDto {
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)
   items: OrderItemDto[];
-  // เพิ่มใน class CreateOrderDto ของไฟล์ src/orders/dto/create-order.dto.ts
   @ApiPropertyOptional({
     example: 'DINE_IN',
     enum: ['DINE_IN', 'TAKEAWAY', 'DELIVERY'],
@@ -54,4 +53,14 @@ export class CreateOrderDto {
   @IsString()
   @IsOptional()
   order_type?: string;
+
+  @ApiPropertyOptional({ example: 1, description: 'ID โปรโมชันส่วนลดที่ใช้ (เฉพาะสั่งออนไลน์)' })
+  @IsInt()
+  @IsOptional()
+  promo_id?: number;
+
+  @ApiPropertyOptional({ example: 'ZING50', description: 'รหัสโค้ดโปรโมชัน (เฉพาะสั่งออนไลน์)' })
+  @IsString()
+  @IsOptional()
+  promo_code?: string;
 }

@@ -7,11 +7,14 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PromotionsService } from './promotions.service';
 import { CreatePromotionDto } from './dto/create-promotion.dto';
 import { UpdatePromotionDto } from './dto/update-promotion.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('Promotions')
 @Controller('promotions')
@@ -28,6 +31,27 @@ export class PromotionsController {
   @ApiOperation({ summary: 'ดูรายการโปรโมชันที่กำลังเปิดใช้งานอยู่ (สำหรับลูกค้า)' })
   findActive() {
     return this.promotionsService.findActive();
+  }
+
+  @Get('my/list')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'ดูรายการคูปองโปรโมชันที่ User คนนี้กดเก็บไว้' })
+  getMyPromotions(@CurrentUser() user: any) {
+    const userId = user.userId || user.sub || user.user_id;
+    return this.promotionsService.getMyPromotions(Number(userId));
+  }
+
+  @Post('claim/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'กดเก็บโค้ดส่วนลดเข้ากระเป๋าของ User ปัจจุบัน' })
+  claimPromotion(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+  ) {
+    const userId = user.userId || user.sub || user.user_id;
+    return this.promotionsService.claimPromotion(Number(userId), id);
   }
 
   @Get('code/:code')

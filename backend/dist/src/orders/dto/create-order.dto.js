@@ -67,4 +67,16 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CreateOrderDto.prototype, "order_type", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 1, description: 'ID โปรโมชันส่วนลดที่ใช้ (เฉพาะสั่งออนไลน์)' }),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], CreateOrderDto.prototype, "promo_id", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 'ZING50', description: 'รหัสโค้ดโปรโมชัน (เฉพาะสั่งออนไลน์)' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateOrderDto.prototype, "promo_code", void 0);
 //# sourceMappingURL=create-order.dto.js.map
