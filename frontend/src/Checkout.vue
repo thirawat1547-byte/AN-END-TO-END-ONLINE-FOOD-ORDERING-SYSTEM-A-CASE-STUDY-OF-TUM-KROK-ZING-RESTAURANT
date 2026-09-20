@@ -183,6 +183,7 @@ import axios from 'axios';
 import QRCode from 'qrcode';
 import { adminStore } from './admin/store/adminData.js';
 import { API_BASE } from './config/api';
+import { socket } from './config/socket';
 import CustomerNavbar from './components/CustomerNavbar.vue';
 import { authStore } from './store/authStore';
 
@@ -472,6 +473,13 @@ async validateAndCheckout() {
 
         const createdOrder = response.data;
         const orderId = createdOrder?.order_id || createdOrder?.id || ('TRX-' + Math.floor(1000 + Math.random() * 9000));
+
+        // ส่งสัญญาณ WebSocket แจ้งเตือนห้องครัวแบบ Real-time ทันที
+        try {
+          socket.emit('place_order', createdOrder);
+        } catch (socketErr) {
+          console.warn('ไม่สามารถส่งสัญญาณ socket place_order:', socketErr);
+        }
 
         // บันทึกข้อมูล Transaction ลงในฐานข้อมูลจริง
         if (createdOrder?.order_id) {

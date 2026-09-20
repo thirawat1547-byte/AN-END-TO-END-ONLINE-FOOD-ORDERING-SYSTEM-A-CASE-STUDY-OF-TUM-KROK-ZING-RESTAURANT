@@ -51,6 +51,7 @@ import OrderHeader from '../components/OrderHeader.vue'
 import CartItemCard from '../components/CartItemCard.vue'
 import { useCart } from '../composables/useCart'
 import { API_BASE } from '../../config/api'
+import { socket } from '../../config/socket'
 
 const route = useRoute()
 const router = useRouter()
@@ -103,6 +104,13 @@ const placeOrder = async () => {
 
     // ส่งคำสั่งซื้อเข้า Backend เพื่อส่งต่อไปยังห้องครัว (Kitchen KDS) ทันที
     const res = await axios.post(`${API_BASE}/orders`, orderPayload, { headers })
+
+    // ส่งสัญญาณ WebSocket แจ้งเตือนห้องครัวทันที
+    try {
+      socket.emit('place_order', res.data)
+    } catch (socketErr) {
+      console.warn('ไม่สามารถส่งสัญญาณ socket place_order จากโต๊ะ:', socketErr)
+    }
 
     placeOrderToHistory()
     router.push({ path: `/table/${tableId}/success`, query: { total: finalTotal, orderId: res.data?.order_id } })

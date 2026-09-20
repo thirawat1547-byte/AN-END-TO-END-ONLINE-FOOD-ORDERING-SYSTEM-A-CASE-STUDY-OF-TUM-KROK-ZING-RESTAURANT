@@ -1,25 +1,40 @@
 <script setup>
 import { computed, onMounted, onBeforeUnmount } from 'vue'
 import { adminStore } from '../store/adminData'
+import { socket } from '../../config/socket'
 
 let kdsPollTimer = null
+
+const handleRealtimeNewOrder = () => {
+  console.log('⚡ [Admin KDS] ตรวจพบออเดอร์ใหม่ผ่าน WebSocket ซิงค์ข้อมูลทันที...')
+  if (typeof adminStore.fetchOrdersFromAPI === 'function') {
+    adminStore.fetchOrdersFromAPI()
+  }
+}
 
 onMounted(async () => {
   if (typeof adminStore.fetchOrdersFromAPI === 'function') {
     await adminStore.fetchOrdersFromAPI()
   }
-  // ซิงค์คำสั่งซื้อใหม่เข้าจอ KDS อัตโนมัติทุกๆ 4 วินาที
+
+  // ดักฟังอีเวนต์ออเดอร์ใหม่ผ่าน WebSocket
+  socket.on('new_order', handleRealtimeNewOrder)
+  socket.on('order_status_updated', handleRealtimeNewOrder)
+
+  // Polling สำรองทุก 15 วินาที
   kdsPollTimer = setInterval(() => {
     if (typeof adminStore.fetchOrdersFromAPI === 'function') {
       adminStore.fetchOrdersFromAPI()
     }
-  }, 4000)
+  }, 15000)
 })
 
 onBeforeUnmount(() => {
   if (kdsPollTimer) {
     clearInterval(kdsPollTimer)
   }
+  socket.off('new_order', handleRealtimeNewOrder)
+  socket.off('order_status_updated', handleRealtimeNewOrder)
 })
 
 // ดึงออเดอร์ทั้งหมดมาแสดงใน KDS เพื่อให้เห็นตั๋วทันที (หรือกรองเฉพาะที่กำลังทำ)
