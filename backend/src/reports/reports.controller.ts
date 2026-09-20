@@ -1,6 +1,7 @@
 // src/reports/reports.controller.ts
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Response } from 'express';
 import { ReportsService } from './reports.service';
 
 @ApiTags('Reports & Database Views')
@@ -34,5 +35,17 @@ export class ReportsController {
   @ApiResponse({ status: 200, description: 'ข้อมูลสรุปสำหรับหน้าแดชบอร์ด' })
   getDashboardAnalytics() {
     return this.reportsService.getDashboardAnalytics();
+  }
+
+  @Get('export-csv')
+  @ApiOperation({ summary: 'ดาวน์โหลดไฟล์รายงาน Excel (CSV) ส่งตรงจากเซิร์ฟเวอร์พร้อม Content-Disposition' })
+  async exportCsv(@Res() res: Response) {
+    const csvContent = await this.reportsService.generateCsv();
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const filename = `TumKrokZing_SalesReport_${dateStr}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send('\uFEFF' + csvContent);
   }
 }

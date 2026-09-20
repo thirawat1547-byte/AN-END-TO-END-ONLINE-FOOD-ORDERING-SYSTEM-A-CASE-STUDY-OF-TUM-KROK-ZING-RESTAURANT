@@ -101,4 +101,32 @@ export class ReportsService {
       receipts,
     };
   }
+
+  // 5. สร้างข้อมูล CSV จาก Database Views สำหรับส่งออกรายงาน (UTF-8 BOM)
+  async generateCsv() {
+    const receipts = (await this.getReceipts()) as any[];
+    const headers = [
+      'ลำดับ',
+      'รหัสใบเสร็จ',
+      'รหัสออเดอร์',
+      'ชื่อลูกค้า',
+      'ยอดชำระสุทธิ (บาท)',
+      'ช่องทางชำระเงิน',
+      'สถานะการชำระ',
+      'วันที่และเวลา',
+    ];
+
+    const rows = receipts.map((r, idx) => [
+      idx + 1,
+      `"#REC-${r.transaction_id}"`,
+      `"#ORD-${r.order_id}"`,
+      `"${r.customer_name || 'ลูกค้าทั่วไป'}"`,
+      r.total_amount,
+      `"${r.payment_method || '-'}"`,
+      `"${r.payment_status || 'Completed'}"`,
+      `"${r.payment_date ? new Date(r.payment_date).toLocaleString('th-TH') : '-'}"`,
+    ]);
+
+    return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+  }
 }

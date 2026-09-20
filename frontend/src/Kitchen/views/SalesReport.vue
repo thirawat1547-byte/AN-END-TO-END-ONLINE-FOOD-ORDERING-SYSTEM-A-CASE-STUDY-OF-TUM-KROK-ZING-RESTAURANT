@@ -174,27 +174,11 @@ const fetchSalesData = async () => {
   }
 }
 
-// ฟังก์ชันดาวน์โหลดรายงานเป็นไฟล์ Excel (CSV)
+// ฟังก์ชันดาวน์โหลดรายงานเป็นไฟล์ Excel (CSV) ส่งตรงจาก Database View พร้อมชื่อไฟล์มาตรฐาน
 const exportCSV = () => {
-  const headers = ['ลำดับ', 'รหัสออเดอร์', 'โต๊ะ', 'ยอดรวมสุทธิ (บาท)', 'สถานะ', 'วันที่และเวลา']
-  const rows = (rawSummaries.value || []).map((s, idx) => [
-    idx + 1,
-    '#ORD-' + s.order_id,
-    '"' + (s.table_number || '-') + '"',
-    Number(s.total_price || 0),
-    '"' + (s.status || 'PAID') + '"',
-    '"' + (s.order_date ? new Date(s.order_date).toLocaleString('th-TH') : '-') + '"'
-  ])
-
-  const filename = `TumKrokZing_Sales_Report_${new Date().toISOString().slice(0, 10)}.csv`
-  const csvText = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
-
-  // ใช้ Data URI พร้อม UTF-8 BOM (%EF%BB%BF) เพื่อให้ Chrome กำหนดชื่อไฟล์ .csv ถูกต้องเสมอ
-  const encodedUri = 'data:text/csv;charset=utf-8,%EF%BB%BF' + encodeURIComponent(csvText)
   const link = document.createElement('a')
-  link.href = encodedUri
-  link.setAttribute('download', filename)
-  link.download = filename
+  link.href = `${API_BASE}/reports/export-csv`
+  link.setAttribute('download', `TumKrokZing_SalesReport_${new Date().toISOString().slice(0, 10)}.csv`)
   document.body.appendChild(link)
   link.click()
   setTimeout(() => {

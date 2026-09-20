@@ -1097,32 +1097,11 @@ export const adminStore = reactive({
     return this.deletePromotionAPI(promoId)
   },
 
-  // ===== CSV Export =====
+  // ===== CSV Export (ดึงตรงจาก Database View ผ่าน Backend API พร้อมชื่อไฟล์ .csv จาก Content-Disposition) =====
   exportSalesCSV() {
-    const headers = ['Order ID', 'Date Time', 'Type', 'Table', 'Customer', 'Items Count', 'Payment Method', 'Discount (THB)', 'Total Amount (THB)', 'Payment Status', 'Order Status']
-    const rows = this.orders.map(o => [
-      '#ORD-' + o.order_id,
-      '"' + (o.created_at || '') + '"',
-      '"' + (o.order_type || 'In-store') + '"',
-      '"' + (o.table_id ? 'T-0' + o.table_id : '-') + '"',
-      '"' + (o.customer_name || 'ลูกค้า') + '"',
-      (o.items || []).reduce((s, i) => s + (Number(i.quantity) || 1), 0),
-      '"' + (o.payment_method || '-') + '"',
-      o.discount_applied || 0,
-      o.total_price || 0,
-      '"' + (o.payment_status || 'Completed') + '"',
-      '"' + (o.status || 'Completed') + '"'
-    ])
-
-    const filename = 'TumKrokZing_SalesReport_' + new Date().toISOString().slice(0, 10) + '.csv'
-    const csvText = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
-
-    // ใช้ Data URI พร้อม UTF-8 BOM (%EF%BB%BF) ป้องกัน Chrome โหลดเป็นรหัส UUID
-    const encodedUri = 'data:text/csv;charset=utf-8,%EF%BB%BF' + encodeURIComponent(csvText)
     const link = document.createElement('a')
-    link.href = encodedUri
-    link.setAttribute('download', filename)
-    link.download = filename
+    link.href = `${API_BASE}/reports/export-csv`
+    link.setAttribute('download', `TumKrokZing_SalesReport_${new Date().toISOString().slice(0, 10)}.csv`)
     document.body.appendChild(link)
     link.click()
     setTimeout(() => {
