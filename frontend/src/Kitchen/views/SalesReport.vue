@@ -46,24 +46,64 @@ const hourlyData = ref([
 ])
 
 const topItems = ref([])
+const rawSummaries = ref([])
 
-// ดึงข้อมูลยอดขายและออเดอร์ทั้งหมดจาก Backend
+// ดึงข้อมูลยอดขายและสถิติจาก Database Views ของ Backend
 const fetchSalesData = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/orders`)
-    const orders = res.data || []
+    const [summaryRes, topRes] = await Promise.allSettled([
+      axios.get(`${API_BASE}/reports/sales-summary`),
+      axios.get(`${API_BASE}/reports/top-selling`),
+      axios.get(`${API_BASE}/orders`)
+    ])
 
-    if (orders.length > 0) {
-      // 1. คำนวณรายได้รวม
+    let summaries = summaryRes.status === 'fulfilled' && Array.isArray(summaryRes.value.data) && summaryRes.value.data.length > 0
+      ? summaryRes.value.data 
+      : []
+
+    let topMenus = topRes.status === 'fulfilled' && Array.isArray(topRes.value.data) && topRes.value.data.length > 0
+      ? topRes.value.data 
+      : []
+
+    let orders = []
+    try {
+      const ordersRes = await axios.get(`${API_BASE}/orders`)
+      orders = ordersRes.data || []
+    } catch (e) {}
+
+    // หาก View ใน MySQL มีข้อมูล ให้ใช้งานจาก View โดยตรง
+    if (summaries.length > 0) {
+      rawSummaries.value = summaries
+      const totalRevenue = summaries.reduce((sum, o) => sum + Number(o.total_price || 0), 0)
+      summaryCards.value[0].value = `฿${totalRevenue.toLocaleString()}`
+      summaryCards.value[0].sub = `รวม ${summaries.length} ออเดอร์ (จาก View)`
+
+      summaryCards.value[1].value = String(summaries.length)
+      summaryCards.value[1].sub = 'ดึงจาก ORDER_SUMMARIES_VIEW'
+    } else if (orders.length > 0) {
+      rawSummaries.value = orders.map(o => ({
+        order_id: o.order_id,
+        table_number: o.table?.table_number || (o.table_id ? `T-${o.table_id}` : '-'),
+        total_price: o.total_price,
+        status: o.status,
+        order_date: o.created_at
+      }))
       const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total_price || 0), 0)
       summaryCards.value[0].value = `฿${totalRevenue.toLocaleString()}`
       summaryCards.value[0].sub = `รวม ${orders.length} ออเดอร์`
-
-      // 2. ยอดสั่งซื้อทั้งหมด
       summaryCards.value[1].value = String(orders.length)
       summaryCards.value[1].sub = 'ออเดอร์ทั้งหมดในระบบ'
+    }
 
-      // 3. รวมสถิติเมนูขายดีจาก Order Items จริง
+    if (topMenus.length > 0) {
+      topItems.value = topMenus.slice(0, 5).map(m => ({
+        name: m.menu_name,
+        category: m.category_name || 'อาหารจานหลัก',
+        orders: Number(m.total_sold || 0),
+        revenue: `฿${Number(m.total_revenue || 0).toLocaleString()}`,
+        image: '/images/kapaomu.jpg'
+      }))
+    } else if (orders.length > 0) {
       const menuCounts = {}
       orders.forEach(o => {
         (o.order_items || o.items || []).forEach(oi => {
@@ -87,53 +127,79 @@ const fetchSalesData = async () => {
         })
       })
 
-      const sorted = Object.values(menuCounts)
+      topItems.value = Object.values(menuCounts)
         .sort((a, b) => b.orders - a.orders)
         .slice(0, 5)
         .map(item => ({
           ...item,
           revenue: `฿${item.revenueNum.toLocaleString()}`
         }))
-
-      topItems.value = sorted
-
-      // 4. คำนวณยอดขายรายชั่วโมง
-      const hourBuckets = [
-        { time: '11am', hour: 11, count: 0 },
-        { time: '', hour: 11.5, count: 0 },
-        { time: '12pm', hour: 12, count: 0 },
-        { time: '', hour: 12.5, count: 0 },
-        { time: '1pm', hour: 13, count: 0 },
-        { time: '2pm', hour: 14, count: 0 },
-        { time: '3pm', hour: 15, count: 0 },
-        { time: '4pm', hour: 16, count: 0 },
-        { time: '5pm', hour: 17, count: 0 },
-      ]
-
-      orders.forEach(o => {
-        const d = new Date(o.created_at)
-        const hr = d.getHours()
-        const match = hourBuckets.find(b => b.hour === hr)
-        if (match) {
-          match.count++
-        } else {
-          hourBuckets[7].count++
-        }
-      })
-
-      const maxCount = Math.max(...hourBuckets.map(b => b.count), 1)
-      hourlyData.value = hourBuckets.map(b => {
-        const pct = Math.max(15, Math.min(100, Math.round((b.count / maxCount) * 85)))
-        return {
-          time: b.time,
-          height: `${pct}%`,
-          isHighlight: b.count === maxCount
-        }
-      })
     }
+
+    // 4. คำนวณยอดขายรายชั่วโมง
+    const hourBuckets = [
+      { time: '11am', hour: 11, count: 0 },
+      { time: '', hour: 11.5, count: 0 },
+      { time: '12pm', hour: 12, count: 0 },
+      { time: '', hour: 12.5, count: 0 },
+      { time: '1pm', hour: 13, count: 0 },
+      { time: '2pm', hour: 14, count: 0 },
+      { time: '3pm', hour: 15, count: 0 },
+      { time: '4pm', hour: 16, count: 0 },
+      { time: '5pm', hour: 17, count: 0 },
+    ]
+
+    orders.forEach(o => {
+      const d = new Date(o.created_at)
+      const hr = d.getHours()
+      const match = hourBuckets.find(b => b.hour === hr)
+      if (match) {
+        match.count++
+      } else {
+        hourBuckets[7].count++
+      }
+    })
+
+    const maxCount = Math.max(...hourBuckets.map(b => b.count), 1)
+    hourlyData.value = hourBuckets.map(b => {
+      const pct = Math.max(15, Math.min(100, Math.round((b.count / maxCount) * 85)))
+      return {
+        time: b.time,
+        height: `${pct}%`,
+        isHighlight: b.count === maxCount
+      }
+    })
   } catch (err) {
     console.error('โหลดรายงานยอดขายไม่สำเร็จ:', err)
   }
+}
+
+// ฟังก์ชันดาวน์โหลดรายงานเป็นไฟล์ Excel (CSV)
+const exportCSV = () => {
+  const headers = ['ลำดับ', 'รหัสออเดอร์', 'โต๊ะ', 'ยอดรวมสุทธิ (บาท)', 'สถานะ', 'วันที่และเวลา']
+  const rows = (rawSummaries.value || []).map((s, idx) => [
+    idx + 1,
+    '#ORD-' + s.order_id,
+    '"' + (s.table_number || '-') + '"',
+    Number(s.total_price || 0),
+    '"' + (s.status || 'PAID') + '"',
+    '"' + (s.order_date ? new Date(s.order_date).toLocaleString('th-TH') : '-') + '"'
+  ])
+
+  const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.setAttribute('href', url)
+  link.setAttribute('download', `TumKrokZing_Sales_Report_${new Date().toISOString().slice(0, 10)}.csv`)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
+
+// ฟังก์ชันพิมพ์หรือบันทึกเป็น PDF
+const exportPDF = () => {
+  window.print()
 }
 
 onMounted(() => {
@@ -142,12 +208,12 @@ onMounted(() => {
 </script>
 
 <template>
-  <div style="display: flex; flex-direction: column; height: 100vh; overflow: hidden; background-color: #FAF9F5; font-family: sans-serif;">
+  <div class="sales-report-container" style="display: flex; flex-direction: column; height: 100vh; overflow: hidden; background-color: #FAF9F5; font-family: sans-serif;">
     <!-- Top Bar Header -->
-    <header style="background-color: #48785A; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; color: white;">
+    <header class="no-print" style="background-color: #48785A; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; color: white;">
       <div style="display: flex; align-items: baseline; gap: 12px;">
         <h1 style="font-size: 24px; font-weight: 400; margin: 0; letter-spacing: 0.5px;">Dashboard</h1>
-        <span style="font-size: 14px; font-weight: 300; opacity: 0.8;">ระบบรายงานภาพรวมร้านค้า</span>
+        <span style="font-size: 14px; font-weight: 300; opacity: 0.8;">ระบบรายงานภาพรวมร้านค้า (Database Views)</span>
       </div>
       <div style="display: flex; align-items: center; gap: 24px; color: rgba(255,255,255,0.9); font-size: 18px;">
         <button style="cursor: pointer; background: none; border: none; color: inherit;">🔔</button>
@@ -165,10 +231,26 @@ onMounted(() => {
         <div style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 16px; border-bottom: 1px solid rgba(209,213,219,0.6);">
           <div>
             <h2 style="font-size: 26px; font-weight: 700; color: #1F2937; margin: 0 0 4px 0;">รายงานยอดขายประจำวัน</h2>
-            <p style="font-size: 13px; color: #6B7280; margin: 0;">วิเคราะห์สถิติและประสิทธิภาพการขายของร้าน</p>
+            <p style="font-size: 13px; color: #6B7280; margin: 0;">ดึงข้อมูลประมวลผลจาก ORDER_SUMMARIES_VIEW และ TOP_SELLING_MENUS_VIEW</p>
           </div>
-          <div style="background-color: white; border: 1px solid #D1D5DB; padding: 10px 16px; border-radius: 14px; font-size: 13px; font-weight: 500; color: #374151; display: flex; align-items: center; gap: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); cursor: pointer;">
-            <span>📅</span> วันนี้, {{ todayDateStr }} <span style="font-size: 10px; color: #9CA3AF;">▼</span>
+          <div class="no-print" style="display: flex; align-items: center; gap: 10px;">
+            <div style="background-color: white; border: 1px solid #D1D5DB; padding: 9px 14px; border-radius: 12px; font-size: 13px; font-weight: 500; color: #374151; display: flex; align-items: center; gap: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+              <span>📅</span> {{ todayDateStr }}
+            </div>
+            <button 
+              @click="exportCSV"
+              style="cursor: pointer; background: #48785A; color: white; border: none; padding: 9px 15px; border-radius: 12px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 5px rgba(72,120,90,0.3); transition: 0.2s;"
+              title="ดาวน์โหลดรายงานยอดขายเป็นไฟล์ Excel (CSV)"
+            >
+              <span>📊</span> Export Excel (CSV)
+            </button>
+            <button 
+              @click="exportPDF"
+              style="cursor: pointer; background: #1F2937; color: white; border: none; padding: 9px 15px; border-radius: 12px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: 0.2s;"
+              title="พิมพ์หรือบันทึกเป็น PDF"
+            >
+              <span>📄</span> บันทึกเป็น PDF
+            </button>
           </div>
         </div>
 
@@ -285,3 +367,21 @@ onMounted(() => {
     </main>
   </div>
 </template>
+
+<style scoped>
+@media print {
+  header.no-print,
+  .no-print {
+    display: none !important;
+  }
+  .sales-report-container {
+    height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+  main {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+}
+</style>

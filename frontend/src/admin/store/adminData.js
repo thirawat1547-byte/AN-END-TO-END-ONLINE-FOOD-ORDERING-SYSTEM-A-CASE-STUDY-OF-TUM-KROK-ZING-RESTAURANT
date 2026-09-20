@@ -1123,5 +1123,39 @@ export const adminStore = reactive({
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+  },
+
+  // ===== Database Views Integration =====
+  async fetchReceiptsFromView() {
+    try {
+      const res = await fetch(`${API_BASE}/reports/receipts`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) {
+        this.receipts = data
+        console.log(`✅ โหลดข้อมูลใบเสร็จจาก TRANSACTION_RECEIPTS_VIEW สำเร็จ: ${data.length} รายการ`)
+      }
+    } catch (err) {
+      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API TRANSACTION_RECEIPTS_VIEW ได้:', err.message)
+    }
+  },
+
+  async fetchSalesSummaryFromView() {
+    try {
+      const res = await fetch(`${API_BASE}/reports/sales-summary`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) {
+        this.orderSummaries = data
+        console.log(`✅ โหลดข้อมูลยอดขายจาก ORDER_SUMMARIES_VIEW สำเร็จ: ${data.length} รายการ`)
+      }
+    } catch (err) {
+      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API ORDER_SUMMARIES_VIEW ได้:', err.message)
+    }
+  },
+
+  // ===== PDF Export =====
+  exportSalesPDF() {
+    window.print()
   }
 })

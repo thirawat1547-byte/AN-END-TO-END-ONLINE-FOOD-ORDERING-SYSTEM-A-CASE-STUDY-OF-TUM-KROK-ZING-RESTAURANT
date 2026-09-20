@@ -5,27 +5,27 @@ export declare class TablesController {
     private readonly tablesService;
     constructor(tablesService: TablesService);
     findAll(): Promise<{
-        table_id: number;
         table_number: string;
-        capacity: number;
         status: string;
+        table_id: number;
+        capacity: number;
     }[]>;
     findOne(id: number): Promise<{
-        table_id: number;
         table_number: string;
-        capacity: number;
         status: string;
+        table_id: number;
+        capacity: number;
     }>;
     create(createTableDto: CreateTableDto): Promise<{
-        table_id: number;
         table_number: string;
-        capacity: number;
         status: string;
+        table_id: number;
+        capacity: number;
     }>;
     updateStatus(id: number, updateDto: UpdateTableStatusDto): Promise<{
-        table_id: number;
         table_number: string;
-        capacity: number;
         status: string;
+        table_id: number;
+        capacity: number;
     }>;
 }

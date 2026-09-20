@@ -7,6 +7,7 @@ import { TablesModule } from './tables/tables.module';
 import { PrismaService } from './prisma.service';
 import { IngredientsModule } from './ingredients/ingredients.module';
 import { PromotionsModule } from './promotions/promotions.module';
+import { ReportsModule } from './reports/reports.module';
 @Module({
   imports: [
     AuthModule,
@@ -16,6 +17,7 @@ import { PromotionsModule } from './promotions/promotions.module';
     TablesModule,
     IngredientsModule,
     PromotionsModule,
+    ReportsModule,
   ],
   providers: [PrismaService],
 })

@@ -6,24 +6,24 @@ export declare class TransactionsController {
     create(createTransactionDto: CreateTransactionDto): Promise<{
         order_id: number;
         transaction_id: number;
-        amount: import("@prisma/client/runtime/library").Decimal;
         payment_method: string;
         payment_status: string;
+        amount: import("@prisma/client/runtime/library").Decimal;
         payment_slip_url: string | null;
     }>;
     findAll(): Promise<({
         order: {
             table: {
-                table_id: number;
                 table_number: string;
-                capacity: number;
                 status: string;
+                table_id: number;
+                capacity: number;
             };
             order_items: ({
                 menu: {
-                    category_id: number;
                     menu_id: number;
                     menu_name: string;
+                    category_id: number;
                     description: string | null;
                     price: import("@prisma/client/runtime/library").Decimal;
                     image_url: string | null;
@@ -31,29 +31,29 @@ export declare class TransactionsController {
                     is_available: boolean;
                 };
             } & {
-                menu_id: number;
-                quantity: number;
-                created_at: Date;
                 order_id: number;
-                unit_price: number;
+                menu_id: number;
+                created_at: Date;
+                quantity: number;
                 order_item_id: number;
+                unit_price: number;
             })[];
         } & {
-            user_id: number | null;
-            table_id: number | null;
-            status: string;
-            created_at: Date;
-            order_type: string;
-            total_price: import("@prisma/client/runtime/library").Decimal;
             order_id: number;
+            total_price: import("@prisma/client/runtime/library").Decimal;
+            status: string;
             promo_id: number | null;
+            created_at: Date;
+            table_id: number | null;
+            user_id: number | null;
+            order_type: string;
         };
     } & {
         order_id: number;
         transaction_id: number;
-        amount: import("@prisma/client/runtime/library").Decimal;
         payment_method: string;
         payment_status: string;
+        amount: import("@prisma/client/runtime/library").Decimal;
         payment_slip_url: string | null;
     })[]>;
     createStripeIntent(orderId: number): Promise<{
@@ -63,13 +63,13 @@ export declare class TransactionsController {
         currency: string;
     }>;
     confirmStripeTest(orderId: number): Promise<{
-        user_id: number | null;
-        table_id: number | null;
-        status: string;
-        created_at: Date;
-        order_type: string;
-        total_price: import("@prisma/client/runtime/library").Decimal;
         order_id: number;
+        total_price: import("@prisma/client/runtime/library").Decimal;
+        status: string;
         promo_id: number | null;
+        created_at: Date;
+        table_id: number | null;
+        user_id: number | null;
+        order_type: string;
     }>;
 }

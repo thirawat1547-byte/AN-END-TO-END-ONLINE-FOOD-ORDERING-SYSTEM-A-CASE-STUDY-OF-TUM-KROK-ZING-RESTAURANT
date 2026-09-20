@@ -2,10 +2,13 @@
 import { ref, computed, onMounted } from 'vue'
 import { adminStore } from '../store/adminData'
 
-// ดึงข้อมูลออเดอร์ล่าสุดทันทีที่เปิดหน้าเว็บ
+// ดึงข้อมูลออเดอร์และใบเสร็จจาก Database View ล่าสุดทันทีที่เปิดหน้าเว็บ
 onMounted(async () => {
   if (typeof adminStore.fetchOrdersFromAPI === 'function') {
     await adminStore.fetchOrdersFromAPI()
+  }
+  if (typeof adminStore.fetchReceiptsFromView === 'function') {
+    await adminStore.fetchReceiptsFromView()
   }
 })
 
@@ -30,7 +33,7 @@ function viewSlip(url) {
 
 function viewOrderDetails(order) {
   selectedOrder.value = order
-  console.log("📦 ข้อมูลออเดอร์ทั้งหมด:", order) // <-- เช็กใน Console ของเบราว์เซอร์ (F12)
+  console.log("📦 ข้อมูลออเดอร์ทั้งหมด:", order)
 }
 </script>
 
@@ -40,14 +43,24 @@ function viewOrderDetails(order) {
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
         <h1 class="text-xl font-bold text-slate-900">ตรวจสอบการเงินและประวัติธุรกรรม (Transaction & Audit)</h1>
-        <p class="text-xs text-slate-500">ตรวจสอบหลักฐานการโอนเงิน สลิป QR Code ยอดรวมสุทธิ และรายงานทางบัญชี</p>
+        <p class="text-xs text-slate-500">ข้อมูลเชื่อมต่อตรงจาก TRANSACTION_RECEIPTS_VIEW ในระบบฐานข้อมูล MySQL</p>
       </div>
-      <button 
-        @click="adminStore.exportSalesCSV()"
-        class="px-4 py-2.5 rounded-xl bg-[#2d5a43] hover:bg-[#183324] text-white font-bold text-xs shadow-md transition flex items-center gap-2"
-      >
-        <span>📥 ดาวน์โหลดไฟล์รายงาน (Export CSV)</span>
-      </button>
+      <div class="flex items-center gap-2">
+        <button 
+          @click="adminStore.exportSalesCSV()"
+          class="px-3.5 py-2.5 rounded-xl bg-[#2d5a43] hover:bg-[#183324] text-white font-bold text-xs shadow-md transition flex items-center gap-1.5"
+          title="ดาวน์โหลดไฟล์รายงาน Excel / CSV จากฐานข้อมูล"
+        >
+          <span>📊 ส่งออก Excel (CSV)</span>
+        </button>
+        <button 
+          @click="adminStore.exportSalesPDF()"
+          class="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs shadow-md transition flex items-center gap-1.5"
+          title="พิมพ์หรือบันทึกรายงานเป็นไฟล์ PDF"
+        >
+          <span>📄 บันทึกเป็น PDF</span>
+        </button>
+      </div>
     </div>
 
     <!-- Filter Bar -->

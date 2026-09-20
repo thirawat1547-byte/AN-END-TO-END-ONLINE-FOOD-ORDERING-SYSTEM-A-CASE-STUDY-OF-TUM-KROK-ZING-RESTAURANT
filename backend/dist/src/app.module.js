@@ -16,6 +16,7 @@ const tables_module_1 = require("./tables/tables.module");
 const prisma_service_1 = require("./prisma.service");
 const ingredients_module_1 = require("./ingredients/ingredients.module");
 const promotions_module_1 = require("./promotions/promotions.module");
+const reports_module_1 = require("./reports/reports.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -29,6 +30,7 @@ exports.AppModule = AppModule = __decorate([
             tables_module_1.TablesModule,
             ingredients_module_1.IngredientsModule,
             promotions_module_1.PromotionsModule,
+            reports_module_1.ReportsModule,
         ],
         providers: [prisma_service_1.PrismaService],
     })
