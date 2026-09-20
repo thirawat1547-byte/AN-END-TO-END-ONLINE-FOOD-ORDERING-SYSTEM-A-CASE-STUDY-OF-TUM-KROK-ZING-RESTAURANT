@@ -730,9 +730,16 @@ async validateAndCheckout() {
         localStorage.removeItem('cartData');
         sessionStorage.removeItem('currentOrder');
         localStorage.removeItem('orderHistoryList');
+        if (createdOrder?.order_id) {
+          sessionStorage.setItem('active_tracking_order_id', String(createdOrder.order_id));
+        }
         this.cartItems = [];
 
-        this.$router.push('/tracking');
+        if (createdOrder?.order_id) {
+          this.$router.push({ path: '/tracking', query: { orderId: String(createdOrder.order_id) } });
+        } else {
+          this.$router.push('/tracking');
+        }
       } catch (error) {
         console.error('บันทึกคำสั่งซื้อไม่สำเร็จ:', error);
         const errMsg = error.response?.data?.message || 'เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ';

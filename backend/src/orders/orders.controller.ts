@@ -55,6 +55,16 @@ export class OrdersController {
     );
   }
 
+  // ดึงออเดอร์เดลิเวอรี่ที่กำลัง active อยู่ของ User ปัจจุบัน (สำหรับ Live Tracking)
+  @Get('my-active')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'ดูคำสั่งซื้อที่กำลังจัดส่งแบบเรียลไทม์ของผู้ใช้งานปัจจุบัน' })
+  findMyActiveOrder(@Req() req: any, @Query('orderId') orderId?: string) {
+    const userId = req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub;
+    return this.ordersService.findActiveUserOrder(Number(userId), orderId ? parseInt(orderId, 10) : undefined);
+  }
+
   // ดึงประวัติเฉพาะของ User ปัจจุบัน (ต้องวางไว้ก่อน @Get(':id'))
   @Get('my-orders')
   @UseGuards(AuthGuard('jwt'))

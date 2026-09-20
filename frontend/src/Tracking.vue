@@ -3,7 +3,7 @@
     <!-- Header มาตรฐานเดียวกันทุกหน้า -->
     <CustomerNavbar />
 
-    <!-- ส่วนที่ 1: เมื่อยังไม่ได้เข้าสู่ระบบ (ซ่อนคำสั่งซื้อ) -->
+    <!-- ส่วนที่ 1: เมื่อยังไม่ได้เข้าสู่ระบบ (แจ้งเตือนให้เข้าสู่ระบบ) -->
     <div class="empty-tracking-wrapper" v-if="!authStore.isLoggedIn">
       <div class="empty-tracking-card">
         <div class="empty-icon">🔒</div>
@@ -13,8 +13,21 @@
       </div>
     </div>
 
-    <!-- ส่วนที่ 2: แสดงผลเมื่อเข้าสู่ระบบแล้ว และมีคำสั่งซื้อ -->
+    <!-- ส่วนที่ 2: แสดงผลเมื่อเข้าสู่ระบบแล้ว และมีคำสั่งซื้อที่กำลังจัดส่ง (Active Order) -->
     <template v-else-if="hasActiveOrder && currentOrder">
+      <!-- แถบแจ้งเตือนสถานะเรียลไทม์ด้านบนแผนที่ -->
+      <div class="live-status-bar">
+        <div class="live-indicator">
+          <span class="live-dot-pulse"></span>
+          <span class="live-text">กำลังติดตามสถานะแบบเรียลไทม์ (อัปเดตอัตโนมัติ)</span>
+        </div>
+        <div class="live-actions">
+          <button class="manual-sync-btn" @click="fetchLatestOrder(false)" title="กดเพื่อซิงค์ข้อมูลล่าสุดทันที">
+            🔄 ซิงค์สถานะ
+          </button>
+        </div>
+      </div>
+
       <div class="map-banner">
         <div class="map-overlay-simulation">
           <iframe 
@@ -29,7 +42,7 @@
       </div>
 
       <div class="tracking-content">
-        <!-- 1. ไทม์ไลน์สถานะ -->
+        <!-- 1. ไทม์ไลน์สถานะ 4 ขั้นตอน -->
         <div class="card status-card">
           <h3 class="card-title">สถานะการจัดส่ง</h3>
           <div class="timeline">
@@ -71,20 +84,41 @@
           </div>
         </div>
 
-        <!-- 2. รายละเอียดคนขับ -->
+        <!-- 2. รายละเอียดผู้ดำเนินการ (เปลี่ยนตามสถานะจริง: ในครัว -> ไรเดอร์ -> ส่งสำเร็จ) -->
         <div class="card rider-card">
-          <h3 class="card-title">รายละเอียดผู้จัดส่ง</h3>
-          <div class="rider-profile-box">
-            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop" alt="Rider" class="rider-img">
-            <h4 class="rider-name">สิริโชค คำมา</h4>
-            <p class="rider-vehicle">🛵 Honda Wave • 1กข 1234</p>
+          <h3 class="card-title">ผู้ดำเนินการ</h3>
+          
+          <!-- สถานะ 1-2: กำลังปรุงอาหารในครัว -->
+          <div v-if="currentStep <= 2" class="prep-profile-box">
+            <div class="prep-icon-large">👨‍🍳</div>
+            <h4 class="rider-name">ห้องครัวตำครกซิ่ง</h4>
+            <p class="rider-vehicle">🔥 เชฟกำลังปรุงสดใหม่ตามออเดอร์</p>
+            <p class="prep-desc">ไรเดอร์จะเข้ารับอาหารทันทีที่ปรุงเสร็จเพื่อนำส่งถึงมือคุณ</p>
           </div>
-          <div class="rider-actions">
-            <button class="action-btn call-btn" @click="callRider">
-              <span>📞</span> โทรหาคนขับ
-            </button>
-            <button class="action-btn chat-btn" @click="chatRider">
-              <span>💬</span> ข้อความ
+
+          <!-- สถานะ 3: ส่งมอบไรเดอร์แล้ว กำลังจัดส่ง -->
+          <div v-else-if="currentStep === 3" class="rider-profile-box">
+            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop" alt="Rider" class="rider-img">
+            <h4 class="rider-name">สิริโชค คำมา (ไรเดอร์)</h4>
+            <p class="rider-vehicle">🛵 Honda Wave • 1กข 1234</p>
+            <div class="rider-actions">
+              <button class="action-btn call-btn" @click="callRider">
+                <span>📞</span> โทรหาคนขับ
+              </button>
+              <button class="action-btn chat-btn" @click="chatRider">
+                <span>💬</span> ข้อความ
+              </button>
+            </div>
+          </div>
+
+          <!-- สถานะ 4: จัดส่งสำเร็จเรียบร้อย -->
+          <div v-else class="completed-profile-box">
+            <div class="completed-icon-large">🎉</div>
+            <h4 class="rider-name">จัดส่งถึงคุณเรียบร้อยแล้ว</h4>
+            <p class="rider-vehicle" style="background:#eef7f1; color:#2d5a43;">✓ พนักงานส่งมอบอาหารสำเร็จ</p>
+            <p class="prep-desc">ขอบคุณที่เลือกทานอาหารกับร้านตำครกซิ่งครับ</p>
+            <button class="dismiss-btn" @click="dismissOrder">
+              ปิดหน้านี้ / สั่งอาหารเพิ่ม ➔
             </button>
           </div>
         </div>
@@ -117,7 +151,7 @@
             </div>
             <div class="price-row">
               <span>ยอดชำระ:</span>
-              <span style="font-weight: 600; color: #557c61;">B{{ currentOrder.total }}</span>
+              <span style="font-weight: 700; color: #557c61;">B{{ currentOrder.total }}</span>
             </div>
           </div>
 
@@ -128,13 +162,16 @@
       </div>
     </template>
 
-    <!-- ส่วนที่ 3: เมื่อล็อกอินแล้วแต่ยังไม่มีคำสั่งซื้อ -->
+    <!-- ส่วนที่ 3: เมื่อล็อกอินแล้วแต่ยังไม่มีคำสั่งซื้อที่อยู่ระหว่างจัดส่งในขณะนี้ -->
     <div class="empty-tracking-wrapper" v-else>
       <div class="empty-tracking-card">
         <div class="empty-icon">🛵💨</div>
-        <h3>ยังไม่มีคำสั่งซื้อในขณะนี้</h3>
-        <p>คุณยังไม่ได้ทำรายการสั่งซื้ออาหาร ไปเลือกเมนูอร่อยๆ กันเลย!</p>
-        <button class="go-home-btn" @click="$router.push('/')">เลือกซื้ออาหาร ➔</button>
+        <h3>ยังไม่มีคำสั่งซื้อที่อยู่ระหว่างจัดส่ง</h3>
+        <p>คุณยังไม่มีรายการอาหารที่กำลังจัดส่งในขณะนี้ สามารถเลือกดูเมนูอร่อยๆ หรือตรวจสอบประวัติคำสั่งซื้อที่ผ่านมาได้ครับ</p>
+        <div class="empty-actions-row">
+          <button class="go-home-btn" @click="$router.push('/')">เลือกซื้ออาหาร ➔</button>
+          <button class="history-link-btn" @click="$router.push('/history')">ดูประวัติคำสั่งซื้อ</button>
+        </div>
       </div>
     </div>
 
@@ -245,8 +282,10 @@ export default {
         case 'COOKING':
           return 2;
         case 'READY':
+        case 'IN_DELIVERY':
           return 3;
         case 'COMPLETED':
+        case 'DELIVERED':
           return 4;
         default:
           return 1;
@@ -254,23 +293,25 @@ export default {
     },
     displayStatusText() {
       const statusMap = {
-        PENDING: 'กำลังดำเนินการ',
+        PENDING: 'ยืนยันออเดอร์แล้ว',
         PAID: 'รับออเดอร์แล้ว',
         COOKING: 'กำลังปรุงอาหาร',
-        READY: 'กำลังจัดส่ง',
+        READY: 'อาหารเสร็จแล้ว',
+        IN_DELIVERY: 'กำลังจัดส่ง',
         COMPLETED: 'จัดส่งสำเร็จ',
+        DELIVERED: 'จัดส่งสำเร็จ',
         CANCELLED: 'ยกเลิกแล้ว'
       };
       return statusMap[this.rawStatus] || this.rawStatus;
     },
     statusBadgeClass() {
-      if (this.rawStatus === 'COMPLETED') return 'badge-completed';
+      if (this.rawStatus === 'COMPLETED' || this.rawStatus === 'DELIVERED') return 'badge-completed';
       if (this.rawStatus === 'CANCELLED') return 'badge-cancelled';
       return 'badge-pending';
     },
     estimatedTimeText() {
-      if (this.rawStatus === 'COMPLETED') return 'ส่งถึงแล้ว';
-      if (this.rawStatus === 'READY') return '10-15 นาที';
+      if (this.rawStatus === 'COMPLETED' || this.rawStatus === 'DELIVERED') return 'ส่งถึงแล้ว';
+      if (this.rawStatus === 'READY' || this.rawStatus === 'IN_DELIVERY') return '10-15 นาที';
       if (this.rawStatus === 'COOKING') return '20-25 นาที';
       return '25-35 นาที';
     }
@@ -281,15 +322,19 @@ export default {
     // 1. โหลดข้อมูลโปรไฟล์
     const profileData = localStorage.getItem('userProfile');
     if (profileData) {
-      const parsed = JSON.parse(profileData);
-      this.userProfile = {
-        name: parsed.name || parsed.username || 'ลูกค้าทั่วไป',
-        phone: parsed.phone || '08x-xxx-xxxx',
-        address: parsed.address || 'ตลาดปากเกร็ด นนทบุรี'
-      };
+      try {
+        const parsed = JSON.parse(profileData);
+        this.userProfile = {
+          name: parsed.name || parsed.username || 'ลูกค้าทั่วไป',
+          phone: parsed.phone || '08x-xxx-xxxx',
+          address: parsed.address || 'ตลาดปากเกร็ด นนทบุรี'
+        };
+      } catch (e) {
+        this.userProfile = { name: 'ลูกค้าทั่วไป', phone: '08x-xxx-xxxx', address: 'ตลาดปากเกร็ด นนทบุรี' };
+      }
     }
 
-    // 2. ดึงข้อมูลออเดอร์เฉพาะของผู้ใช้คนนี้จากเซิร์ฟเวอร์
+    // 2. ดึงข้อมูลออเดอร์ที่กำลังจัดส่งของ User คนนี้จากเซิร์ฟเวอร์
     if (this.authStore.isLoggedIn) {
       await this.fetchLatestOrder();
     } else {
@@ -297,12 +342,12 @@ export default {
       this.currentOrder = null;
     }
 
-    // 3. เริ่มต้น Polling อัปเดตสถานะทุกๆ 5 วินาที
+    // 3. เริ่มต้น Polling อัปเดตสถานะแบบ Real-Time ทุก 2.5 วินาที
     this.pollingTimer = setInterval(() => {
-      if (this.authStore.isLoggedIn && this.hasActiveOrder && this.rawStatus !== 'COMPLETED' && this.rawStatus !== 'CANCELLED') {
+      if (this.authStore.isLoggedIn) {
         this.fetchLatestOrder(true);
       }
-    }, 5000);
+    }, 2500);
   },
   beforeUnmount() {
     if (this.pollingTimer) {
@@ -330,16 +375,21 @@ export default {
       }
 
       try {
-        const res = await axios.get(`${API_BASE}/orders/my-orders`, {
+        // ดึงเฉพาะคำสั่งซื้อประเภท DELIVERY ที่กำลัง active อยู่ของผู้ใช้คนนี้
+        const routeOrderId = this.$route.query.orderId || sessionStorage.getItem('active_tracking_order_id');
+        const queryParam = routeOrderId ? `?orderId=${encodeURIComponent(routeOrderId)}` : '';
+
+        const res = await axios.get(`${API_BASE}/orders/my-active${queryParam}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
 
-        const orders = res.data || [];
-        if (orders.length > 0) {
-          const latest = orders[0];
-          this.rawStatus = latest.status;
+        const activeOrder = res.data;
 
-          const items = (latest.order_items || []).map(oi => {
+        // หากพบคำสั่งซื้อที่กำลังจัดส่งอยู่จริง
+        if (activeOrder && activeOrder.order_id) {
+          this.rawStatus = activeOrder.status;
+
+          const items = (activeOrder.order_items || []).map(oi => {
             let noteStr = oi.notes || '';
             if (!noteStr && oi.customization) {
               if (typeof oi.customization === 'string') noteStr = oi.customization;
@@ -362,24 +412,32 @@ export default {
           const subtotal = items.reduce((acc, curr) => acc + (curr.price * curr.qty), 0);
 
           this.currentOrder = {
-            orderNumber: String(latest.order_id),
-            date: new Date(latest.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }),
-            total: Number(latest.total_price),
-            subtotal: subtotal || Number(latest.total_price),
-            shippingFee: Math.max(0, Number(latest.total_price) - subtotal),
-            paymentMethod: latest.payment_method || 'พร้อมเพย์',
+            orderNumber: String(activeOrder.order_id),
+            date: new Date(activeOrder.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }),
+            total: Number(activeOrder.total_price),
+            subtotal: subtotal || Number(activeOrder.total_price),
+            shippingFee: Math.max(0, Number(activeOrder.total_price) - subtotal),
+            paymentMethod: activeOrder.payment_method || 'พร้อมเพย์',
             status: this.displayStatusText,
             items: items
           };
 
           this.hasActiveOrder = true;
         } else {
+          // ถ้าไม่มีออเดอร์ที่กำลังจัดส่งอยู่ ให้เคลียร์สถานะเป็นไม่มีออเดอร์
           this.hasActiveOrder = false;
           this.currentOrder = null;
+          sessionStorage.removeItem('active_tracking_order_id');
         }
       } catch (err) {
         if (!isSilent) console.warn('ดึงข้อมูลสถานะล่าสุดไม่สำเร็จ:', err);
       }
+    },
+    dismissOrder() {
+      this.hasActiveOrder = false;
+      this.currentOrder = null;
+      sessionStorage.removeItem('active_tracking_order_id');
+      this.$router.push('/');
     },
     logout() {
       localStorage.removeItem('access_token');
@@ -398,15 +456,69 @@ export default {
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
 
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Prompt', sans-serif; }
 .tracking-container { background-color: #f7f6f0; min-height: 100vh; display: flex; flex-direction: column; }
 
-.map-banner { width: 100%; height: 260px; position: relative; overflow: hidden; background: #e0dfd5; }
+/* แถบแจ้งเตือน Real-Time */
+.live-status-bar {
+  max-width: 1300px;
+  width: 100%;
+  margin: 16px auto 0;
+  padding: 8px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.live-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  border: 1px solid #bbf7d0;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+}
+
+.live-dot-pulse {
+  width: 10px;
+  height: 10px;
+  background-color: #22c55e;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+  animation: livePulse 1.8s infinite;
+}
+
+.live-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #15803d;
+}
+
+.manual-sync-btn {
+  background: white;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.manual-sync-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.map-banner { width: 100%; height: 260px; position: relative; overflow: hidden; background: #e0dfd5; margin-top: 10px; }
 .map-overlay-simulation { width: 100%; height: 100%; }
 
-.tracking-content { display: flex; justify-content: center; gap: 20px; padding: 30px 40px; max-width: 1300px; margin: 0 auto; width: 100%; flex-grow: 1; }
+.tracking-content { display: flex; justify-content: center; gap: 20px; padding: 25px 40px; max-width: 1300px; margin: 0 auto; width: 100%; flex-grow: 1; }
 .card { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); flex: 1; display: flex; flex-direction: column; }
 .card-title { font-size: 18px; font-weight: 600; color: #333; margin-bottom: 20px; }
 
@@ -422,6 +534,46 @@ export default {
 .timeline-item h4 { font-size: 14px; font-weight: 600; color: #333; }
 .timeline-item p { font-size: 12px; color: #777; margin-top: 2px; line-height: 1.4; }
 .text-muted h4 { color: #aaa; }
+
+/* Dynamic Middle Card */
+.prep-profile-box, .completed-profile-box {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: auto 0;
+  padding: 10px 0;
+}
+
+.prep-icon-large, .completed-icon-large {
+  font-size: 52px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.prep-desc {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.dismiss-btn {
+  margin-top: 8px;
+  background: #557c61;
+  color: white;
+  border: none;
+  padding: 9px 18px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.dismiss-btn:hover {
+  background: #405e49;
+}
 
 /* Rider Card */
 .rider-profile-box { text-align: center; display: flex; flex-direction: column; align-items: center; margin-bottom: 20px; }
@@ -455,13 +607,37 @@ export default {
 .view-receipt-btn { background: #557c61; color: white; border: none; width: 100%; padding: 12px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; transition: 0.2s; margin-top: auto; font-family: inherit; }
 .view-receipt-btn:hover { background: #405e49; }
 
+/* Empty state */
 .empty-tracking-wrapper { display: flex; justify-content: center; align-items: center; flex-grow: 1; padding: 40px 20px; }
 .empty-tracking-card { background: white; border-radius: 20px; padding: 60px 30px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.02); display: flex; flex-direction: column; align-items: center; gap: 12px; border: 1px solid #e5e2d5; max-width: 600px; width: 100%; }
 .empty-icon { font-size: 60px; margin-bottom: 5px; }
 .empty-tracking-card h3 { font-size: 22px; font-weight: 600; color: #333; }
-.empty-tracking-card p { font-size: 15px; color: #777; margin-bottom: 20px; }
-.go-home-btn { background: #557c61; color: white; border: none; padding: 12px 30px; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: inherit; }
-.go-home-btn:hover { background: #405e49; }
+.empty-tracking-card p { font-size: 14px; color: #777; margin-bottom: 15px; max-width: 440px; line-height: 1.5; }
+
+.empty-actions-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.go-home-btn { background: #557c61; color: white; border: none; padding: 12px 26px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: inherit; }
+.go-home-btn:hover { background: #405e49; transform: translateY(-1px); }
+
+.history-link-btn {
+  background: #f1ede1;
+  color: #444;
+  border: 1px solid #e5e2d5;
+  padding: 12px 22px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+  font-family: inherit;
+}
+.history-link-btn:hover {
+  background: #e5e2d5;
+}
 
 .footer { display: flex; justify-content: space-between; align-items: center; padding: 25px 40px; background: #f7f6f0; border-top: 1px solid #e5e2d5; margin-top: auto; font-size: 12px; color: #666; }
 .footer-brand { font-weight: 600; color: #557c61; font-size: 14px; }
@@ -485,4 +661,19 @@ export default {
 .receipt-summary { display: flex; flex-direction: column; gap: 10px; padding-top: 10px; }
 .r-summary-row { display: flex; justify-content: space-between; font-size: 14px; color: #555; }
 .r-total-row { font-size: 18px; font-weight: 700; color: #557c61; margin-top: 5px; }
+
+@keyframes livePulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(34, 197, 94, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+}
 </style>

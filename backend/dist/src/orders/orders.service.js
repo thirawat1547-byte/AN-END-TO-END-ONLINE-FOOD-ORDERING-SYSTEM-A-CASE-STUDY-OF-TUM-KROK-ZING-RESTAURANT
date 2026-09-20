@@ -207,6 +207,76 @@ let OrdersService = class OrdersService {
             orderBy: { order_id: 'desc' },
         });
     }
+    async findActiveUserOrder(userId, requestedOrderId) {
+        if (!userId || isNaN(userId)) {
+            return null;
+        }
+        const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+        await this.prisma.order.updateMany({
+            where: {
+                order_type: 'DELIVERY',
+                status: { in: ['PENDING', 'PAID', 'COOKING', 'READY', 'IN_DELIVERY'] },
+                created_at: { lt: sixHoursAgo },
+            },
+            data: {
+                status: 'COMPLETED',
+            },
+        }).catch(() => { });
+        if (requestedOrderId && !isNaN(requestedOrderId)) {
+            const specific = await this.prisma.order.findFirst({
+                where: {
+                    order_id: requestedOrderId,
+                    user_id: userId,
+                    order_type: 'DELIVERY',
+                },
+                include: {
+                    order_items: {
+                        include: { menu: true },
+                    },
+                    table: true,
+                    transaction: true,
+                    user: {
+                        select: {
+                            user_id: true,
+                            username: true,
+                            phone_number: true,
+                            address: true,
+                        },
+                    },
+                },
+            });
+            if (specific)
+                return specific;
+        }
+        return this.prisma.order.findFirst({
+            where: {
+                user_id: userId,
+                order_type: 'DELIVERY',
+                status: {
+                    in: ['PENDING', 'PAID', 'COOKING', 'READY', 'IN_DELIVERY'],
+                },
+                created_at: {
+                    gte: sixHoursAgo,
+                },
+            },
+            include: {
+                order_items: {
+                    include: { menu: true },
+                },
+                table: true,
+                transaction: true,
+                user: {
+                    select: {
+                        user_id: true,
+                        username: true,
+                        phone_number: true,
+                        address: true,
+                    },
+                },
+            },
+            orderBy: { order_id: 'desc' },
+        });
+    }
     async findOne(id) {
         const order = await this.prisma.order.findUnique({
             where: { order_id: id },

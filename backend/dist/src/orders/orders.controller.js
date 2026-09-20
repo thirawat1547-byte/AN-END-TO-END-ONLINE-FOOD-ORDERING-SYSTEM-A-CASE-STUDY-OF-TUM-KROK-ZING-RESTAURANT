@@ -34,6 +34,10 @@ let OrdersController = class OrdersController {
     findAll(status, tableId, orderType) {
         return this.ordersService.findAll(status, tableId ? parseInt(tableId, 10) : undefined, orderType);
     }
+    findMyActiveOrder(req, orderId) {
+        const userId = req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub;
+        return this.ordersService.findActiveUserOrder(Number(userId), orderId ? parseInt(orderId, 10) : undefined);
+    }
     findMyOrders(req) {
         const userId = req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub;
         return this.ordersService.findByUser(Number(userId));
@@ -71,6 +75,17 @@ __decorate([
     __metadata("design:paramtypes", [String, String, String]),
     __metadata("design:returntype", void 0)
 ], OrdersController.prototype, "findAll", null);
+__decorate([
+    (0, common_1.Get)('my-active'),
+    (0, common_1.UseGuards)((0, passport_1.AuthGuard)('jwt')),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({ summary: 'ดูคำสั่งซื้อที่กำลังจัดส่งแบบเรียลไทม์ของผู้ใช้งานปัจจุบัน' }),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Query)('orderId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", void 0)
+], OrdersController.prototype, "findMyActiveOrder", null);
 __decorate([
     (0, common_1.Get)('my-orders'),
     (0, common_1.UseGuards)((0, passport_1.AuthGuard)('jwt')),

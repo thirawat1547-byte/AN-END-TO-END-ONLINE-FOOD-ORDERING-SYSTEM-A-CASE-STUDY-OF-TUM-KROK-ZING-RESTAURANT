@@ -237,6 +237,83 @@ export class OrdersService {
     });
   }
 
+  // 3.1 ดึงคำสั่งซื้อเดลิเวอรี่ที่กำลังดำเนินการอยู่ (Active Order) ของ User รายนี้โดยเฉพาะ
+  async findActiveUserOrder(userId: number, requestedOrderId?: number) {
+    if (!userId || isNaN(userId)) {
+      return null;
+    }
+
+    // เคลียร์ออเดอร์เดลิเวอรี่เก่าที่ค้างเกิน 6 ชั่วโมงให้เป็น COMPLETED อัตโนมัติ เพื่อไม่ให้ค้างในหน้าติดตาม
+    const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+    await this.prisma.order.updateMany({
+      where: {
+        order_type: 'DELIVERY',
+        status: { in: ['PENDING', 'PAID', 'COOKING', 'READY', 'IN_DELIVERY'] },
+        created_at: { lt: sixHoursAgo },
+      },
+      data: {
+        status: 'COMPLETED',
+      },
+    }).catch(() => {});
+
+    // หากมีการระบุเลข Order ID เฉพาะเจาะจงที่เพิ่งสั่ง
+    if (requestedOrderId && !isNaN(requestedOrderId)) {
+      const specific = await this.prisma.order.findFirst({
+        where: {
+          order_id: requestedOrderId,
+          user_id: userId,
+          order_type: 'DELIVERY',
+        },
+        include: {
+          order_items: {
+            include: { menu: true },
+          },
+          table: true,
+          transaction: true,
+          user: {
+            select: {
+              user_id: true,
+              username: true,
+              phone_number: true,
+              address: true,
+            },
+          },
+        },
+      });
+      if (specific) return specific;
+    }
+
+    // ค้นหาออเดอร์เดลิเวอรี่ล่าสุดของ User นี้ ที่ยังอยู่ในขั้นตอนการจัดส่ง (ไม่เกิน 6 ชม.)
+    return this.prisma.order.findFirst({
+      where: {
+        user_id: userId,
+        order_type: 'DELIVERY',
+        status: {
+          in: ['PENDING', 'PAID', 'COOKING', 'READY', 'IN_DELIVERY'],
+        },
+        created_at: {
+          gte: sixHoursAgo,
+        },
+      },
+      include: {
+        order_items: {
+          include: { menu: true },
+        },
+        table: true,
+        transaction: true,
+        user: {
+          select: {
+            user_id: true,
+            username: true,
+            phone_number: true,
+            address: true,
+          },
+        },
+      },
+      orderBy: { order_id: 'desc' },
+    });
+  }
+
   // 4. ดูรายละเอียดออร์เดอร์ตาม ID
   async findOne(id: number) {
     const order = await this.prisma.order.findUnique({
