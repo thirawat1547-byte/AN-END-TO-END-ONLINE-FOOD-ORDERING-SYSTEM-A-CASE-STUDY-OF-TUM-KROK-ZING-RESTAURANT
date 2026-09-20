@@ -604,6 +604,7 @@ export const adminStore = reactive({
   // ===== Centralized Admin Initialization =====
   async initAdminData() {
     await Promise.allSettled([
+      this.fetchSettingsFromAPI(),
       this.fetchMenusFromAPI(),
       this.fetchInventoryFromAPI(),
       this.fetchTablesFromAPI(),
@@ -1135,6 +1136,110 @@ export const adminStore = reactive({
       }
     } catch (err) {
       console.warn('⚠️ ไม่สามารถเชื่อมต่อ API ORDER_SUMMARIES_VIEW ได้:', err.message)
+    }
+  },
+
+  // ===== Store Settings API =====
+  async fetchSettingsFromAPI() {
+    try {
+      const res = await fetch(`${API_BASE}/settings`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      if (data) {
+        this.storeSettings = {
+          ...this.storeSettings,
+          storeName: data.store_name || this.storeSettings.storeName,
+          tagline: data.tagline || this.storeSettings.tagline,
+          promptpayNumber: data.promptpay_number || this.storeSettings.promptpayNumber,
+          promptpayName: data.promptpay_name || this.storeSettings.promptpayName,
+          taxId: data.tax_id || this.storeSettings.taxId,
+          address: data.address || this.storeSettings.address,
+          phone: data.phone || this.storeSettings.phone,
+          openTime: data.open_time || this.storeSettings.openTime,
+          closeTime: data.close_time || this.storeSettings.closeTime,
+          isOpen: data.is_open !== undefined ? Boolean(data.is_open) : this.storeSettings.isOpen,
+          vatRate: data.vat_rate !== undefined ? Number(data.vat_rate) : this.storeSettings.vatRate
+        }
+        try {
+          localStorage.setItem('tumkrok_store_settings', JSON.stringify(this.storeSettings))
+        } catch (e) {}
+      }
+      return true
+    } catch (err) {
+      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API Settings ได้:', err.message)
+      return false
+    }
+  },
+
+  async toggleStoreStatus() {
+    const nextStatus = !this.storeSettings.isOpen
+    this.storeSettings.isOpen = nextStatus
+    try {
+      const res = await fetch(`${API_BASE}/settings/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      this.storeSettings.isOpen = Boolean(data.is_open)
+      try {
+        localStorage.setItem('tumkrok_store_settings', JSON.stringify(this.storeSettings))
+      } catch (e) {}
+      console.log(`✅ อัปเดตสถานะร้านค้าสำเร็จ: ${this.storeSettings.isOpen ? 'เปิดบริการ' : 'ปิดร้าน'}`)
+      return this.storeSettings.isOpen
+    } catch (err) {
+      this.storeSettings.isOpen = !nextStatus // rollback on error
+      console.error('❌ ไม่สามารถเปลี่ยนสถานะร้านค้าได้:', err.message)
+      alert(`ไม่สามารถบันทึกสถานะร้านค้าไปยังเซิร์ฟเวอร์ได้: ${err.message}`)
+      return this.storeSettings.isOpen
+    }
+  },
+
+  async saveSettingsToAPI(customSettings = {}) {
+    try {
+      const payload = {
+        store_name: customSettings.storeName || this.storeSettings.storeName,
+        tagline: customSettings.tagline || this.storeSettings.tagline,
+        promptpay_number: customSettings.promptpayNumber || this.storeSettings.promptpayNumber,
+        promptpay_name: customSettings.promptpayName || this.storeSettings.promptpayName,
+        tax_id: customSettings.taxId || this.storeSettings.taxId,
+        address: customSettings.address || this.storeSettings.address,
+        phone: customSettings.phone || this.storeSettings.phone,
+        open_time: customSettings.openTime || this.storeSettings.openTime,
+        close_time: customSettings.closeTime || this.storeSettings.closeTime,
+        is_open: customSettings.isOpen !== undefined ? customSettings.isOpen : this.storeSettings.isOpen,
+        vat_rate: Number(customSettings.vatRate !== undefined ? customSettings.vatRate : this.storeSettings.vatRate)
+      }
+
+      const res = await fetch(`${API_BASE}/settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      
+      this.storeSettings = {
+        ...this.storeSettings,
+        storeName: data.store_name,
+        tagline: data.tagline,
+        promptpayNumber: data.promptpay_number,
+        promptpayName: data.promptpay_name,
+        taxId: data.tax_id,
+        address: data.address,
+        phone: data.phone,
+        openTime: data.open_time,
+        closeTime: data.close_time,
+        isOpen: Boolean(data.is_open),
+        vatRate: Number(data.vat_rate)
+      }
+      try {
+        localStorage.setItem('tumkrok_store_settings', JSON.stringify(this.storeSettings))
+      } catch (e) {}
+      return true
+    } catch (err) {
+      console.error('❌ ไม่สามารถบันทึกการตั้งค่าไปยังเซิร์ฟเวอร์ได้:', err.message)
+      return false
     }
   },
 

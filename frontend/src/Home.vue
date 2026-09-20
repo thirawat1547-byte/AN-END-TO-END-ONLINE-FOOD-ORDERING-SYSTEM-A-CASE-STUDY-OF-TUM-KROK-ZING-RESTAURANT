@@ -3,6 +3,18 @@
     <!-- Top Navbar มาตรฐานเดียวกันทุกหน้า -->
     <CustomerNavbar v-model="searchQuery" :showSearch="true" />
 
+    <!-- 🛑 ป้ายแจ้งเตือนเมื่อร้านปิดให้บริการ -->
+    <div v-if="!isStoreOpen" class="store-closed-top-banner">
+      <div class="closed-banner-inner">
+        <span class="closed-icon">🛑</span>
+        <div class="closed-texts">
+          <strong class="closed-title">ขณะนี้ร้านปิดให้บริการชั่วคราว</strong>
+          <span class="closed-sub">ระบบงดรับคำสั่งซื้อทุกช่องทางในขณะนี้ (เวลาทำการปกติ 10:30 - 22:00 น.) ขออภัยในความไม่สะดวกครับ</span>
+        </div>
+        <span class="closed-tag">ปิดร้านชั่วคราว</span>
+      </div>
+    </div>
+
     <div class="main-layout">
       <!-- ส่วนเนื้อหาหลักด้านซ้าย -->
       <div class="content-area">
@@ -111,8 +123,13 @@
             <span>B{{ subtotal }}</span>
           </div>
           
-          <button class="checkout-main-btn" @click="proceedToCheckout">
-            ชำระเงินทันที ➔
+          <button 
+            class="checkout-main-btn" 
+            :disabled="!isStoreOpen"
+            :class="{ 'disabled-checkout-btn': !isStoreOpen }"
+            @click="proceedToCheckout"
+          >
+            {{ isStoreOpen ? 'ชำระเงินทันที ➔' : '🛑 ร้านปิดบริการชั่วคราว' }}
           </button>
         </div>
       </aside>
@@ -283,6 +300,7 @@ export default {
     return {
       authStore,
       isLoggedIn: false,
+      isStoreOpen: true,
       showAuthModal: false,
       showAddressDropdown: false,
       searchQuery: '',
@@ -415,8 +433,19 @@ export default {
 
     // ซิงก์ราคาและข้อมูลสดจาก Database Backend
     await this.fetchMenus();
+    await this.fetchStoreSettings();
   },
   methods: {
+    async fetchStoreSettings() {
+      try {
+        const res = await axios.get(`${API_BASE}/settings`);
+        if (res.data && res.data.is_open !== undefined) {
+          this.isStoreOpen = Boolean(res.data.is_open);
+        }
+      } catch (err) {
+        console.warn('ไม่สามารถโหลดสถานะร้านค้าจาก Backend ได้:', err);
+      }
+    },
     
     async fetchMenus() {
       try {
@@ -476,6 +505,10 @@ export default {
     },
 
     openModalOrAdd(item) {
+      if (!this.isStoreOpen) {
+        alert('🛑 ขออภัยครับ ขณะนี้ร้านปิดให้บริการชั่วคราว ไม่สามารถสั่งอาหารได้ในขณะนี้');
+        return;
+      }
       if (item.is_available === false) return;
       this.authStore.syncAuth();
       if (!this.authStore.isLoggedIn) { 
@@ -518,6 +551,10 @@ export default {
       this.closeItemModal();
     },
     addDirectToCart(item) {
+      if (!this.isStoreOpen) {
+        alert('🛑 ขออภัยครับ ขณะนี้ร้านปิดให้บริการชั่วคราว ไม่สามารถสั่งอาหารได้ในขณะนี้');
+        return;
+      }
       if (item.is_available === false) return;
       let found = this.cartItems.find(i => i.name === item.name && !i.dishType && !i.spiceLevel && !i.seafoodChoice && (!i.addons || i.addons.length === 0));
       if (found) { found.qty++; } else { this.cartItems.push({ name: item.name, price: item.price, qty: 1, dishType: null, spiceLevel: null, seafoodChoice: null, addons: [] }); }
@@ -535,6 +572,10 @@ export default {
       this.cartItems = []; 
     },
     proceedToCheckout() {
+      if (!this.isStoreOpen) {
+        alert('🛑 ขออภัยครับ ขณะนี้ร้านปิดให้บริการชั่วคราว ไม่สามารถดำเนินการชำระเงินหรือสั่งอาหารได้ในขณะนี้');
+        return;
+      }
       this.authStore.syncAuth();
       if (!this.authStore.isLoggedIn) {
         this.showAuthModal = true;
@@ -557,6 +598,40 @@ export default {
 .out-of-stock-overlay { position: absolute; inset: 0; background: rgba(15, 23, 42, 0.6); display: flex; align-items: center; justify-content: center; border-radius: 10px; z-index: 5; }
 .out-of-stock-badge { background: #dc2626; color: white; padding: 6px 12px; border-radius: 12px; font-size: 11px; font-weight: 700; }
 .disabled-btn { background: #cbd5e1 !important; color: #64748b !important; cursor: not-allowed !important; }
+
+/* 🛑 Store Closed Top Banner */
+.store-closed-top-banner {
+  background: #fee2e2;
+  border-bottom: 2px solid #ef4444;
+  padding: 12px 24px;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.15);
+}
+.closed-banner-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.closed-icon { font-size: 22px; }
+.closed-texts { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.closed-title { font-size: 14px; font-weight: 700; color: #991b1b; }
+.closed-sub { font-size: 12px; color: #7f1d1d; }
+.closed-tag {
+  background: #dc2626;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+.disabled-checkout-btn {
+  background: #94a3b8 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+}
 
 .content-area { flex: 1; min-width: 0; }
 

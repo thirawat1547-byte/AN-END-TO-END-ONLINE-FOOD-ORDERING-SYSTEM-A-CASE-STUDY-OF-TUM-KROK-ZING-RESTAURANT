@@ -12,11 +12,17 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.OrdersService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma.service");
+const settings_service_1 = require("../settings/settings.service");
 let OrdersService = class OrdersService {
-    constructor(prisma) {
+    constructor(prisma, settingsService) {
         this.prisma = prisma;
+        this.settingsService = settingsService;
     }
     async create(createOrderDto) {
+        const storeSettings = await this.settingsService.getSettings();
+        if (!storeSettings.is_open) {
+            throw new common_1.BadRequestException('ขออภัย ขณะนี้ร้านปิดให้บริการชั่วคราว ไม่สามารถรับคำสั่งซื้อได้ในขณะนี้');
+        }
         if (!createOrderDto.items || createOrderDto.items.length === 0) {
             throw new common_1.BadRequestException('รายการสั่งซื้อต้องมีอาหารอย่างน้อย 1 รายการ');
         }
@@ -227,6 +233,7 @@ let OrdersService = class OrdersService {
 exports.OrdersService = OrdersService;
 exports.OrdersService = OrdersService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        settings_service_1.SettingsService])
 ], OrdersService);
 //# sourceMappingURL=orders.service.js.map

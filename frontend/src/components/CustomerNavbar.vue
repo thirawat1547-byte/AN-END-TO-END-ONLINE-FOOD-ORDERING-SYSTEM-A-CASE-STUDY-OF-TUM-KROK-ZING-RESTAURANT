@@ -50,6 +50,15 @@
 
     <!-- กลุ่มขวา: แจ้งเตือน + ตะกร้า + สถานะการล็อกอิน -->
     <div class="nav-right-group">
+      <!-- แสดงสถานะร้านค้า เปิด / ปิด -->
+      <div 
+        :class="['store-status-pill', isStoreOpen ? 'open' : 'closed']" 
+        :title="isStoreOpen ? 'ร้านเปิดให้บริการตามปกติ' : 'ขณะนี้ร้านปิดให้บริการชั่วคราว'"
+      >
+        <span class="status-dot"></span>
+        <span class="status-label">{{ isStoreOpen ? 'ร้านเปิด' : 'ร้านปิด' }}</span>
+      </div>
+
       <button class="icon-btn" title="การแจ้งเตือน" type="button">🔔</button>
       <button class="icon-btn cart-btn" title="ตะกร้าสินค้า" type="button" @click="onCartClick">🛒</button>
 
@@ -107,6 +116,7 @@ import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import logoImg from '../assets/logo.png';
 import { authStore } from '../store/authStore';
+import { API_BASE } from '../config/api';
 
 export default {
   name: 'CustomerNavbar',
@@ -128,6 +138,7 @@ export default {
     const showAddressDropdown = ref(false);
     const locationWrapper = ref(null);
     const defaultAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop';
+    const isStoreOpen = ref(true);
 
     const isHomeActive = computed(() => route.path === '/');
     const isTrackingActive = computed(() => route.path === '/tracking');
@@ -149,9 +160,20 @@ export default {
       }
     };
 
-    onMounted(() => {
+    onMounted(async () => {
       authStore.syncAuth();
       document.addEventListener('click', handleClickOutside);
+      try {
+        const res = await fetch(`${API_BASE}/settings`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.is_open !== undefined) {
+            isStoreOpen.value = Boolean(data.is_open);
+          }
+        }
+      } catch (err) {
+        console.warn('ไม่สามารถโหลดสถานะร้านค้าใน Navbar ได้:', err);
+      }
     });
 
     onUnmounted(() => {
@@ -191,7 +213,8 @@ export default {
       isHelpActive,
       handleLogout,
       goToProfileEdit,
-      onCartClick
+      onCartClick,
+      isStoreOpen
     };
   }
 };
@@ -217,6 +240,39 @@ export default {
 }
 
 /* กลุ่มซ้าย: โลโก้ + เมนู */
+.store-status-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.store-status-pill.open {
+  background-color: #e6f4ea;
+  color: #137333;
+  border: 1px solid #ceead6;
+}
+.store-status-pill.closed {
+  background-color: #fce8e6;
+  color: #c5221f;
+  border: 1px solid #fad2cf;
+}
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.store-status-pill.open .status-dot {
+  background-color: #34a853;
+  box-shadow: 0 0 0 2px rgba(52, 168, 83, 0.2);
+}
+.store-status-pill.closed .status-dot {
+  background-color: #ea4335;
+}
+
 .nav-left-group {
   display: flex;
   align-items: center;

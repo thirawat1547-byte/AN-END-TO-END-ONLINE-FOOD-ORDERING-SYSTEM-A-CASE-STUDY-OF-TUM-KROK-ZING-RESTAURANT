@@ -81,16 +81,40 @@ onUnmounted(() => {
       </div>
 
       <!-- Live Store Status Banner -->
-      <div v-show="isSidebarOpen" class="px-4 py-3 mx-3 my-3 rounded-xl bg-[#244633]/80 border border-[#2d5a43]/60 flex items-center justify-between">
+      <div 
+        v-show="isSidebarOpen" 
+        :class="[
+          'px-4 py-3 mx-3 my-3 rounded-xl border flex items-center justify-between transition-colors',
+          adminStore.storeSettings.isOpen 
+            ? 'bg-[#244633]/80 border-[#2d5a43]/60' 
+            : 'bg-red-950/40 border-red-500/50'
+        ]"
+      >
         <div class="flex items-center gap-2">
-          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span class="text-xs font-medium text-emerald-100">สถานะร้าน: <b class="text-emerald-300">{{ adminStore.storeSettings.isOpen ? 'เปิดบริการ' : 'ปิดร้าน' }}</b></span>
+          <span 
+            :class="[
+              'w-2.5 h-2.5 rounded-full',
+              adminStore.storeSettings.isOpen ? 'bg-emerald-400 animate-pulse' : 'bg-red-500'
+            ]"
+          ></span>
+          <span class="text-xs font-medium text-emerald-100">
+            สถานะร้าน: 
+            <b :class="adminStore.storeSettings.isOpen ? 'text-emerald-300' : 'text-red-400 font-bold'">
+              {{ adminStore.storeSettings.isOpen ? 'เปิดบริการ' : 'ปิดร้าน' }}
+            </b>
+          </span>
         </div>
         <button 
-          @click="adminStore.storeSettings.isOpen = !adminStore.storeSettings.isOpen"
-          class="text-[10px] px-2 py-0.5 rounded bg-[#2d5a43] hover:bg-[#386b51] text-emerald-100 transition font-medium"
+          @click="adminStore.toggleStoreStatus()"
+          :class="[
+            'text-[10px] px-2.5 py-1 rounded transition font-bold',
+            adminStore.storeSettings.isOpen 
+              ? 'bg-[#2d5a43] hover:bg-[#386b51] text-emerald-100' 
+              : 'bg-red-700 hover:bg-red-600 text-white'
+          ]"
+          :title="adminStore.storeSettings.isOpen ? 'กดเพื่อปิดร้าน' : 'กดเพื่อเปิดร้าน'"
         >
-          สลับ
+          {{ adminStore.storeSettings.isOpen ? 'ปิดร้าน' : 'เปิดร้าน' }}
         </button>
       </div>
 

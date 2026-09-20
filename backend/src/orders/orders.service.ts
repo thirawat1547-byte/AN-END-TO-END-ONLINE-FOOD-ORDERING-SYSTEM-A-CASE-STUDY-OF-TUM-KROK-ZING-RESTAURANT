@@ -1,15 +1,24 @@
-// src/orders/orders.service.ts
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import { SettingsService } from '../settings/settings.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly settingsService: SettingsService,
+  ) {}
 
   // 1. รับคำสั่งซื้อและคำนวณราคาแบบ Transaction
   async create(createOrderDto: CreateOrderDto) {
+    // ตรวจสอบสถานะการเปิด-ปิดร้านค้าจากระบบจริง
+    const storeSettings = await this.settingsService.getSettings();
+    if (!storeSettings.is_open) {
+      throw new BadRequestException('ขออภัย ขณะนี้ร้านปิดให้บริการชั่วคราว ไม่สามารถรับคำสั่งซื้อได้ในขณะนี้');
+    }
+
     if (!createOrderDto.items || createOrderDto.items.length === 0) {
       throw new BadRequestException('รายการสั่งซื้อต้องมีอาหารอย่างน้อย 1 รายการ');
     }

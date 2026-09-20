@@ -3,6 +3,18 @@
     <!-- Header มาตรฐานเดียวกันทุกหน้า -->
     <CustomerNavbar />
 
+    <!-- 🛑 ป้ายแจ้งเตือนเมื่อร้านปิด -->
+    <div v-if="!isStoreOpen" class="checkout-closed-banner">
+      <div class="closed-banner-content">
+        <span class="closed-icon">🛑</span>
+        <div class="closed-texts">
+          <strong class="closed-title">ขณะนี้ร้านปิดให้บริการชั่วคราว</strong>
+          <span class="closed-sub">ระบบงดรับคำสั่งซื้อทุกช่องทางในขณะนี้ (เวลาทำการปกติ 10:30 - 22:00 น.) ขออภัยในความไม่สะดวกครับ</span>
+        </div>
+        <span class="closed-badge">งดรับออเดอร์</span>
+      </div>
+    </div>
+
     <div class="checkout-main">
       <div class="left-section">
         
@@ -112,8 +124,14 @@
             <span class="total-price-highlight">B{{ total }}</span>
           </div>
 
-          <button class="confirm-checkout-btn" @click="confirmOrder" :disabled="cartItems.length === 0 || isSubmitting">
-            <span v-if="isSubmitting">กำลังตรวจสอบและส่งคำสั่งซื้อ...</span>
+          <button 
+            class="confirm-checkout-btn" 
+            @click="confirmOrder" 
+            :disabled="cartItems.length === 0 || isSubmitting || !isStoreOpen"
+            :class="{ 'disabled-btn': !isStoreOpen }"
+          >
+            <span v-if="!isStoreOpen">🛑 ร้านปิดให้บริการชั่วคราว</span>
+            <span v-else-if="isSubmitting">กำลังตรวจสอบและส่งคำสั่งซื้อ...</span>
             <span v-else>ยืนยันและชำระเงิน B{{ total }}</span>
           </button>
         </div>
@@ -240,7 +258,8 @@ export default {
       showQrModal: false,
       qrCodeUrl: '',
       isGeneratingQr: false,
-      isSubmitting: false
+      isSubmitting: false,
+      isStoreOpen: true
     }
   },
   computed: {
@@ -268,7 +287,7 @@ export default {
       return adminStore?.storeSettings?.promptpayName || 'ร้านตำครกซิ่ง (นายธีรวัฒน์ แสนคำเฮียง)';
     }
   },
-  mounted() {
+  async mounted() {
     this.isLoggedIn = !!localStorage.getItem('access_token') || localStorage.getItem('isLoggedIn') === 'true';
     const profileData = localStorage.getItem('userProfile');
     if (profileData) {
@@ -289,6 +308,16 @@ export default {
     const savedCart = sessionStorage.getItem('cartData') || localStorage.getItem('cartData');
     if (savedCart) {
       this.cartItems = JSON.parse(savedCart);
+    }
+
+    // ตรวจสอบสถานะเปิด-ปิดร้านค้าล่าสุดจากเซิร์ฟเวอร์
+    try {
+      const res = await axios.get(`${API_BASE}/settings`);
+      if (res.data && res.data.is_open !== undefined) {
+        this.isStoreOpen = Boolean(res.data.is_open);
+      }
+    } catch (e) {
+      console.warn('โหลดสถานะร้านค้าในหน้าชำระเงินไม่สำเร็จ:', e);
     }
   },
   methods: {
@@ -364,6 +393,14 @@ export default {
     // 🛑 เพิ่มฟังก์ชันตรวจสอบสถานะสินค้าล่าสุดจาก Backend ก่อนยืนยันสั่งซื้อ
 async validateAndCheckout() {
       try {
+        // 🛑 1. ตรวจสอบสถานะเปิด-ปิดร้านค้าจากเซิร์ฟเวอร์ทันที
+        const storeRes = await axios.get(`${API_BASE}/settings`);
+        if (storeRes.data && storeRes.data.is_open === false) {
+          this.isStoreOpen = false;
+          alert('🛑 ขออภัยครับ ขณะนี้ร้านปิดให้บริการชั่วคราว ไม่สามารถสั่งอาหารหรือดำเนินการชำระเงินได้ครับ');
+          return false;
+        }
+
         const res = await axios.get(`${API_BASE}/menus`);
         const dbMenus = res.data || [];
 
@@ -513,7 +550,47 @@ async validateAndCheckout() {
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Prompt', sans-serif; }
 .checkout-container { background-color: #f7f6f0; min-height: 100vh; display: flex; flex-direction: column; }
 
-.checkout-main { display: flex; justify-content: center; gap: 30px; padding: 30px 40px; flex-grow: 1; max-width: 1200px; margin: 0 auto; width: 100%; }
+.checkout-main {
+  display: flex;
+  max-width: 1200px;
+  margin: 30px auto;
+  gap: 30px;
+  padding: 0 20px;
+}
+
+/* 🛑 Checkout Closed Banner */
+.checkout-closed-banner {
+  background: #fee2e2;
+  border-bottom: 2px solid #ef4444;
+  padding: 12px 24px;
+}
+.closed-banner-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.checkout-closed-banner .closed-icon { font-size: 22px; }
+.checkout-closed-banner .closed-texts { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.checkout-closed-banner .closed-title { font-size: 14px; font-weight: 700; color: #991b1b; }
+.checkout-closed-banner .closed-sub { font-size: 12px; color: #7f1d1d; }
+.checkout-closed-banner .closed-badge {
+  background: #dc2626;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+.confirm-checkout-btn.disabled-btn {
+  background: #94a3b8 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+}
+
 .left-section { flex: 1; display: flex; flex-direction: column; gap: 20px; max-width: 680px; }
 .card-section { background: white; border-radius: 16px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); border: 1px solid #e5e2d5;}
 .section-title { font-size: 18px; font-weight: 600; color: #333; margin-bottom: 15px; }

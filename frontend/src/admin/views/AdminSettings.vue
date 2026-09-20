@@ -3,34 +3,26 @@ import { ref, onMounted } from 'vue'
 import { adminStore } from '../store/adminData'
 
 const savedNotice = ref(false)
+const isSaving = ref(false)
 
-// โหลดข้อมูลตั้งค่าที่เคยบันทึกไว้ทันทีเมื่อเปิดหน้าเว็บ
-onMounted(() => {
-  try {
-    const saved = localStorage.getItem('tumkrok_store_settings')
-    if (saved) {
-      const parsed = JSON.parse(saved)
-      // อัปเดตค่าลงใน store
-      adminStore.storeSettings = { ...adminStore.storeSettings, ...parsed }
-    }
-  } catch (err) {
-    console.warn('ไม่สามารถโหลดข้อมูลตั้งค่าจาก localStorage ได้', err)
-  }
+// โหลดข้อมูลตั้งค่าจาก Backend ทันทีเมื่อเปิดหน้าเว็บ
+onMounted(async () => {
+  await adminStore.fetchSettingsFromAPI()
 })
 
-function saveSettings() {
-  // บันทึกข้อมูลลงใน localStorage
+async function saveSettings() {
+  isSaving.value = true
   try {
-    localStorage.setItem('tumkrok_store_settings', JSON.stringify(adminStore.storeSettings))
+    await adminStore.saveSettingsToAPI(adminStore.storeSettings)
+    savedNotice.value = true
+    setTimeout(() => {
+      savedNotice.value = false
+    }, 3000)
   } catch (err) {
-    console.warn('ไม่สามารถบันทึกลง localStorage ได้', err)
+    alert('บันทึกข้อมูลไม่สำเร็จ: ' + err.message)
+  } finally {
+    isSaving.value = false
   }
-
-  // แสดงแถบแจ้งเตือนความสำเร็จ
-  savedNotice.value = true
-  setTimeout(() => {
-    savedNotice.value = false
-  }, 3000)
 }
 </script>
 
@@ -44,14 +36,60 @@ function saveSettings() {
       </div>
       <button 
         @click="saveSettings"
-        class="px-5 py-2.5 rounded-xl bg-[#2d5a43] hover:bg-[#183324] text-white font-bold text-xs shadow-md shadow-emerald-900/20 transition"
+        :disabled="isSaving"
+        class="px-5 py-2.5 rounded-xl bg-[#2d5a43] hover:bg-[#183324] text-white font-bold text-xs shadow-md shadow-emerald-900/20 transition disabled:opacity-50"
       >
-        💾 บันทึกการตั้งค่า
+        {{ isSaving ? '⏳ กำลังบันทึก...' : '💾 บันทึกการตั้งค่า' }}
       </button>
     </div>
 
     <div v-if="savedNotice" class="p-3 bg-emerald-100 text-emerald-900 text-xs font-bold rounded-xl border border-emerald-300">
-      ✅ บันทึกข้อมูลการตั้งค่าเรียบร้อยแล้ว!
+      ✅ บันทึกข้อมูลการตั้งค่าลงฐานข้อมูลเรียบร้อยแล้ว!
+    </div>
+
+    <!-- Store Status Switch Card -->
+    <div 
+      :class="[
+        'p-5 rounded-2xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4',
+        adminStore.storeSettings.isOpen 
+          ? 'bg-emerald-50/80 border-emerald-300 text-emerald-950' 
+          : 'bg-red-50 border-red-300 text-red-950'
+      ]"
+    >
+      <div class="flex items-center gap-3">
+        <span 
+          :class="[
+            'w-4 h-4 rounded-full flex-shrink-0',
+            adminStore.storeSettings.isOpen ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'
+          ]"
+        ></span>
+        <div>
+          <h2 class="text-sm font-bold flex items-center gap-2">
+            สถานะร้านค้าปัจจุบัน: 
+            <span :class="adminStore.storeSettings.isOpen ? 'text-emerald-700' : 'text-red-600'">
+              {{ adminStore.storeSettings.isOpen ? '🟢 เปิดให้บริการตามปกติ' : '🔴 ปิดร้านชั่วคราว (งดรับออเดอร์)' }}
+            </span>
+          </h2>
+          <p class="text-xs opacity-75 mt-0.5">
+            {{ adminStore.storeSettings.isOpen 
+              ? 'ลูกค้าสามารถสั่งอาหารผ่าน QR โต๊ะอาหาร และระบบเดลิเวอรีได้ตามปกติ' 
+              : 'ระบบจะระงับการสั่งอาหารของลูกค้าทั้งหมด ทั้งที่โต๊ะอาหารและทางหน้าเว็บ จนกว่าจะเปิดร้านใหม่อีกครั้ง' 
+            }}
+          </p>
+        </div>
+      </div>
+
+      <button 
+        @click="adminStore.toggleStoreStatus()"
+        :class="[
+          'px-5 py-2.5 rounded-xl font-bold text-xs shadow transition flex items-center gap-2 self-end sm:self-auto',
+          adminStore.storeSettings.isOpen 
+            ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-200' 
+            : 'bg-emerald-700 hover:bg-emerald-800 text-white shadow-emerald-200'
+        ]"
+      >
+        <span>{{ adminStore.storeSettings.isOpen ? '🛑 สั่งปิดร้านชั่วคราว' : '✅ สั่งเปิดร้านทันที' }}</span>
+      </button>
     </div>
 
     <!-- Store Info Card -->

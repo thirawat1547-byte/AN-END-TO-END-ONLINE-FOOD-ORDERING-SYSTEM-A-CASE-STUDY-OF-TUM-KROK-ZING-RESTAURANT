@@ -1,9 +1,11 @@
 import { PrismaService } from '../prisma.service';
+import { SettingsService } from '../settings/settings.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 export declare class OrdersService {
     private readonly prisma;
-    constructor(prisma: PrismaService);
+    private readonly settingsService;
+    constructor(prisma: PrismaService, settingsService: SettingsService);
     create(createOrderDto: CreateOrderDto): Promise<{
         table: {
             status: string;
@@ -23,12 +25,12 @@ export declare class OrdersService {
                 is_available: boolean;
             };
         } & {
-            menu_id: number;
             created_at: Date;
             order_id: number;
             quantity: number;
             unit_price: number;
             order_item_id: number;
+            menu_id: number;
         })[];
     } & {
         order_type: string;
@@ -74,12 +76,12 @@ export declare class OrdersService {
                 is_available: boolean;
             };
         } & {
-            menu_id: number;
             created_at: Date;
             order_id: number;
             quantity: number;
             unit_price: number;
             order_item_id: number;
+            menu_id: number;
         })[];
     } & {
         order_type: string;
@@ -118,12 +120,12 @@ export declare class OrdersService {
                 is_available: boolean;
             };
         } & {
-            menu_id: number;
             created_at: Date;
             order_id: number;
             quantity: number;
             unit_price: number;
             order_item_id: number;
+            menu_id: number;
         })[];
     } & {
         order_type: string;
@@ -168,12 +170,12 @@ export declare class OrdersService {
                 is_available: boolean;
             };
         } & {
-            menu_id: number;
             created_at: Date;
             order_id: number;
             quantity: number;
             unit_price: number;
             order_item_id: number;
+            menu_id: number;
         })[];
     } & {
         order_type: string;

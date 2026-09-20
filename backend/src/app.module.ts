@@ -8,6 +8,8 @@ import { PrismaService } from './prisma.service';
 import { IngredientsModule } from './ingredients/ingredients.module';
 import { PromotionsModule } from './promotions/promotions.module';
 import { ReportsModule } from './reports/reports.module';
+import { SettingsModule } from './settings/settings.module';
+
 @Module({
   imports: [
     AuthModule,
@@ -18,6 +20,7 @@ import { ReportsModule } from './reports/reports.module';
     IngredientsModule,
     PromotionsModule,
     ReportsModule,
+    SettingsModule,
   ],
   providers: [PrismaService],
 })

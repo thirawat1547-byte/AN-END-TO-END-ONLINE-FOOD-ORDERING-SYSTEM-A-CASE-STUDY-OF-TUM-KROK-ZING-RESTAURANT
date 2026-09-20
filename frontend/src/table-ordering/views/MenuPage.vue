@@ -1,6 +1,17 @@
 <template>
   <div class="menu-page">
     <OrderHeader :tableId="tableId" />
+
+    <!-- 🛑 ป้ายแจ้งเตือนเมื่อร้านปิด -->
+    <div v-if="!isStoreOpen" class="table-closed-banner">
+      <div class="closed-banner-icon">🛑</div>
+      <div class="closed-banner-info">
+        <strong class="closed-banner-title">ขณะนี้ร้านปิดให้บริการชั่วคราว</strong>
+        <p class="closed-banner-sub">ระบบงดรับคำสั่งซื้อจากโต๊ะอาหารในขณะนี้ ขออภัยในความไม่สะดวกครับ</p>
+      </div>
+      <span class="closed-banner-pill">ปิดร้าน</span>
+    </div>
+
     <CategoryTabs :categories="categories" v-model="activeCategory" />
     
     <div class="menu-grid">
@@ -55,6 +66,7 @@ const router = useRouter()
 const tableId = route.params.tableId || '1'
 
 const { addToCart, cartItemCount, cartTotal } = useCart()
+const isStoreOpen = ref(true)
 
 // แผนที่รูปภาพมาตรฐานเพื่อการแสดงผลที่ถูกต้อง
 const imageMap = {
@@ -137,6 +149,16 @@ const fetchMenus = async () => {
         }
       })
     }
+
+    // ซิงค์สถานะร้านค้า เปิด / ปิด จาก Backend
+    try {
+      const setRes = await axios.get(`${API_BASE}/settings`)
+      if (setRes.data && setRes.data.is_open !== undefined) {
+        isStoreOpen.value = Boolean(setRes.data.is_open)
+      }
+    } catch (e) {
+      console.warn('โหลดสถานะร้านค้าไม่สำเร็จ:', e)
+    }
   } catch (err) {
     console.warn('โหลดเมนูจาก API ไม่สำเร็จ กำลังใช้ข้อมูลสำรอง:', err)
   }
@@ -174,6 +196,10 @@ const checkHasOptions = (item) => {
 
 // จัดการคลิกเลือกเมนู
 const handleAction = (item, isQuickAdd = false) => {
+  if (!isStoreOpen.value) {
+    alert('🛑 ขออภัยครับ ขณะนี้ร้านปิดให้บริการชั่วคราว ไม่สามารถสั่งอาหารได้ในขณะนี้')
+    return
+  }
   if (item.is_available === false) {
     alert(`ขออภัยครับ เมนู "${item.menu_name}" หมดชั่วคราว ไม่สามารถสั่งได้ครับ`)
     return
@@ -194,6 +220,10 @@ const closePreview = () => {
 }
 
 const addFromPreview = () => {
+  if (!isStoreOpen.value) {
+    alert('🛑 ขออภัยครับ ขณะนี้ร้านปิดให้บริการชั่วคราว ไม่สามารถสั่งอาหารได้ในขณะนี้')
+    return
+  }
   if (previewItem.value) {
     if (previewItem.value.is_available === false) {
       alert(`ขออภัยครับ เมนู "${previewItem.value.menu_name}" หมดชั่วคราวครับ`)
@@ -206,6 +236,10 @@ const addFromPreview = () => {
 }
 
 const addToCartQuick = (item) => {
+  if (!isStoreOpen.value) {
+    alert('🛑 ขออภัยครับ ขณะนี้ร้านปิดให้บริการชั่วคราว ไม่สามารถสั่งอาหารได้ในขณะนี้')
+    return
+  }
   if (item.is_available === false) {
     alert(`ขออภัยครับ เมนู "${item.menu_name}" หมดชั่วคราวครับ`)
     return
@@ -224,6 +258,29 @@ const goToCart = () => {
   background-color: #f7f6f0;
   padding-bottom: 90px;
   position: relative;
+}
+
+/* 🛑 ป้ายแจ้งเตือนร้านปิด */
+.table-closed-banner {
+  background-color: #fee2e2;
+  border-bottom: 1.5px solid #ef4444;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.closed-banner-icon { font-size: 20px; }
+.closed-banner-info { flex: 1; }
+.closed-banner-title { font-size: 13px; font-weight: 700; color: #991b1b; }
+.closed-banner-sub { font-size: 11px; color: #b91c1c; margin: 0; }
+.closed-banner-pill {
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  white-space: nowrap;
 }
 
 .menu-grid {
