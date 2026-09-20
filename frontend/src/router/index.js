@@ -138,4 +138,17 @@ router.beforeEach((to, from, next) => {
   next();
 });
 
-export default router
+// ดักจับข้อผิดพลาดเมื่อเบราว์เซอร์เรียกไฟล์ Chunk เก่าหลังการ Deploy ให้โหลดใหม่โดยอัตโนมัติ
+router.onError((error, to) => {
+  const isChunkError = 
+    error.message.includes('Failed to fetch dynamically imported module') ||
+    error.message.includes('Importing a module script failed') ||
+    error.message.includes('error loading dynamically imported module');
+
+  if (isChunkError && to) {
+    console.warn('Vite chunk mismatch detected, reloading page to:', to.fullPath);
+    window.location.href = to.fullPath;
+  }
+});
+
+export default router;
