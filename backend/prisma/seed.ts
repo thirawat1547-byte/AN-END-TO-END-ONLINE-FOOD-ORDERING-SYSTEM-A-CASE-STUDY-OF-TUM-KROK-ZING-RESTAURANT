@@ -441,39 +441,48 @@ async function main() {
   const normalizeName = (str: string) =>
     str.replace(/\s+/g, '').replace(/กระเพรา/g, 'กะเพรา').replace(/\//g, '').toLowerCase();
 
-  const getMenuId = (name: string) => {
+  const getMenuIds = (name: string): number[] => {
     const target = normalizeName(name);
-    return allMenus.find((m) => {
-      const n = normalizeName(m.menu_name);
-      return (
-        n === target ||
-        n.includes(target) ||
-        target.includes(n) ||
-        (target.includes('คะน้าหมู') && n.includes('คะน้าหมู')) ||
-        (target.includes('ไก่ทอดปีก') && (n.includes('ไก่ทอดปีก') || n.includes('ปีกไก่ทอด'))) ||
-        (target.includes('โค้ก') && n.includes('โค้ก')) ||
-        (target.includes('น้ำดื่ม') && (n.includes('น้ำดื่ม') || n.includes('น้ำเปล่า')))
-      );
-    })?.menu_id;
+    return allMenus
+      .filter((m) => {
+        const n = normalizeName(m.menu_name);
+        return (
+          n === target ||
+          (target.includes('คะน้าหมู') && n.includes('คะน้าหมู')) ||
+          ((target.includes('ไก่ทอดปีก') || target.includes('ปีกไก่ทอด')) &&
+            (n.includes('ไก่ทอดปีก') || n.includes('ปีกไก่ทอด'))) ||
+          (target.includes('โค้ก') && n.includes('โค้ก')) ||
+          ((target.includes('น้ำดื่ม') || target.includes('น้ำเปล่า')) &&
+            (n.includes('น้ำดื่ม') || n.includes('น้ำเปล่า'))) ||
+          n.includes(target) ||
+          target.includes(n)
+        );
+      })
+      .map((m) => m.menu_id);
   };
 
   const getIngId = (name: string) => {
     const target = normalizeName(name);
+    // 1. Exact match first
+    const exact = allIngredients.find((i) => normalizeName(i.name) === target);
+    if (exact) return exact.ingredient_id;
+
+    // 2. Specific alias match
     return allIngredients.find((i) => {
       const n = normalizeName(i.name);
       return (
-        n === target ||
-        n.includes(target) ||
-        target.includes(n) ||
         (target.includes('หมูสับ') && (n.includes('หมูสับ') || n.includes('หมูสด'))) ||
-        (target.includes('กุ้ง') && (n.includes('กุ้ง') || n.includes('หมึก'))) ||
+        ((target.includes('กุ้ง') || target.includes('หมึก')) && (n.includes('กุ้ง') || n.includes('หมึก'))) ||
         (target.includes('ไก่') && target.includes('สะโพก') && n.includes('สะโพก')) ||
         (target.includes('ไก่') && target.includes('ปีก') && n.includes('ปีก')) ||
         (target.includes('มะละกอ') && n.includes('มะละกอ')) ||
         (target.includes('ปู') && (n.includes('ปูเค็ม') || n.includes('ปูดอง'))) ||
         (target.includes('โค้ก') && n.includes('โค้ก')) ||
         (target.includes('สไปรท์') && n.includes('สไปรท์')) ||
-        (target.includes('น้ำดื่ม') && n.includes('น้ำดื่ม'))
+        ((target.includes('น้ำดื่ม') || target.includes('น้ำเปล่า')) &&
+          (n.includes('น้ำดื่ม') || n.includes('น้ำเปล่า'))) ||
+        n.includes(target) ||
+        target.includes(n)
       );
     })?.ingredient_id;
   };
@@ -609,61 +618,36 @@ async function main() {
     { menuName: 'ข้าวเหนียว', ingName: 'ข้าวเหนียว', qty: 0.15 },
   ];
 
-  // ล้างความสัมพันธ์เก่าที่ตกค้างหรืออ้างอิง ID ที่ไม่มีอยู่จริง (ป้องกัน 500 error)
+  // ล้างข้อมูลสูตรเดิมทั้งหมดใน MENU_INGREDIENTS เพื่อเคลียร์ข้อมูลทดสอบที่ผิดพลาดตกค้างออกให้หมด 100%
   try {
-    await prisma.$executeRawUnsafe(`
-      DELETE FROM MENU_INGREDIENTS 
-      WHERE ingredient_id NOT IN (SELECT ingredient_id FROM INGREDIENTS)
-         OR menu_id NOT IN (SELECT menu_id FROM MENUS);
-    `);
-    await prisma.$executeRawUnsafe(`
-      DELETE FROM MENU_ALLERGENS 
-      WHERE allergen_id NOT IN (SELECT allergen_id FROM ALLERGENS)
-         OR menu_id NOT IN (SELECT menu_id FROM MENUS);
-    `);
-    console.log('🧹 ทำความสะอาดข้อมูลความสัมพันธ์ตกค้างเรียบร้อยแล้ว');
+    await prisma.menuIngredient.deleteMany({});
+    console.log('🧹 ล้างข้อมูลสูตรเดิมตกค้างใน MENU_INGREDIENTS ทั้งหมดเรียบร้อยแล้ว');
   } catch (e) {
-    console.warn('Orphan cleanup notice:', e.message);
+    console.warn('Clear menuIngredient notice:', e.message);
   }
 
   let addedRecipes = 0;
   for (const r of recipes) {
-    const mId = getMenuId(r.menuName);
+    const menuIds = getMenuIds(r.menuName);
     const iId = getIngId(r.ingName);
-    if (mId && iId) {
-      const existingMI = await prisma.menuIngredient.findUnique({
-        where: {
-          menu_id_ingredient_id: {
-            menu_id: mId,
-            ingredient_id: iId,
-          },
-        },
-      });
-      if (!existingMI) {
-        await prisma.menuIngredient.create({
-          data: {
-            menu_id: mId,
-            ingredient_id: iId,
-            quantity_used: r.qty,
-          },
-        });
-        addedRecipes++;
-      } else {
-        await prisma.menuIngredient.update({
-          where: {
-            menu_id_ingredient_id: {
+    if (menuIds.length > 0 && iId) {
+      for (const mId of menuIds) {
+        try {
+          await prisma.menuIngredient.create({
+            data: {
               menu_id: mId,
               ingredient_id: iId,
+              quantity_used: r.qty,
             },
-          },
-          data: {
-            quantity_used: r.qty,
-          },
-        });
+          });
+          addedRecipes++;
+        } catch (e) {
+          // If already created for this menu, ignore
+        }
       }
     }
   }
-  console.log(`✅ บันทึกสูตรอาหารและการใช้วัตถุดิบเรียบร้อยแล้ว (${recipes.length} สูตรที่กำหนด)`);
+  console.log(`✅ บันทึกสูตรอาหารและการใช้วัตถุดิบเรียบร้อยแล้ว (${addedRecipes} รายการที่ผูก)`);
 
   console.log('🎉 Seeding ข้อมูลพื้นฐานเสร็จสิ้นสมบูรณ์!');
 }
