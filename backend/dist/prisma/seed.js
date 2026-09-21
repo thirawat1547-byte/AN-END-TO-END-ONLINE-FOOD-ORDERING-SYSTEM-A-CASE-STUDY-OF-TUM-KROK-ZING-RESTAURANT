@@ -399,7 +399,7 @@ async function main() {
     console.log(`✅ เตรียมข้อมูลวัตถุดิบเรียบร้อยแล้ว (${ingredients.length} รายการ)`);
     const allMenus = await prisma.menu.findMany();
     const allIngredients = await prisma.ingredient.findMany();
-    const normalizeName = (str) => str.replace(/\s+/g, '').replace(/กระเพรา/g, 'กะเพรา').replace(/\//g, '').toLowerCase();
+    const normalizeName = (str) => str.replace(/[\s\(\)\/\-\_]/g, '').replace(/กระเพรา/g, 'กะเพรา').toLowerCase();
     const getMenuIds = (name) => {
         const target = normalizeName(name);
         return allMenus
@@ -409,6 +409,8 @@ async function main() {
                 (target.includes('คะน้าหมู') && n.includes('คะน้าหมู')) ||
                 ((target.includes('ไก่ทอดปีก') || target.includes('ปีกไก่ทอด')) &&
                     (n.includes('ไก่ทอดปีก') || n.includes('ปีกไก่ทอด'))) ||
+                ((target.includes('ไก่ทอดสะโพก') || target.includes('สะโพกไก่ทอด')) &&
+                    (n.includes('ไก่ทอดสะโพก') || n.includes('สะโพกไก่ทอด'))) ||
                 (target.includes('โค้ก') && n.includes('โค้ก')) ||
                 ((target.includes('น้ำดื่ม') || target.includes('น้ำเปล่า')) &&
                     (n.includes('น้ำดื่ม') || n.includes('น้ำเปล่า'))) ||
@@ -512,8 +514,10 @@ async function main() {
         { menuName: 'ยำวุ้นเส้นทะเล', ingName: 'ถั่วลิสงคั่วบด', qty: 0.02 },
         { menuName: 'ไก่ทอด (สะโพก)', ingName: 'เนื้อสะโพกไก่', qty: 0.25 },
         { menuName: 'ไก่ทอด (สะโพก)', ingName: 'แป้งทอดกรอบ', qty: 0.03 },
-        { menuName: 'ไก่ทอด (ปีก)', ingName: 'ปีกไก่สด', qty: 0.20 },
+        { menuName: 'ไก่ทอด (ปีก)', ingName: 'ปีกไก่สด', qty: 0.2 },
         { menuName: 'ไก่ทอด (ปีก)', ingName: 'แป้งทอดกรอบ', qty: 0.02 },
+        { menuName: 'ปีกไก่ทอด', ingName: 'ปีกไก่สด', qty: 0.2 },
+        { menuName: 'ปีกไก่ทอด', ingName: 'แป้งทอดกรอบ', qty: 0.02 },
         { menuName: 'น้ำเก๊กฮวย', ingName: 'ดอกเก๊กฮวยอบแห้ง', qty: 1.0 },
         { menuName: 'โค้ก (กระป๋อง)', ingName: 'โค้กกระป๋อง', qty: 1.0 },
         { menuName: 'สไปรท์ (Sprite)', ingName: 'สไปรท์กระป๋อง', qty: 1.0 },

@@ -439,7 +439,7 @@ async function main() {
   const allIngredients = await prisma.ingredient.findMany();
 
   const normalizeName = (str: string) =>
-    str.replace(/\s+/g, '').replace(/กระเพรา/g, 'กะเพรา').replace(/\//g, '').toLowerCase();
+    str.replace(/[\s\(\)\/\-\_]/g, '').replace(/กระเพรา/g, 'กะเพรา').toLowerCase();
 
   const getMenuIds = (name: string): number[] => {
     const target = normalizeName(name);
@@ -451,6 +451,8 @@ async function main() {
           (target.includes('คะน้าหมู') && n.includes('คะน้าหมู')) ||
           ((target.includes('ไก่ทอดปีก') || target.includes('ปีกไก่ทอด')) &&
             (n.includes('ไก่ทอดปีก') || n.includes('ปีกไก่ทอด'))) ||
+          ((target.includes('ไก่ทอดสะโพก') || target.includes('สะโพกไก่ทอด')) &&
+            (n.includes('ไก่ทอดสะโพก') || n.includes('สะโพกไก่ทอด'))) ||
           (target.includes('โค้ก') && n.includes('โค้ก')) ||
           ((target.includes('น้ำดื่ม') || target.includes('น้ำเปล่า')) &&
             (n.includes('น้ำดื่ม') || n.includes('น้ำเปล่า'))) ||
@@ -595,9 +597,11 @@ async function main() {
     { menuName: 'ไก่ทอด (สะโพก)', ingName: 'เนื้อสะโพกไก่', qty: 0.25 },
     { menuName: 'ไก่ทอด (สะโพก)', ingName: 'แป้งทอดกรอบ', qty: 0.03 },
 
-    // 18. ไก่ทอด (ปีก)
-    { menuName: 'ไก่ทอด (ปีก)', ingName: 'ปีกไก่สด', qty: 0.20 },
+    // 18. ไก่ทอด (ปีก) / ปีกไก่ทอด
+    { menuName: 'ไก่ทอด (ปีก)', ingName: 'ปีกไก่สด', qty: 0.2 },
     { menuName: 'ไก่ทอด (ปีก)', ingName: 'แป้งทอดกรอบ', qty: 0.02 },
+    { menuName: 'ปีกไก่ทอด', ingName: 'ปีกไก่สด', qty: 0.2 },
+    { menuName: 'ปีกไก่ทอด', ingName: 'แป้งทอดกรอบ', qty: 0.02 },
 
     // 19. น้ำเก๊กฮวย
     { menuName: 'น้ำเก๊กฮวย', ingName: 'ดอกเก๊กฮวยอบแห้ง', qty: 1.0 },
