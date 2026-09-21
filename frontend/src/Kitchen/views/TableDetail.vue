@@ -144,6 +144,7 @@ const fetchTableDetail = async () => {
     if (targetTable) {
       tableData.value.id = targetTable.table_number || `T-0${targetTable.table_id}`
       tableData.value.table_id = targetTable.table_id
+      tableData.value.capacity = Number(targetTable.capacity) || 4
 
       // สร้าง QR Code ตามโต๊ะ
       await generateQr()
@@ -160,7 +161,7 @@ const fetchTableDetail = async () => {
         tableData.value.status = 'กำลังทาน (OCCUPIED)'
         const firstOrder = tableOrders[tableOrders.length - 1]
         tableData.value.time = new Date(firstOrder.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
-        tableData.value.customers = targetTable.capacity || 4
+        tableData.value.customers = Math.min(2, tableData.value.capacity)
 
         // รวมรายการอาหารจากออเดอร์ที่ค้างอยู่ของโต๊ะนี้
         const itemsList = []
@@ -202,13 +203,14 @@ const fetchTableDetail = async () => {
         qrTab.value = 'order'
       }
 
-      // โหลดจำนวนลูกค้าที่บันทึกไว้ในระบบ (ถ้ามี)
+      // โหลดจำนวนลูกค้าที่บันทึกไว้ในระบบ (จำกัดไม่ให้เกินความจุโต๊ะตามรูปที่ 2 เด็ดขาด)
+      const cap = Number(tableData.value.capacity) || 4
       const guestKey = `table_guests_${tableData.value.table_id || paramValue.value}`
       const savedGuests = localStorage.getItem(guestKey)
       if (savedGuests && Number(savedGuests) > 0) {
-        tableData.value.customers = Number(savedGuests)
+        tableData.value.customers = Math.max(1, Math.min(cap, Number(savedGuests)))
       } else if (tableData.value.status.includes('OCCUPIED') || tableData.value.status.includes('กำลังทาน')) {
-        tableData.value.customers = tableData.value.customers || 2
+        tableData.value.customers = Math.min(2, cap)
       }
     }
   } catch (err) {
@@ -226,16 +228,27 @@ const subtotal = computed(() => {
 const discount = computed(() => 0.00)
 const netTotal = computed(() => subtotal.value - discount.value)
 
+const availableGuestPresets = computed(() => {
+  const cap = Number(tableData.value.capacity) || 4
+  const presets = []
+  for (let i = 1; i <= cap; i++) {
+    presets.push(i)
+  }
+  return presets
+})
+
 const changeCustomers = (delta) => {
-  tableData.value.customers = Math.max(0, tableData.value.customers + delta)
+  const cap = Number(tableData.value.capacity) || 4
+  tableData.value.customers = Math.max(1, Math.min(cap, (tableData.value.customers || 1) + delta))
   const guestKey = `table_guests_${tableData.value.table_id || paramValue.value}`
   localStorage.setItem(guestKey, String(tableData.value.customers))
 }
 
 const setCustomers = (num) => {
-  tableData.value.customers = num
+  const cap = Number(tableData.value.capacity) || 4
+  tableData.value.customers = Math.max(1, Math.min(cap, num))
   const guestKey = `table_guests_${tableData.value.table_id || paramValue.value}`
-  localStorage.setItem(guestKey, String(num))
+  localStorage.setItem(guestKey, String(tableData.value.customers))
 }
 
 const toggleTableStatus = async () => {
@@ -247,13 +260,16 @@ const toggleTableStatus = async () => {
       await axios.patch(`${API_BASE}/tables/${tableData.value.table_id}/status`, { status: newStatus })
     }
     const guestKey = `table_guests_${tableData.value.table_id || paramValue.value}`
+    const cap = Number(tableData.value.capacity) || 4
     if (newStatus === 'AVAILABLE') {
       localStorage.removeItem(guestKey)
       tableData.value.status = 'ว่าง (AVAILABLE)'
       tableData.value.customers = 0
     } else {
       if (tableData.value.customers <= 0) {
-        tableData.value.customers = 2
+        tableData.value.customers = Math.min(2, cap)
+      } else {
+        tableData.value.customers = Math.max(1, Math.min(cap, tableData.value.customers))
       }
       localStorage.setItem(guestKey, String(tableData.value.customers))
       tableData.value.status = 'กำลังทาน (OCCUPIED)'
@@ -303,7 +319,10 @@ const confirmPayment = async () => {
       await axios.patch(`${API_BASE}/tables/${targetTableId}/status`, { status: 'AVAILABLE' }).catch(() => {})
     }
 
+    const guestKey = `table_guests_${tableData.value.table_id || paramValue.value}`
+    localStorage.removeItem(guestKey)
     tableData.value.status = 'ว่าง (AVAILABLE)'
+    tableData.value.customers = 0
     orders.value = []
     activeOrderIds.value = []
 
@@ -439,7 +458,10 @@ const forceClear = async () => {
       if (tableData.value.table_id) {
         await axios.patch(`${API_BASE}/tables/${tableData.value.table_id}/status`, { status: 'AVAILABLE' }).catch(() => {})
       }
+      const guestKey = `table_guests_${tableData.value.table_id || paramValue.value}`
+      localStorage.removeItem(guestKey)
       tableData.value.status = 'ว่าง (AVAILABLE)'
+      tableData.value.customers = 0
       orders.value = []
       activeOrderIds.value = []
       router.push('/kitchen/manage')
@@ -619,17 +641,25 @@ const goBack = () => {
             <div style="background-color: #EFECE3; border-radius: 20px; padding: 20px; border: 1px solid rgba(227,222,195,0.8); display: flex; flex-direction: column; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
               <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
                 <div>
-                  <p style="font-size: 11px; font-weight: 700; color: #4B5563; letter-spacing: 0.5px; margin: 0;">จำนวนลูกค้า (DINERS)</p>
+                  <p style="font-size: 11px; font-weight: 700; color: #4B5563; letter-spacing: 0.5px; margin: 0;">
+                    จำนวนลูกค้า (DINERS) - ความจุโต๊ะ {{ tableData.capacity }} ที่นั่ง
+                  </p>
                   <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px;">
                     <button
                       @click="changeCustomers(-1)"
+                      :disabled="tableData.customers <= 1"
                       style="width: 34px; height: 34px; border-radius: 10px; background-color: white; border: 1px solid #D1D5DB; font-weight: bold; color: #374151; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.02);"
+                      :style="tableData.customers <= 1 ? 'opacity: 0.4; cursor: not-allowed;' : ''"
+                      title="ลดจำนวนคน"
                     >-</button>
-                    <span style="font-size: 22px; font-weight: 800; color: #111827; min-width: 32px; text-align: center;">{{ tableData.customers }}</span>
-                    <span style="font-size: 14px; font-weight: 600; color: #4B5563;">คน</span>
+                    <span style="font-size: 24px; font-weight: 800; color: #111827; min-width: 32px; text-align: center;">{{ tableData.customers }}</span>
+                    <span style="font-size: 14px; font-weight: 600; color: #4B5563;">/ {{ tableData.capacity }} คน</span>
                     <button
                       @click="changeCustomers(1)"
+                      :disabled="tableData.customers >= tableData.capacity"
                       style="width: 34px; height: 34px; border-radius: 10px; background-color: white; border: 1px solid #D1D5DB; font-weight: bold; color: #374151; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.02);"
+                      :style="tableData.customers >= tableData.capacity ? 'opacity: 0.4; cursor: not-allowed;' : ''"
+                      title="เพิ่มจำนวนคน (ไม่เกินความจุโต๊ะ)"
                     >+</button>
                   </div>
                 </div>
@@ -643,15 +673,17 @@ const goBack = () => {
                 </button>
               </div>
 
-              <!-- Quick Diners Presets -->
+              <!-- Quick Diners Presets (จำกัดตามความจุโต๊ะจริง ไม่เกินความจุ) -->
               <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; border-top: 1px solid rgba(209,213,219,0.5); padding-top: 10px;">
-                <span style="font-size: 12px; font-weight: 600; color: #6B7280; margin-right: 4px;">กดเลือกจำนวนคนด่วน:</span>
+                <span style="font-size: 12px; font-weight: 600; color: #6B7280; margin-right: 4px;">
+                  เลือกจำนวนคน (สูงสุด {{ tableData.capacity }} คน):
+                </span>
                 <button
-                  v-for="num in [1, 2, 3, 4, 6, 8]"
+                  v-for="num in availableGuestPresets"
                   :key="num"
                   @click="setCustomers(num)"
                   :style="{
-                    padding: '5px 12px',
+                    padding: '5px 14px',
                     borderRadius: '8px',
                     fontSize: '12px',
                     fontWeight: '700',

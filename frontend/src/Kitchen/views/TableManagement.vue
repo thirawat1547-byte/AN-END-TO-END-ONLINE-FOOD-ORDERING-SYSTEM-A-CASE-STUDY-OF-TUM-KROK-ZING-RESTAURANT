@@ -23,16 +23,27 @@ const isTableOpenModalVisible = ref(false)
 const selectedOpenTable = ref(null)
 const openTableGuests = ref(2)
 
+const getAvailablePresets = (capacity) => {
+  const cap = Number(capacity) || 4
+  const list = []
+  for (let i = 1; i <= cap; i++) {
+    list.push(i)
+  }
+  return list
+}
+
 const openTableModal = (table) => {
   selectedOpenTable.value = table
-  openTableGuests.value = table.seats > 0 ? table.seats : Math.min(2, table.capacity || 4)
+  const cap = Number(table.capacity) || 4
+  openTableGuests.value = table.seats > 0 ? Math.min(cap, table.seats) : Math.min(2, cap)
   isTableOpenModalVisible.value = true
 }
 
 const confirmOpenTable = async () => {
   if (!selectedOpenTable.value) return
   const t = selectedOpenTable.value
-  const guests = Math.max(1, openTableGuests.value)
+  const cap = Number(t.capacity) || 4
+  const guests = Math.max(1, Math.min(cap, openTableGuests.value))
   
   try {
     if (t.table_id) {
@@ -76,8 +87,9 @@ const adjustTableGuests = (table, delta) => {
     openTableModal(table)
     return
   }
+  const cap = Number(table.capacity) || 4
   const current = Number(table.seats) || 1
-  const updated = Math.max(1, Math.min(table.capacity * 2, current + delta))
+  const updated = Math.max(1, Math.min(cap, current + delta))
   table.seats = updated
   localStorage.setItem(`table_guests_${table.table_id || table.id}`, String(updated))
 }
@@ -124,11 +136,12 @@ const fetchTablesData = async () => {
         currentStatus = 'billing'
       }
 
-      // ดึงจำนวนแขกที่นั่งจาก localStorage (ถ้ามีบันทึกไว้) หรือคำนวณ
+      // ดึงจำนวนแขกที่นั่งจาก localStorage (จำกัดไม่เกินความจุโต๊ะตามรูปที่ 2)
+      const cap = Number(t.capacity) || 4
       const savedGuests = localStorage.getItem(`table_guests_${t.table_id || t.table_number}`)
       let guestCount = 0
       if (currentStatus === 'occupied' || currentStatus === 'billing') {
-        guestCount = savedGuests ? Number(savedGuests) : (activeOrders.length > 0 ? 2 : 2)
+        guestCount = savedGuests ? Math.max(1, Math.min(cap, Number(savedGuests))) : Math.min(2, cap)
       }
 
       return {
@@ -598,14 +611,18 @@ const handleAddTable = async () => {
                 <div style="display: flex; align-items: center; gap: 6px;">
                   <button 
                     @click.stop="adjustTableGuests(table, -1)" 
+                    :disabled="table.seats <= 1"
                     style="width: 22px; height: 22px; border-radius: 6px; background: white; border: 1px solid #D1D5DB; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #374151; font-size: 13px;"
+                    :style="table.seats <= 1 ? 'opacity: 0.4; cursor: not-allowed;' : ''"
                     title="ลดจำนวนคน"
                   >-</button>
                   <b style="font-size: 14px; color: #111827; min-width: 14px; text-align: center;">{{ table.seats }}</b>
                   <button 
                     @click.stop="adjustTableGuests(table, 1)" 
+                    :disabled="table.seats >= table.capacity"
                     style="width: 22px; height: 22px; border-radius: 6px; background: white; border: 1px solid #D1D5DB; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #374151; font-size: 13px;"
-                    title="เพิ่มจำนวนคน"
+                    :style="table.seats >= table.capacity ? 'opacity: 0.4; cursor: not-allowed;' : ''"
+                    title="เพิ่มจำนวนคน (ไม่เกินความจุโต๊ะ)"
                   >+</button>
                   <span style="font-size: 11px; color: #6B7280;">/ {{ table.capacity }} ที่</span>
                 </div>
@@ -688,26 +705,32 @@ const handleAddTable = async () => {
 
         <!-- Guest count input / Stepper -->
         <div style="display: flex; flex-direction: column; gap: 10px;">
-          <label style="font-size: 13px; font-weight: 700; color: #374151;">ระบุจำนวนลูกค้าที่นั่ง:</label>
+          <label style="font-size: 13px; font-weight: 700; color: #374151;">ระบุจำนวนลูกค้าที่นั่ง (สูงสุด {{ selectedOpenTable.capacity }} คน):</label>
           <div style="display: flex; align-items: center; justify-content: center; gap: 16px; background-color: #F9FAFB; padding: 12px; border-radius: 16px; border: 1.5px solid #E5E7EB;">
             <button
               @click="openTableGuests = Math.max(1, openTableGuests - 1)"
+              :disabled="openTableGuests <= 1"
               style="width: 40px; height: 40px; border-radius: 12px; background: white; border: 1px solid #D1D5DB; font-size: 20px; font-weight: bold; color: #374151; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);"
+              :style="openTableGuests <= 1 ? 'opacity: 0.4; cursor: not-allowed;' : ''"
+              title="ลดจำนวนคน"
             >-</button>
             <div style="font-size: 28px; font-weight: 900; color: #111827; min-width: 48px; text-align: center;">
               {{ openTableGuests }}
             </div>
             <button
-              @click="openTableGuests = openTableGuests + 1"
+              @click="openTableGuests = Math.min(selectedOpenTable.capacity, openTableGuests + 1)"
+              :disabled="openTableGuests >= selectedOpenTable.capacity"
               style="width: 40px; height: 40px; border-radius: 12px; background: white; border: 1px solid #D1D5DB; font-size: 20px; font-weight: bold; color: #374151; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);"
+              :style="openTableGuests >= selectedOpenTable.capacity ? 'opacity: 0.4; cursor: not-allowed;' : ''"
+              title="เพิ่มจำนวนคน"
             >+</button>
-            <span style="font-size: 16px; font-weight: 600; color: #4B5563;">คน</span>
+            <span style="font-size: 15px; font-weight: 600; color: #4B5563;">/ {{ selectedOpenTable.capacity }} คน</span>
           </div>
 
           <!-- Quick Presets -->
           <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px;">
             <button
-              v-for="num in [1, 2, 3, 4, 6, 8]"
+              v-for="num in getAvailablePresets(selectedOpenTable.capacity)"
               :key="num"
               @click="openTableGuests = num"
               :style="{
