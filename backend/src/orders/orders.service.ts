@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import { OrdersGateway } from './orders.gateway';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 
@@ -9,6 +10,7 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly settingsService: SettingsService,
+    private readonly ordersGateway: OrdersGateway,
   ) {}
 
   // 1. รับคำสั่งซื้อและคำนวณราคาแบบ Transaction
@@ -23,7 +25,7 @@ export class OrdersService {
       throw new BadRequestException('รายการสั่งซื้อต้องมีอาหารอย่างน้อย 1 รายการ');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const createdOrder = await this.prisma.$transaction(async (tx) => {
       let totalAmount = 0;
       const orderItemsData = [];
 
@@ -192,6 +194,15 @@ export class OrdersService {
 
       return order;
     });
+
+    // ส่งสัญญาณแจ้งเตือนออเดอร์ใหม่ (new_order) ผ่าน WebSocket ไปยังหน้าจอครัว (KDS) ทันที
+    try {
+      this.ordersGateway.sendNewOrder(createdOrder);
+    } catch (wsErr) {
+      console.warn('[WebSocket] ไม่สามารถส่งสัญญาณ new_order:', wsErr);
+    }
+
+    return createdOrder;
   }
 
   // 2. ดึงรายการออร์เดอร์ทั้งหมด (รองรับตัวกรอง status, tableId, orderType)
@@ -399,6 +410,13 @@ export class OrdersService {
           }
         }
       }
+    }
+
+    // ส่งสัญญาณแจ้งเตือนการเปลี่ยนสถานะออเดอร์ผ่าน WebSocket
+    try {
+      this.ordersGateway.sendOrderStatusUpdated(updated);
+    } catch (wsErr) {
+      console.warn('[WebSocket] ไม่สามารถส่งสัญญาณ order_status_updated:', wsErr);
     }
 
     return updated;

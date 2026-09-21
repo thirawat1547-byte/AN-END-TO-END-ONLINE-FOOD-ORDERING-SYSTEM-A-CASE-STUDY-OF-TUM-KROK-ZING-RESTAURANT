@@ -2,12 +2,80 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import axios from 'axios'
 import { API_BASE } from '../../config/api'
+import { socket } from '../../config/socket'
 
 const activeTab = ref('incoming')
 const incomingOrders = ref([])
 const completedOrders = ref([])
 const isLoading = ref(false)
+const isSocketConnected = ref(socket.connected)
+const newOrderNotification = ref(null)
 let pollingTimer = null
+
+// ฟังก์ชันจำลองเสียงกระดิ่งแจ้งเตือนออเดอร์ใหม่ (Web Audio API)
+const playChime = () => {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext
+    if (!AudioCtx) return
+    const ctx = new AudioCtx()
+    const now = ctx.currentTime
+
+    // โน้ตที่ 1 (D5)
+    const osc1 = ctx.createOscillator()
+    const gain1 = ctx.createGain()
+    osc1.type = 'sine'
+    osc1.frequency.setValueAtTime(587.33, now)
+    gain1.gain.setValueAtTime(0.2, now)
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.25)
+    osc1.connect(gain1)
+    gain1.connect(ctx.destination)
+    osc1.start(now)
+    osc1.stop(now + 0.25)
+
+    // โน้ตที่ 2 (A5)
+    const osc2 = ctx.createOscillator()
+    const gain2 = ctx.createGain()
+    osc2.type = 'sine'
+    osc2.frequency.setValueAtTime(880, now + 0.15)
+    gain2.gain.setValueAtTime(0.25, now + 0.15)
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45)
+    osc2.connect(gain2)
+    gain2.connect(ctx.destination)
+    osc2.start(now + 0.15)
+    osc2.stop(now + 0.45)
+  } catch (e) {
+    console.warn('ไม่สามารถเล่นเสียงแจ้งเตือนได้:', e)
+  }
+}
+
+// จัดการ Event เมื่อมีออเดอร์ใหม่ส่งมาจาก Backend ผ่าน WebSocket
+const onNewOrderReceived = (order) => {
+  console.log('⚡ [KDS Real-time] มีออเดอร์ใหม่เข้ามา:', order)
+  playChime()
+  fetchOrders()
+
+  const orderNum = order?.order_id || order?.id || ''
+  const tableLabel = order?.table?.table_number ? ` (โต๊ะ ${order.table.table_number})` : ''
+  newOrderNotification.value = `🔔 มีคำสั่งซื้อใหม่ #${orderNum}${tableLabel} เข้ามาแล้ว!`
+
+  setTimeout(() => {
+    newOrderNotification.value = null
+  }, 5000)
+}
+
+const onOrderStatusChanged = (order) => {
+  console.log('⚡ [KDS Real-time] สถานะออเดอร์เปลี่ยนแปลง:', order)
+  fetchOrders()
+}
+
+const onSocketConnect = () => {
+  isSocketConnected.value = true
+}
+
+const onSocketDisconnect = () => {
+  isSocketConnected.value = false
+}
+
 
 // ฟังก์ชันดึงรายละเอียด/หมายเหตุที่ลูกค้าเลือก (ความเผ็ด, ไม่ใส่ผัก, โน้ตเพิ่มเติม)
 const extractNote = (oi) => {
@@ -121,14 +189,26 @@ const recallOrder = async (orderId) => {
 
 onMounted(() => {
   fetchOrders()
-  // เช็กออเดอร์ใหม่อัตโนมัติทุกๆ 5 วินาที
-  pollingTimer = setInterval(fetchOrders, 5000)
+
+  // เชื่อมต่อ Event ของ Socket.io
+  isSocketConnected.value = socket.connected
+  socket.on('connect', onSocketConnect)
+  socket.on('disconnect', onSocketDisconnect)
+  socket.on('new_order', onNewOrderReceived)
+  socket.on('order_status_updated', onOrderStatusChanged)
+
+  // Polling สำรองทุก 20 วินาที เพื่อความเสถียรสูงสุด
+  pollingTimer = setInterval(fetchOrders, 20000)
 })
 
 onBeforeUnmount(() => {
   if (pollingTimer) {
     clearInterval(pollingTimer)
   }
+  socket.off('connect', onSocketConnect)
+  socket.off('disconnect', onSocketDisconnect)
+  socket.off('new_order', onNewOrderReceived)
+  socket.off('order_status_updated', onOrderStatusChanged)
 })
 </script>
 
@@ -140,6 +220,29 @@ onBeforeUnmount(() => {
       <div style="display: flex; align-items: baseline; gap: 12px;">
         <h1 style="font-size: 20px; font-weight: 500; margin: 0; letter-spacing: 0.5px;">Kitchen Monitor</h1>
         <span style="font-size: 14px; opacity: 0.85;">จอแสดงผลห้องครัว</span>
+        <span 
+          :style="{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '3px 10px',
+            borderRadius: '9999px',
+            fontSize: '12px',
+            backgroundColor: isSocketConnected ? 'rgba(74, 222, 128, 0.25)' : 'rgba(239, 68, 68, 0.25)',
+            color: isSocketConnected ? '#BBF7D0' : '#FECACA',
+            border: `1px solid ${isSocketConnected ? 'rgba(74, 222, 128, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`
+          }"
+        >
+          <span 
+            :style="{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: isSocketConnected ? '#4ADE80' : '#EF4444'
+            }"
+          ></span>
+          {{ isSocketConnected ? 'Live Socket.io' : 'Connecting...' }}
+        </span>
       </div>
       
       <div style="display: flex; align-items: center; gap: 24px; color: rgba(255,255,255,0.9); font-size: 18px;">
@@ -149,6 +252,15 @@ onBeforeUnmount(() => {
         </button>
       </div>
     </header>
+
+    <!-- Real-time New Order Banner -->
+    <div 
+      v-if="newOrderNotification" 
+      style="background: linear-gradient(90deg, #F59E0B, #EAB308); color: white; padding: 12px 24px; font-weight: 600; text-align: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px;"
+    >
+      <span>🔔</span>
+      <span>{{ newOrderNotification }}</span>
+    </div>
 
     <!-- Content Area -->
     <div style="padding: 32px; display: flex; flex-direction: column; gap: 24px;">
