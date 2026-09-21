@@ -52,7 +52,10 @@ const THAI_MAP = {
   'glass noodles': { name: 'วุ้นเส้น', unit: 'ห่อ' },
   'peanuts': { name: 'ถั่วลิสงคั่วบด', unit: 'กก.' },
   'dried shrimp': { name: 'กุ้งแห้ง', unit: 'กก.' },
-  'curry paste': { name: 'พริกแกงเผ็ด', unit: 'กก.' }
+  'curry paste': { name: 'พริกแกงเผ็ด', unit: 'กก.' },
+  'crispy flour': { name: 'แป้งทอดกรอบ', unit: 'กรัม' },
+  'herbs for larb': { name: 'ผักเคียง/เครื่องลาบ', unit: 'กรัม' },
+  'herbs for yum': { name: 'ผักเคียง/เครื่องยำ', unit: 'กรัม' }
 }
 
 const UNIT_TRANSLATIONS = {
@@ -105,11 +108,12 @@ function getThaiUnit(unit, name = '') {
   return unit
 }
 
-// ดึงข้อมูลคลังวัตถุดิบจาก Backend ทันทีที่เปิดหน้าเว็บ
+// ดึงข้อมูลคลังวัตถุดิบและรายการอาหารพร้อมสูตรจริงจาก Backend ทันทีที่เปิดหน้าเว็บ
 onMounted(async () => {
-  if (typeof adminStore.fetchInventoryFromAPI === 'function') {
-    await adminStore.fetchInventoryFromAPI()
-  }
+  await Promise.all([
+    adminStore.fetchInventoryFromAPI ? adminStore.fetchInventoryFromAPI() : null,
+    adminStore.fetchMenusFromAPI ? adminStore.fetchMenusFromAPI() : null
+  ])
 })
 
 const activeTab = ref('stock') // 'stock' or 'recipes'
@@ -220,16 +224,29 @@ function deleteIng(id) {
   }
 }
 
-// Recipes formulation helpers
+// Recipes formulation helpers (ดึงสูตรจากฐานข้อมูลของเพื่อนก่อนเป็นอันดับแรก)
 function getMenuIngredients(menuId) {
+  const targetMenu = adminStore.menus.find(m => m.menu_id === menuId)
+  if (targetMenu && targetMenu.ingredients && targetMenu.ingredients.length > 0) {
+    return targetMenu.ingredients.map(mi => {
+      const ing = adminStore.ingredients.find(i => i.ingredient_id === mi.ingredient_id)
+      return {
+        ...mi,
+        ingredient_name: ing ? getThaiName(ing.ingredient_name) : (getThaiName(mi.ingredient_name) || 'วัตถุดิบ'),
+        unit: ing ? getThaiUnit(ing.unit, ing.ingredient_name) : (getThaiUnit(mi.unit, mi.ingredient_name) || ''),
+        in_stock: ing ? ing.quantity_in_stock : (mi.in_stock || 0)
+      }
+    })
+  }
+
   return adminStore.menuIngredients
     .filter(mi => mi.menu_id === menuId)
     .map(mi => {
       const ing = adminStore.ingredients.find(i => i.ingredient_id === mi.ingredient_id)
       return {
         ...mi,
-        ingredient_name: ing ? getThaiName(ing.ingredient_name) : 'วัตถุดิบ',
-        unit: ing ? getThaiUnit(ing.unit, ing.ingredient_name) : '',
+        ingredient_name: ing ? getThaiName(ing.ingredient_name) : (getThaiName(mi.ingredient_name) || 'วัตถุดิบ'),
+        unit: ing ? getThaiUnit(ing.unit, ing.ingredient_name) : (getThaiUnit(mi.unit, mi.ingredient_name) || ''),
         in_stock: ing ? ing.quantity_in_stock : 0
       }
     })
@@ -246,6 +263,81 @@ function getMaxPortions(menuId) {
     }
   }
   return minPortions === Infinity ? '-' : minPortions + ' จาน'
+}
+
+// Recipe editing / formulation modal state
+const isRecipeModalOpen = ref(false)
+const selectedMenuForRecipe = ref(null)
+const recipeEditingItems = ref([])
+const newRecipeIngId = ref('')
+const newRecipeQty = ref(15)
+const isSavingRecipe = ref(false)
+
+function openRecipeModal(menu) {
+  selectedMenuForRecipe.value = menu
+  const currentReqs = getMenuIngredients(menu.menu_id)
+  recipeEditingItems.value = currentReqs.map(r => ({
+    ingredient_id: r.ingredient_id,
+    quantity_used: Number(r.quantity_used),
+    ingredient_name: r.ingredient_name,
+    unit: r.unit,
+    in_stock: r.in_stock
+  }))
+  newRecipeIngId.value = ''
+  newRecipeQty.value = 15
+  isRecipeModalOpen.value = true
+}
+
+function addIngredientToRecipe() {
+  if (!newRecipeIngId.value) return
+  const ingId = Number(newRecipeIngId.value)
+  const existing = recipeEditingItems.value.find(i => i.ingredient_id === ingId)
+  if (existing) {
+    existing.quantity_used = Math.round(((Number(existing.quantity_used) || 0) + (Number(newRecipeQty.value) || 1)) * 100) / 100
+    newRecipeIngId.value = ''
+    return
+  }
+
+  const ing = adminStore.ingredients.find(i => i.ingredient_id === ingId)
+  recipeEditingItems.value.push({
+    ingredient_id: ingId,
+    quantity_used: Number(newRecipeQty.value) || 1,
+    ingredient_name: ing ? getThaiName(ing.ingredient_name) : 'วัตถุดิบ',
+    unit: ing ? getThaiUnit(ing.unit, ing.ingredient_name) : '',
+    in_stock: ing ? ing.quantity_in_stock : 0
+  })
+  newRecipeIngId.value = ''
+  newRecipeQty.value = 15
+}
+
+function removeIngredientFromRecipe(index) {
+  recipeEditingItems.value.splice(index, 1)
+}
+
+async function saveRecipeFormula() {
+  if (!selectedMenuForRecipe.value) return
+  isSavingRecipe.value = true
+  try {
+    const payload = recipeEditingItems.value
+      .filter(item => Number(item.quantity_used) > 0)
+      .map(item => ({
+        ingredient_id: item.ingredient_id,
+        quantity_used: Number(item.quantity_used)
+      }))
+
+    const ok = await adminStore.updateMenuRecipeAPI(selectedMenuForRecipe.value.menu_id, payload)
+    if (ok) {
+      alert(`🎉 บันทึกสูตรอาหาร "${selectedMenuForRecipe.value.menu_name}" ลงฐานข้อมูลเรียบร้อยแล้ว!`)
+      isRecipeModalOpen.value = false
+    } else {
+      alert('เกิดข้อผิดพลาดในการบันทึกสูตรอาหาร กรุณาลองใหม่อีกครั้ง')
+    }
+  } catch (err) {
+    console.error('Save recipe error:', err)
+    alert('เกิดข้อผิดพลาด: ' + err.message)
+  } finally {
+    isSavingRecipe.value = false
+  }
 }
 </script>
 
@@ -466,6 +558,14 @@ function getMaxPortions(menuId) {
                 <h3 class="font-bold text-sm text-slate-900 truncate">{{ menu.menu_name }}</h3>
                 <p class="text-slate-400 text-xs">฿{{ menu.price }} | ทำได้สูงสุด: <b class="text-emerald-600">{{ getMaxPortions(menu.menu_id) }}</b></p>
               </div>
+              <button
+                @click="openRecipeModal(menu)"
+                class="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-[#2d5a43] text-[#2d5a43] hover:text-white font-bold text-xs transition flex items-center gap-1 border border-emerald-200/80 shadow-sm flex-shrink-0"
+                title="แก้ไขสูตรหรือผูกวัตถุดิบเข้ากับเมนูนี้"
+              >
+                <span>⚙️</span>
+                <span>ผูก/แก้ไขสูตร</span>
+              </button>
             </div>
 
             <!-- Ingredients breakdown -->
@@ -486,10 +586,124 @@ function getMaxPortions(menuId) {
                 </div>
               </div>
               <div v-if="getMenuIngredients(menu.menu_id).length === 0" class="text-xs text-slate-400 italic py-2 text-center">
-                ยังไม่มีการผูกสูตรอาหาร
+                ยังไม่มีการผูกสูตรอาหาร (กดปุ่ม "ผูก/แก้ไขสูตร" เพื่อกำหนดวัตถุดิบ)
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: จัดการ/ผูกสูตรอาหาร (Recipe Formulation Modal) -->
+    <div v-if="isRecipeModalOpen && selectedMenuForRecipe" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 text-xs max-h-[90vh] flex flex-col">
+        <!-- Modal Header -->
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100 flex-shrink-0">
+          <div class="flex items-center gap-3">
+            <img :src="selectedMenuForRecipe.image_url" :alt="selectedMenuForRecipe.menu_name" class="w-10 h-10 rounded-xl object-cover">
+            <div>
+              <h3 class="font-bold text-base text-slate-900">
+                🍲 จัดการสูตรอาหาร: {{ selectedMenuForRecipe.menu_name }}
+              </h3>
+              <p class="text-[11px] text-slate-500">
+                กำหนดวัตถุดิบและสัดส่วนที่ใช้ต่อ 1 จาน (บันทึกลงตาราง MENU_INGREDIENTS)
+              </p>
+            </div>
+          </div>
+          <button @click="isRecipeModalOpen = false" class="text-slate-400 hover:text-slate-600 text-lg">✕</button>
+        </div>
+
+        <!-- Recipe Ingredients List -->
+        <div class="flex-1 overflow-y-auto space-y-3 pr-1">
+          <div v-if="recipeEditingItems.length === 0" class="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-400">
+            ยังไม่มีวัตถุดิบในสูตรนี้ กดเลือกวัตถุดิบด้านล่างเพื่อเพิ่มได้เลยครับ
+          </div>
+
+          <div 
+            v-for="(item, idx) in recipeEditingItems" 
+            :key="item.ingredient_id"
+            class="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80"
+          >
+            <div class="flex-1 min-w-0">
+              <div class="font-bold text-slate-800 truncate">{{ item.ingredient_name }}</div>
+              <div class="text-[10px] text-slate-400">คงเหลือในสต็อก: {{ item.in_stock }} {{ item.unit }}</div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <span class="text-slate-500 text-[11px]">ใช้ต่อ 1 จาน:</span>
+              <input 
+                type="number" 
+                step="0.01" 
+                min="0.01"
+                v-model.number="item.quantity_used"
+                class="w-20 px-2 py-1 rounded-lg bg-white border border-slate-300 font-bold text-slate-900 text-center text-xs focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none"
+              />
+              <span class="text-slate-600 font-bold w-10 text-xs">{{ item.unit }}</span>
+              <button 
+                @click="removeIngredientFromRecipe(idx)"
+                class="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                title="ลบวัตถุดิบนี้ออกจากสูตร"
+              >
+                🗑️
+              </button>
+            </div>
+          </div>
+
+          <!-- Add ingredient section -->
+          <div class="p-3 bg-emerald-50/50 rounded-xl border border-emerald-200/60 space-y-2 mt-3">
+            <label class="block font-bold text-slate-700 text-xs">➕ เพิ่มวัตถุดิบลงในสูตรอาหาร:</label>
+            <div class="flex items-center gap-2 flex-wrap">
+              <select 
+                v-model="newRecipeIngId"
+                class="flex-1 min-w-[140px] px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none font-semibold text-slate-800"
+              >
+                <option value="" disabled>-- เลือกวัตถุดิบจากคลัง --</option>
+                <option 
+                  v-for="ing in adminStore.ingredients" 
+                  :key="ing.ingredient_id" 
+                  :value="ing.ingredient_id"
+                >
+                  {{ getThaiName(ing.ingredient_name) }} (คงเหลือ {{ ing.quantity_in_stock }} {{ getThaiUnit(ing.unit, ing.ingredient_name) }})
+                </option>
+              </select>
+
+              <input 
+                type="number" 
+                step="0.01" 
+                min="0.01"
+                v-model.number="newRecipeQty"
+                placeholder="ปริมาณ"
+                class="w-20 px-2 py-1.5 rounded-xl bg-white border border-slate-200 font-bold text-slate-900 text-center text-xs focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none"
+              />
+
+              <button 
+                type="button"
+                @click="addIngredientToRecipe"
+                :disabled="!newRecipeIngId"
+                class="px-3 py-1.5 rounded-xl bg-[#2d5a43] hover:bg-[#183324] text-white font-bold text-xs shadow-sm transition disabled:opacity-50"
+              >
+                เพิ่มในสูตร
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 flex-shrink-0">
+          <button 
+            @click="isRecipeModalOpen = false" 
+            class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold text-xs transition"
+          >
+            ยกเลิก
+          </button>
+          <button 
+            @click="saveRecipeFormula"
+            :disabled="isSavingRecipe"
+            class="px-4 py-2 rounded-xl bg-[#2d5a43] hover:bg-[#183324] text-white font-bold text-xs shadow-md shadow-emerald-900/20 transition flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <span v-if="isSavingRecipe">⏳ กำลังบันทึก...</span>
+            <span v-else>💾 บันทึกสูตรอาหาร</span>
+          </button>
         </div>
       </div>
     </div>

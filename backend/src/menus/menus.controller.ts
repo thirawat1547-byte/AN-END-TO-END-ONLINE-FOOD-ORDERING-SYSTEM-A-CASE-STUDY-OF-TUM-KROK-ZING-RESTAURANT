@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Body,
   Patch,
   Param,
@@ -89,5 +90,25 @@ export class MenusController {
   @ApiParam({ name: 'id', description: 'รหัสเมนูอาหาร (menu_id)' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.menusService.remove(id);
+  }
+
+  @Put(':id/ingredients')
+  @ApiOperation({ summary: 'ผูกสูตรอาหาร / ปรับปรุงสัดส่วนวัตถุดิบ (Recipe Formulation)' })
+  @ApiParam({ name: 'id', description: 'รหัสเมนูอาหาร (menu_id)' })
+  updateIngredients(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { ingredients: Array<{ ingredient_id: number; quantity_used: number }> },
+  ) {
+    return this.menusService.updateIngredients(id, body.ingredients || []);
+  }
+
+  @Post(':id/ingredients')
+  @ApiOperation({ summary: 'ผูกสูตรอาหาร / ปรับปรุงสัดส่วนวัตถุดิบ (Recipe Formulation)' })
+  @ApiParam({ name: 'id', description: 'รหัสเมนูอาหาร (menu_id)' })
+  saveIngredients(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { ingredients: Array<{ ingredient_id: number; quantity_used: number }> },
+  ) {
+    return this.menusService.updateIngredients(id, body.ingredients || []);
   }
 }

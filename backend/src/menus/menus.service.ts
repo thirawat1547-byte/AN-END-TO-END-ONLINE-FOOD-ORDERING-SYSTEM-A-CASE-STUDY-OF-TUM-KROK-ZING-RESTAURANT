@@ -15,7 +15,7 @@ export class MenusService {
     });
   }
 
-  // 2. ดึงรายการอาหารทั้งหมด (กรองตามหมวดหมู่ / สถานะขาย)
+  // 2. ดึงรายการอาหารทั้งหมด (กรองตามหมวดหมู่ / สถานะขาย) พร้อมสูตรวัตถุดิบ
   async findAll(categoryId?: number, isAvailable?: boolean) {
     return this.prisma.menu.findMany({
       where: {
@@ -26,6 +26,9 @@ export class MenusService {
         category: true,
         allergens: {
           include: { allergen: true },
+        },
+        ingredients: {
+          include: { ingredient: true },
         },
       },
       orderBy: { menu_id: 'asc' },
@@ -69,5 +72,45 @@ export class MenusService {
     return this.prisma.menu.delete({
       where: { menu_id: id },
     });
+  }
+
+  // 6. ผูกสูตร / แก้ไขสูตรอาหารและสัดส่วนวัตถุดิบ (Recipe Formulation)
+  async updateIngredients(
+    menuId: number,
+    ingredients: Array<{ ingredient_id: number; quantity_used: number }>,
+  ) {
+    await this.findOne(menuId);
+
+    // ลบสูตรเดิมออกก่อน
+    await this.prisma.menuIngredient.deleteMany({
+      where: { menu_id: menuId },
+    });
+
+    // เพิ่มสูตรใหม่ที่ระบุ
+    if (ingredients && ingredients.length > 0) {
+      // ป้องกันค่าซ้ำกันในรายการเดียวกัน
+      const uniqueIngredients = [];
+      const seen = new Set();
+      for (const item of ingredients) {
+        const ingId = Number(item.ingredient_id);
+        const qty = Number(item.quantity_used);
+        if (ingId && qty > 0 && !seen.has(ingId)) {
+          seen.add(ingId);
+          uniqueIngredients.push({
+            menu_id: menuId,
+            ingredient_id: ingId,
+            quantity_used: qty,
+          });
+        }
+      }
+
+      if (uniqueIngredients.length > 0) {
+        await this.prisma.menuIngredient.createMany({
+          data: uniqueIngredients,
+        });
+      }
+    }
+
+    return this.findOne(menuId);
   }
 }

@@ -30,6 +30,13 @@ const INGREDIENT_DICT: Array<{ regex: RegExp; thaiName: string; thaiUnit: string
   { regex: /shrimp|prawn/i, thaiName: 'กุ้งสด', thaiUnit: 'กก.' },
   { regex: /squid|calamari/i, thaiName: 'ปลาหมึกสด', thaiUnit: 'กก.' },
   { regex: /seafood/i, thaiName: 'อาหารทะเลรวม', thaiUnit: 'กก.' },
+  { regex: /fermented\s*fish|plara/i, thaiName: 'น้ำปลาร้าปรุงสุก', thaiUnit: 'ขวด' },
+  { regex: /fish\s*sauce/i, thaiName: 'น้ำปลาแท้', thaiUnit: 'ขวด' },
+  { regex: /oyster\s*sauce/i, thaiName: 'ซอสหอยนางรม', thaiUnit: 'ขวด' },
+  { regex: /soy\s*sauce/i, thaiName: 'ซีอิ๊วขาว', thaiUnit: 'ขวด' },
+  { regex: /crispy\s*flour/i, thaiName: 'แป้งทอดกรอบ', thaiUnit: 'กรัม' },
+  { regex: /herbs?\s*for\s*larb/i, thaiName: 'ผักเคียง/เครื่องลาบ', thaiUnit: 'กรัม' },
+  { regex: /herbs?\s*for\s*yum/i, thaiName: 'ผักเคียง/เครื่องยำ', thaiUnit: 'กรัม' },
   { regex: /fish/i, thaiName: 'เนื้อปลาสด', thaiUnit: 'กก.' },
   { regex: /beef/i, thaiName: 'เนื้อวัวสด', thaiUnit: 'กก.' },
   { regex: /raw\s*papaya|green\s*papaya|papaya/i, thaiName: 'มะละกอดิบขูด', thaiUnit: 'กก.' },
@@ -45,10 +52,6 @@ const INGREDIENT_DICT: Array<{ regex: RegExp; thaiName: string; thaiUnit: string
   { regex: /mint|peppermint/i, thaiName: 'ใบสะระแหน่', thaiUnit: 'กก.' },
   { regex: /morning\s*glory/i, thaiName: 'ผักบุ้ง', thaiUnit: 'กก.' },
   { regex: /cucumber/i, thaiName: 'แตงกวา', thaiUnit: 'กก.' },
-  { regex: /fermented\s*fish|plara/i, thaiName: 'น้ำปลาร้าปรุงสุก', thaiUnit: 'ขวด' },
-  { regex: /fish\s*sauce/i, thaiName: 'น้ำปลาแท้', thaiUnit: 'ขวด' },
-  { regex: /oyster\s*sauce/i, thaiName: 'ซอสหอยนางรม', thaiUnit: 'ขวด' },
-  { regex: /soy\s*sauce/i, thaiName: 'ซีอิ๊วขาว', thaiUnit: 'ขวด' },
   { regex: /palm\s*sugar/i, thaiName: 'น้ำตาลปี๊บ', thaiUnit: 'กก.' },
   { regex: /sugar/i, thaiName: 'น้ำตาลทราย', thaiUnit: 'กก.' },
   { regex: /msg|monosodium/i, thaiName: 'ผงชูรส', thaiUnit: 'กรัม' },
@@ -124,6 +127,12 @@ export class IngredientsService implements OnModuleInit {
       const cleanUnit = (newUnit || '').toLowerCase().trim();
       if (UNIT_MAP[cleanUnit]) {
         newUnit = UNIT_MAP[cleanUnit];
+      }
+
+      // แก้ไขกรณีวัตถุดิบเดิมที่เคยถูกแปลผิดเป็น 'เนื้อปลาสด' ทั้งที่ในสูตรอาหารใช้เป็นน้ำปลาแท้
+      if ((item.ingredient_id === 5 || item.ingredient_id === 16) && newName === 'เนื้อปลาสด') {
+        newName = 'น้ำปลาแท้';
+        newUnit = 'ขวด';
       }
 
       if (newName !== item.name || newUnit !== item.unit) {

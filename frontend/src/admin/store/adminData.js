@@ -670,13 +670,66 @@ export const adminStore = reactive({
           is_available: m.is_available ?? true,
           image_url: m.image_url || 'https://images.unsplash.com/photo-1569562211093-4ed0d0758f12?w=500&auto=format&fit=crop&q=80',
           allergen_ids: m.allergens ? m.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean) : [],
-          total_sold: m.total_sold || 0
+          total_sold: m.total_sold || 0,
+          ingredients: m.ingredients ? m.ingredients.map(mi => ({
+            menu_id: mi.menu_id,
+            ingredient_id: mi.ingredient_id,
+            quantity_used: Number(mi.quantity_used),
+            ingredient_name: mi.ingredient?.name || '',
+            unit: mi.ingredient?.unit || '',
+            in_stock: Number(mi.ingredient?.quantity || 0)
+          })) : []
         }))
+
+        // ซิงค์สูตรอาหารจากฐานข้อมูลทั้งหมดเข้า store.menuIngredients
+        const allDbMenuIngredients = []
+        for (const m of this.menus) {
+          if (m.ingredients && m.ingredients.length > 0) {
+            allDbMenuIngredients.push(...m.ingredients)
+          }
+        }
+        if (allDbMenuIngredients.length > 0) {
+          this.menuIngredients = allDbMenuIngredients
+        }
       }
-      console.log(`✅ โหลดเมนูจาก API สำเร็จ: ${this.menus.length} รายการ`)
+      console.log(`✅ โหลดเมนูจาก API สำเร็จ: ${this.menus.length} รายการ (พบสูตรอาหารในฐานข้อมูล ${this.menuIngredients.length} รายการ)`)
       return true
     } catch (err) {
       console.warn('⚠️ ไม่สามารถเชื่อมต่อ API เมนูได้:', err.message)
+      return false
+    }
+  },
+
+  async updateMenuRecipeAPI(menuId, ingredients) {
+    try {
+      const res = await fetch(`${API_BASE}/menus/${menuId}/ingredients`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ingredients })
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const updatedMenu = await res.json()
+
+      const target = this.menus.find(m => m.menu_id === menuId)
+      if (target) {
+        target.ingredients = updatedMenu.ingredients ? updatedMenu.ingredients.map(mi => ({
+          menu_id: mi.menu_id,
+          ingredient_id: mi.ingredient_id,
+          quantity_used: Number(mi.quantity_used),
+          ingredient_name: mi.ingredient?.name || '',
+          unit: mi.ingredient?.unit || '',
+          in_stock: Number(mi.ingredient?.quantity || 0)
+        })) : []
+      }
+
+      this.menuIngredients = this.menuIngredients.filter(mi => mi.menu_id !== menuId)
+      if (target && target.ingredients) {
+        this.menuIngredients.push(...target.ingredients)
+      }
+      console.log(`✅ บันทึกสูตรอาหารของเมนู #${menuId} สำเร็จ`)
+      return true
+    } catch (err) {
+      console.error('❌ บันทึกสูตรอาหารไม่สำเร็จ:', err.message)
       return false
     }
   },
