@@ -201,6 +201,15 @@ const fetchTableDetail = async () => {
         paymentQrDataUrl.value = ''
         qrTab.value = 'order'
       }
+
+      // โหลดจำนวนลูกค้าที่บันทึกไว้ในระบบ (ถ้ามี)
+      const guestKey = `table_guests_${tableData.value.table_id || paramValue.value}`
+      const savedGuests = localStorage.getItem(guestKey)
+      if (savedGuests && Number(savedGuests) > 0) {
+        tableData.value.customers = Number(savedGuests)
+      } else if (tableData.value.status.includes('OCCUPIED') || tableData.value.status.includes('กำลังทาน')) {
+        tableData.value.customers = tableData.value.customers || 2
+      }
     }
   } catch (err) {
     console.error('โหลดรายละเอียดโต๊ะไม่สำเร็จ:', err)
@@ -219,6 +228,41 @@ const netTotal = computed(() => subtotal.value - discount.value)
 
 const changeCustomers = (delta) => {
   tableData.value.customers = Math.max(0, tableData.value.customers + delta)
+  const guestKey = `table_guests_${tableData.value.table_id || paramValue.value}`
+  localStorage.setItem(guestKey, String(tableData.value.customers))
+}
+
+const setCustomers = (num) => {
+  tableData.value.customers = num
+  const guestKey = `table_guests_${tableData.value.table_id || paramValue.value}`
+  localStorage.setItem(guestKey, String(num))
+}
+
+const toggleTableStatus = async () => {
+  const isOccupied = tableData.value.status.includes('OCCUPIED') || tableData.value.status.includes('กำลังทาน')
+  const newStatus = isOccupied ? 'AVAILABLE' : 'OCCUPIED'
+
+  try {
+    if (tableData.value.table_id) {
+      await axios.patch(`${API_BASE}/tables/${tableData.value.table_id}/status`, { status: newStatus })
+    }
+    const guestKey = `table_guests_${tableData.value.table_id || paramValue.value}`
+    if (newStatus === 'AVAILABLE') {
+      localStorage.removeItem(guestKey)
+      tableData.value.status = 'ว่าง (AVAILABLE)'
+      tableData.value.customers = 0
+    } else {
+      if (tableData.value.customers <= 0) {
+        tableData.value.customers = 2
+      }
+      localStorage.setItem(guestKey, String(tableData.value.customers))
+      tableData.value.status = 'กำลังทาน (OCCUPIED)'
+      tableData.value.time = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
+    }
+  } catch (err) {
+    console.error('ไม่สามารถเปลี่ยนสถานะโต๊ะได้:', err)
+    alert('เกิดข้อผิดพลาดในการเปลี่ยนสถานะโต๊ะ')
+  }
 }
 
 const isPaying = ref(false)
@@ -514,12 +558,33 @@ const goBack = () => {
         <!-- Table Header Banner -->
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
               <h1 style="font-size: 32px; font-weight: 700; color: #111827; margin: 0; font-family: serif;">โต๊ะ {{ tableData.id }}</h1>
               <span style="background-color: #DCE7DF; color: #48785A; font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 9999px; display: inline-flex; align-items: center; gap: 6px;">
                 <span style="width: 6px; height: 6px; border-radius: 9999px; background-color: #48785A; display: inline-block;"></span>
                 {{ tableData.status }}
               </span>
+              <!-- Toggle Open/Close Button -->
+              <button
+                @click="toggleTableStatus"
+                :style="{
+                  padding: '6px 14px',
+                  borderRadius: '9999px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  border: 'none',
+                  cursor: 'pointer',
+                  backgroundColor: (tableData.status.includes('OCCUPIED') || tableData.status.includes('กำลังทาน')) ? '#FEE2E2' : '#48785A',
+                  color: (tableData.status.includes('OCCUPIED') || tableData.status.includes('กำลังทาน')) ? '#B91C1C' : '#FFFFFF',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }"
+              >
+                <span>{{ (tableData.status.includes('OCCUPIED') || tableData.status.includes('กำลังทาน')) ? '⚪' : '🟢' }}</span>
+                <span>{{ (tableData.status.includes('OCCUPIED') || tableData.status.includes('กำลังทาน')) ? 'ปิดโต๊ะ (ตั้งเป็นว่าง)' : 'เปิดโต๊ะ (Check In)' }}</span>
+              </button>
             </div>
             <p style="font-size: 12px; color: #6B7280; margin: 6px 0 0 0;">
               เปิดโต๊ะ: {{ tableData.time }} | พนักงานรับออเดอร์: {{ tableData.staff }}
@@ -551,29 +616,55 @@ const goBack = () => {
           <div class="lg:col-span-2 flex flex-col gap-6">
 
             <!-- Diners Control Card -->
-            <div style="background-color: #EFECE3; border-radius: 20px; padding: 20px; border: 1px solid rgba(227,222,195,0.8); display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
-              <div>
-                <p style="font-size: 11px; font-weight: 700; color: #4B5563; letter-spacing: 0.5px; margin: 0;">จำนวนลูกค้า (DINERS)</p>
-                <div style="display: flex; align-items: center; gap: 12px; margin-top: 12px;">
-                  <button
-                    @click="changeCustomers(-1)"
-                    style="width: 32px; height: 32px; border-radius: 10px; background-color: white; border: 1px solid #D1D5DB; font-weight: bold; color: #374151; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.02);"
-                  >-</button>
-                  <span style="font-size: 18px; font-weight: 700; color: #111827; width: 24px; text-align: center;">{{ tableData.customers }}</span>
-                  <button
-                    @click="changeCustomers(1)"
-                    style="width: 32px; height: 32px; border-radius: 10px; background-color: white; border: 1px solid #D1D5DB; font-weight: bold; color: #374151; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.02);"
-                  >+</button>
+            <div style="background-color: #EFECE3; border-radius: 20px; padding: 20px; border: 1px solid rgba(227,222,195,0.8); display: flex; flex-direction: column; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
+              <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                <div>
+                  <p style="font-size: 11px; font-weight: 700; color: #4B5563; letter-spacing: 0.5px; margin: 0;">จำนวนลูกค้า (DINERS)</p>
+                  <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px;">
+                    <button
+                      @click="changeCustomers(-1)"
+                      style="width: 34px; height: 34px; border-radius: 10px; background-color: white; border: 1px solid #D1D5DB; font-weight: bold; color: #374151; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.02);"
+                    >-</button>
+                    <span style="font-size: 22px; font-weight: 800; color: #111827; min-width: 32px; text-align: center;">{{ tableData.customers }}</span>
+                    <span style="font-size: 14px; font-weight: 600; color: #4B5563;">คน</span>
+                    <button
+                      @click="changeCustomers(1)"
+                      style="width: 34px; height: 34px; border-radius: 10px; background-color: white; border: 1px solid #D1D5DB; font-weight: bold; color: #374151; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.02);"
+                    >+</button>
+                  </div>
                 </div>
+
+                <!-- Force Clear Button -->
+                <button
+                  @click="forceClear"
+                  style="display: flex; align-items: center; gap: 8px; border: 1px solid #FCA5A5; color: #DC2626; background-color: rgba(254,226,226,0.5); padding: 10px 16px; border-radius: 12px; font-size: 12px; font-weight: 700; cursor: pointer; transition: background-color 0.2s;"
+                >
+                  <span>🗑</span> เคลียร์ / ปิดโต๊ะ (Clear Table)
+                </button>
               </div>
 
-              <!-- Force Clear Button -->
-              <button
-                @click="forceClear"
-                style="display: flex; align-items: center; gap: 8px; border: 1px solid #FCA5A5; color: #DC2626; background-color: rgba(254,226,226,0.5); padding: 10px 16px; border-radius: 12px; font-size: 12px; font-weight: 700; cursor: pointer; transition: background-color 0.2s;"
-              >
-                <span>🗑</span> บังคับปิดโต๊ะ (Force Clear)
-              </button>
+              <!-- Quick Diners Presets -->
+              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; border-top: 1px solid rgba(209,213,219,0.5); padding-top: 10px;">
+                <span style="font-size: 12px; font-weight: 600; color: #6B7280; margin-right: 4px;">กดเลือกจำนวนคนด่วน:</span>
+                <button
+                  v-for="num in [1, 2, 3, 4, 6, 8]"
+                  :key="num"
+                  @click="setCustomers(num)"
+                  :style="{
+                    padding: '5px 12px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    border: tableData.customers === num ? '1.5px solid #48785A' : '1px solid #D1D5DB',
+                    backgroundColor: tableData.customers === num ? '#E8F3EC' : 'white',
+                    color: tableData.customers === num ? '#48785A' : '#374151',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                  }"
+                >
+                  {{ num }} คน
+                </button>
+              </div>
             </div>
 
             <!-- Ordered Items Card -->

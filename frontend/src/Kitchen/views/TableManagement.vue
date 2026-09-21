@@ -18,6 +18,70 @@ const newTable = ref({
   capacity: 4
 })
 
+// Modal เปิดโต๊ะพร้อมเลือกจำนวนคน
+const isTableOpenModalVisible = ref(false)
+const selectedOpenTable = ref(null)
+const openTableGuests = ref(2)
+
+const openTableModal = (table) => {
+  selectedOpenTable.value = table
+  openTableGuests.value = table.seats > 0 ? table.seats : Math.min(2, table.capacity || 4)
+  isTableOpenModalVisible.value = true
+}
+
+const confirmOpenTable = async () => {
+  if (!selectedOpenTable.value) return
+  const t = selectedOpenTable.value
+  const guests = Math.max(1, openTableGuests.value)
+  
+  try {
+    if (t.table_id) {
+      await axios.patch(`${API_BASE}/tables/${t.table_id}/status`, { status: 'OCCUPIED' })
+    }
+    localStorage.setItem(`table_guests_${t.table_id || t.id}`, String(guests))
+    t.status = 'occupied'
+    t.seats = guests
+    isTableOpenModalVisible.value = false
+    await fetchTablesData()
+  } catch (err) {
+    console.error('ไม่สามารถเปิดโต๊ะได้:', err)
+    alert('เกิดข้อผิดพลาดในการเปิดโต๊ะ')
+  }
+}
+
+const closeOrClearTable = async (table) => {
+  const hasUnpaid = table.total > 0 || (table.activeOrders && table.activeOrders.length > 0)
+  const confirmMsg = hasUnpaid 
+    ? `โต๊ะ ${table.id} ยังมียอดค้างชำระ ฿${table.total.toLocaleString()} ต้องการปิดโต๊ะและเปลี่ยนเป็นสถานะ "ว่าง" ใช่หรือไม่?`
+    : `ต้องการปิดโต๊ะ ${table.id} และเปลี่ยนเป็นสถานะ "ว่าง" ใช่หรือไม่?`
+
+  if (!confirm(confirmMsg)) return
+
+  try {
+    if (table.table_id) {
+      await axios.patch(`${API_BASE}/tables/${table.table_id}/status`, { status: 'AVAILABLE' })
+    }
+    localStorage.removeItem(`table_guests_${table.table_id || table.id}`)
+    table.status = 'available'
+    table.seats = 0
+    await fetchTablesData()
+  } catch (err) {
+    console.error('ไม่สามารถปิดโต๊ะได้:', err)
+    alert('เกิดข้อผิดพลาดในการปิดโต๊ะ')
+  }
+}
+
+const adjustTableGuests = (table, delta) => {
+  if (table.status === 'available') {
+    openTableModal(table)
+    return
+  }
+  const current = Number(table.seats) || 1
+  const updated = Math.max(1, Math.min(table.capacity * 2, current + delta))
+  table.seats = updated
+  localStorage.setItem(`table_guests_${table.table_id || table.id}`, String(updated))
+}
+
 // ข้อมูลสถานะและสีประจำสถานะ (ปรับโทนสีให้ละมุนและเข้ากันมากขึ้น)
 const statusMap = {
   available: { label: 'ว่าง', bg: 'bg-[#E3DFD5]', text: 'text-gray-700', border: 'border-transparent' },
@@ -40,7 +104,7 @@ const fetchTablesData = async () => {
     const allOrders = ordersRes.data || []
 
     tables.value = dbTables.map((t) => {
-      // ค้นหาออเดอร์ของโต๊ะนี้ที่ยังทานอยู่ (PENDING, COOKING, READY, PAID)
+      // ค้นหาออเดอร์ของโต๊ะนี้ที่ยังทานอยู่ (PENDING, COOKING, READY, SERVED)
       const activeOrders = allOrders.filter((o) => {
         const matchesTableId = o.table_id === t.table_id || o.table?.table_id === t.table_id
         const matchesTableNum = o.table?.table_number === t.table_number || (typeof o.table === 'string' && o.table === t.table_number)
@@ -60,11 +124,18 @@ const fetchTablesData = async () => {
         currentStatus = 'billing'
       }
 
+      // ดึงจำนวนแขกที่นั่งจาก localStorage (ถ้ามีบันทึกไว้) หรือคำนวณ
+      const savedGuests = localStorage.getItem(`table_guests_${t.table_id || t.table_number}`)
+      let guestCount = 0
+      if (currentStatus === 'occupied' || currentStatus === 'billing') {
+        guestCount = savedGuests ? Number(savedGuests) : (activeOrders.length > 0 ? 2 : 2)
+      }
+
       return {
         table_id: t.table_id,
         id: t.table_number || `T-0${t.table_id}`,
         status: currentStatus,
-        seats: activeOrders.length > 0 ? (t.capacity || 4) : 0,
+        seats: guestCount,
         capacity: t.capacity || 4,
         total: totalAmount,
         activeOrders
@@ -495,13 +566,13 @@ const handleAddTable = async () => {
         </div>
 
         <!-- Tables Grid -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px;">
           <div
             v-for="table in filteredTables"
             :key="table.id"
             @click="goToTableDetail(table.id)"
-            style="background-color: #EFECE3; border-radius: 20px; padding: 20px; border: 1px solid rgba(227,222,195,0.8); box-shadow: 0 4px 12px rgba(0,0,0,0.02); cursor: pointer; display: flex; flex-direction: column; justify-content: space-between; height: 140px; position: relative; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s;"
-            :style="table.status === 'occupied' ? 'border-left: 4px solid #3D664C;' : table.status === 'billing' ? 'border-left: 4px solid #4F46E5;' : 'border-left: 4px solid #D1D5DB;'"
+            style="background-color: #EFECE3; border-radius: 20px; padding: 18px; border: 1px solid rgba(227,222,195,0.8); box-shadow: 0 4px 12px rgba(0,0,0,0.02); cursor: pointer; display: flex; flex-direction: column; justify-content: space-between; min-height: 165px; position: relative; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s;"
+            :style="table.status === 'occupied' ? 'border-left: 5px solid #3D664C;' : table.status === 'billing' ? 'border-left: 5px solid #4F46E5;' : 'border-left: 5px solid #D1D5DB;'"
           >
             <!-- Card Top Row (Table Name & Status Badge) -->
             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
@@ -517,34 +588,79 @@ const handleAddTable = async () => {
               </span>
             </div>
 
-            <!-- Card Bottom Row (Seats, QR Button & Total Price) -->
-            <div style="display: flex; align-items: flex-end; justify-content: space-between; font-size: 13px;">
-              <!-- Seats Info -->
-              <div style="display: flex; align-items: center; gap: 6px; color: #6B7280; font-weight: 500;">
-                <svg xmlns="http://www.w3.org/2000/svg" style="width: 14px; height: 14px;" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
-                </svg>
-                <span>{{ table.seats }}/{{ table.capacity }} ที่นั่ง</span>
+            <!-- Card Middle Row (Customer Count / Guests Controls) -->
+            <div style="margin: 8px 0;">
+              <div 
+                v-if="table.status === 'occupied' || table.status === 'billing'" 
+                style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.6); padding: 5px 8px; border-radius: 10px; border: 1px solid rgba(209,213,219,0.5);"
+              >
+                <span style="font-size: 12px; color: #374151; font-weight: 600;">👥 ลูกค้า:</span>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <button 
+                    @click.stop="adjustTableGuests(table, -1)" 
+                    style="width: 22px; height: 22px; border-radius: 6px; background: white; border: 1px solid #D1D5DB; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #374151; font-size: 13px;"
+                    title="ลดจำนวนคน"
+                  >-</button>
+                  <b style="font-size: 14px; color: #111827; min-width: 14px; text-align: center;">{{ table.seats }}</b>
+                  <button 
+                    @click.stop="adjustTableGuests(table, 1)" 
+                    style="width: 22px; height: 22px; border-radius: 6px; background: white; border: 1px solid #D1D5DB; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #374151; font-size: 13px;"
+                    title="เพิ่มจำนวนคน"
+                  >+</button>
+                  <span style="font-size: 11px; color: #6B7280;">/ {{ table.capacity }} ที่</span>
+                </div>
+              </div>
+              <div 
+                v-else 
+                style="display: flex; align-items: center; justify-content: space-between; padding: 4px 6px; color: #6B7280; font-size: 12px;"
+              >
+                <span style="display: flex; align-items: center; gap: 4px; font-weight: 500;">
+                  <span>👥 โต๊ะว่าง</span>
+                </span>
+                <span style="font-size: 11px; color: #9CA3AF;">จุได้ {{ table.capacity }} ที่นั่ง</span>
+              </div>
+            </div>
+
+            <!-- Card Bottom Row (Open/Close Button, QR Button & Total Price) -->
+            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 13px; gap: 4px;">
+              <!-- Open / Close Table Action Button -->
+              <div>
+                <button
+                  v-if="table.status === 'available'"
+                  @click.stop="openTableModal(table)"
+                  style="padding: 5px 12px; border-radius: 10px; font-size: 12px; font-weight: 700; background: #48785A; color: white; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: background-color 0.2s;"
+                  title="เปิดโต๊ะเพื่อรับลูกค้า"
+                >
+                  <span>🟢</span> เปิดโต๊ะ
+                </button>
+                <button
+                  v-else
+                  @click.stop="closeOrClearTable(table)"
+                  style="padding: 5px 10px; border-radius: 10px; font-size: 11px; font-weight: 700; background: #FEE2E2; color: #B91C1C; border: 1px solid #FCA5A5; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: background-color 0.2s;"
+                  title="ปิดโต๊ะและเปลี่ยนสถานะเป็นว่าง"
+                >
+                  <span>⚪</span> ปิดโต๊ะ
+                </button>
               </div>
 
-              <!-- QR Code Quick Button, Payment Button & Total Amount -->
+              <!-- Right: Payment, QR & Total -->
               <div style="display: flex; align-items: center; gap: 6px;">
                 <button
                   v-if="table.total > 0"
                   @click.stop="openPaymentModal(table)"
-                  style="padding: 3px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; background: #003B70; color: white; border: none; cursor: pointer; display: flex; align-items: center; gap: 3px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: background-color 0.2s;"
+                  style="padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; background: #003B70; color: white; border: none; cursor: pointer; display: flex; align-items: center; gap: 3px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: background-color 0.2s;"
                   title="พิมพ์ใบเรียกเก็บเงินและ QR ชำระเงิน"
                 >
                   <span>🧾</span> จ่ายเงิน
                 </button>
                 <button
                   @click.stop="openQrModal(table)"
-                  style="padding: 3px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; background: white; border: 1px solid #D1D5DB; color: #374151; cursor: pointer; display: flex; align-items: center; gap: 3px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); transition: background-color 0.2s;"
+                  style="padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; background: white; border: 1px solid #D1D5DB; color: #374151; cursor: pointer; display: flex; align-items: center; gap: 3px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); transition: background-color 0.2s;"
                   title="ดู QR Code สำหรับสแกนสั่งอาหารของโต๊ะนี้"
                 >
                   <span>📱</span> QR
                 </button>
-                <div style="font-weight: 700; font-size: 15px;" :style="table.total > 0 ? 'color: #2563EB;' : 'color: #9CA3AF;'">
+                <div style="font-weight: 700; font-size: 14px;" :style="table.total > 0 ? 'color: #2563EB;' : 'color: #9CA3AF;'">
                   ฿{{ table.total.toLocaleString() }}
                 </div>
               </div>
@@ -554,6 +670,78 @@ const handleAddTable = async () => {
 
       </div>
     </main>
+
+    <!-- Modal เปิดโต๊ะพร้อมเลือกจำนวนคน -->
+    <div v-if="isTableOpenModalVisible && selectedOpenTable" style="position: fixed; inset: 0; background-color: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 60;">
+      <div style="background-color: white; border-radius: 24px; max-width: 380px; width: 100%; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15); display: flex; flex-direction: column; gap: 18px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #E5E7EB; padding-bottom: 12px;">
+          <div>
+            <h3 style="font-size: 20px; font-weight: 800; color: #111827; margin: 0;">
+              🟢 เปิดโต๊ะ {{ selectedOpenTable.id }}
+            </h3>
+            <p style="font-size: 12px; color: #6B7280; margin: 4px 0 0 0;">
+              ความจุโต๊ะ: {{ selectedOpenTable.capacity }} ที่นั่ง
+            </p>
+          </div>
+          <button @click="isTableOpenModalVisible = false" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #9CA3AF; padding: 4px;">✕</button>
+        </div>
+
+        <!-- Guest count input / Stepper -->
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <label style="font-size: 13px; font-weight: 700; color: #374151;">ระบุจำนวนลูกค้าที่นั่ง:</label>
+          <div style="display: flex; align-items: center; justify-content: center; gap: 16px; background-color: #F9FAFB; padding: 12px; border-radius: 16px; border: 1.5px solid #E5E7EB;">
+            <button
+              @click="openTableGuests = Math.max(1, openTableGuests - 1)"
+              style="width: 40px; height: 40px; border-radius: 12px; background: white; border: 1px solid #D1D5DB; font-size: 20px; font-weight: bold; color: #374151; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);"
+            >-</button>
+            <div style="font-size: 28px; font-weight: 900; color: #111827; min-width: 48px; text-align: center;">
+              {{ openTableGuests }}
+            </div>
+            <button
+              @click="openTableGuests = openTableGuests + 1"
+              style="width: 40px; height: 40px; border-radius: 12px; background: white; border: 1px solid #D1D5DB; font-size: 20px; font-weight: bold; color: #374151; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);"
+            >+</button>
+            <span style="font-size: 16px; font-weight: 600; color: #4B5563;">คน</span>
+          </div>
+
+          <!-- Quick Presets -->
+          <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px;">
+            <button
+              v-for="num in [1, 2, 3, 4, 6, 8]"
+              :key="num"
+              @click="openTableGuests = num"
+              :style="{
+                padding: '6px 12px',
+                borderRadius: '10px',
+                fontSize: '12px',
+                fontWeight: '700',
+                border: openTableGuests === num ? '1.5px solid #48785A' : '1px solid #E5E7EB',
+                backgroundColor: openTableGuests === num ? '#E8F3EC' : 'white',
+                color: openTableGuests === num ? '#48785A' : '#4B5563',
+                cursor: 'pointer'
+              }"
+            >
+              {{ num }} คน
+            </button>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 8px;">
+          <button
+            @click="isTableOpenModalVisible = false"
+            style="flex: 1; padding: 12px 0; border-radius: 14px; font-size: 14px; font-weight: 600; background: #F3F4F6; color: #4B5563; border: none; cursor: pointer;"
+          >
+            ยกเลิก
+          </button>
+          <button
+            @click="confirmOpenTable"
+            style="flex: 1; padding: 12px 0; border-radius: 14px; font-size: 14px; font-weight: 700; background: #48785A; color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 4px rgba(72,120,90,0.2);"
+          >
+            <span>✓</span> ยืนยันเปิดโต๊ะ
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- Modal เพิ่มโต๊ะใหม่ -->
     <div v-if="isAddModalOpen" style="position: fixed; inset: 0; background-color: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50;">

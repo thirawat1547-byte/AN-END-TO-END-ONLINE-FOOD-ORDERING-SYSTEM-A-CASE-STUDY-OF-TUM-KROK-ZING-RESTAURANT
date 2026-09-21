@@ -39,16 +39,18 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
         }
       }
 
-      // ซิงค์สถานะโต๊ะตามออเดอร์จริงที่มีอยู่ในระบบ
+      // ซิงค์สถานะโต๊ะตามออเดอร์จริงที่มีอยู่ในระบบ (เฉพาะออเดอร์ที่ยังไม่เสร็จสิ้น)
       try {
         await this.$executeRawUnsafe(`
           UPDATE TABLES t
-          SET t.status = 'OCCUPIED'
-          WHERE EXISTS (
-            SELECT 1 FROM ORDERS o
-            WHERE o.table_id = t.table_id
-            AND o.status IN ('PENDING', 'COOKING', 'READY', 'PAID')
-          );
+          SET t.status = CASE
+            WHEN EXISTS (
+              SELECT 1 FROM ORDERS o
+              WHERE o.table_id = t.table_id
+              AND o.status IN ('PENDING', 'COOKING', 'READY', 'SERVED')
+            ) THEN 'OCCUPIED'
+            ELSE 'AVAILABLE'
+          END;
         `);
       } catch (e) {}
 
