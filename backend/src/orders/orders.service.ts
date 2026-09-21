@@ -205,13 +205,42 @@ export class OrdersService {
     return createdOrder;
   }
 
-  // 2. ดึงรายการออร์เดอร์ทั้งหมด (รองรับตัวกรอง status, tableId, orderType)
-  async findAll(status?: string, tableId?: number, orderType?: string) {
+  // 2. ดึงรายการออร์เดอร์ทั้งหมด (รองรับตัวกรอง status, tableId, orderType, date)
+  async findAll(status?: string, tableId?: number, orderType?: string, date?: string) {
+    let dateFilter: any = undefined;
+
+    if (date === 'today') {
+      // หาวันที่ปัจจุบันตามโซนเวลาประเทศไทย (Asia/Bangkok)
+      const bangkokDateStr = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Bangkok',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date());
+
+      const startOfThaiDay = new Date(`${bangkokDateStr}T00:00:00+07:00`);
+      const endOfThaiDay = new Date(`${bangkokDateStr}T23:59:59.999+07:00`);
+
+      dateFilter = {
+        gte: startOfThaiDay,
+        lte: endOfThaiDay,
+      };
+    } else if (date && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const startOfThaiDay = new Date(`${date}T00:00:00+07:00`);
+      const endOfThaiDay = new Date(`${date}T23:59:59.999+07:00`);
+
+      dateFilter = {
+        gte: startOfThaiDay,
+        lte: endOfThaiDay,
+      };
+    }
+
     return this.prisma.order.findMany({
       where: {
         ...(status && { status: status }),
         ...(tableId && { table_id: tableId }),
         ...(orderType && { order_type: orderType }),
+        ...(dateFilter && { created_at: dateFilter }),
       },
       include: {
         order_items: {

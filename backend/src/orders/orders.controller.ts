@@ -43,15 +43,18 @@ export class OrdersController {
   @ApiQuery({ name: 'status', required: false, description: 'กรองตามสถานะ (PENDING, COOKING, READY, IN_DELIVERY, DELIVERED, COMPLETED)' })
   @ApiQuery({ name: 'tableId', required: false, type: Number, description: 'กรองตามหมายเลขโต๊ะ' })
   @ApiQuery({ name: 'orderType', required: false, description: 'กรองตามประเภท (DELIVERY, DINE_IN, TAKEAWAY)' })
+  @ApiQuery({ name: 'date', required: false, description: 'กรองตามวันที่ (YYYY-MM-DD หรือ today)' })
   findAll(
     @Query('status') status?: string,
     @Query('tableId') tableId?: string,
     @Query('orderType') orderType?: string,
+    @Query('date') date?: string,
   ) {
     return this.ordersService.findAll(
       status,
       tableId ? parseInt(tableId, 10) : undefined,
       orderType,
+      date,
     );
   }
 

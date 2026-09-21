@@ -37,10 +37,9 @@ onBeforeUnmount(() => {
   socket.off('order_status_updated', handleRealtimeNewOrder)
 })
 
-// ดึงออเดอร์ทั้งหมดมาแสดงใน KDS เพื่อให้เห็นตั๋วทันที (หรือกรองเฉพาะที่กำลังทำ)
+// ดึงเฉพาะออเดอร์ที่กำลังรอทำและกำลังปรุงในครัวมาแสดงใน KDS (ไม่รวมออเดอร์ที่ทำเสร็จแล้ว)
 const activeOrders = computed(() => {
-  // ถ้าอยากให้แสดงทุกออเดอร์ตัวอย่างที่มี ให้คืนค่า adminStore.orders ได้เลยครับ
-  return adminStore.orders
+  return (adminStore.orders || []).filter(o => ['Pending', 'Cooking'].includes(o.status))
 })
 
 const totalDishesInKitchen = computed(() => {

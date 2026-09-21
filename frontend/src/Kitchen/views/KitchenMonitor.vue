@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import axios from 'axios'
 import { API_BASE } from '../../config/api'
 import { socket } from '../../config/socket'
@@ -10,7 +10,21 @@ const completedOrders = ref([])
 const isLoading = ref(false)
 const isSocketConnected = ref(socket.connected)
 const newOrderNotification = ref(null)
+const selectedFilter = ref('today') // 'today' | 'all' (รีเซ็ตทุกวันเป็นค่าเริ่มต้น)
 let pollingTimer = null
+
+const todayDateLabel = computed(() => {
+  return new Intl.DateTimeFormat('th-TH', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  }).format(new Date())
+})
+
+const changeFilter = (filterType) => {
+  selectedFilter.value = filterType
+  fetchOrders()
+}
 
 // ฟังก์ชันจำลองเสียงกระดิ่งแจ้งเตือนออเดอร์ใหม่ (Web Audio API)
 const playChime = () => {
@@ -135,16 +149,37 @@ const formatOrder = (order) => {
   }
 }
 
-// 1. ดึงข้อมูลรายการคำสั่งซื้อทั้งหมดจาก Backend
+// 1. ดึงข้อมูลรายการคำสั่งซื้อจาก Backend (กรองเฉพาะวันนี้เป็นค่าเริ่มต้น เพื่อรีเซ็ตหน้าจอทุกวัน)
 const fetchOrders = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/orders`)
+    const url = selectedFilter.value === 'today' ? `${API_BASE}/orders?date=today` : `${API_BASE}/orders`
+    const res = await axios.get(url)
     const allOrders = res.data || []
 
     const incoming = []
     const completed = []
 
+    const todayDateStr = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Bangkok',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date())
+
     allOrders.forEach((o) => {
+      // ตรวจสอบเพิ่มเติมหากเปิดโหมดวันนี้ เพื่อความแม่นยำสูงสุด
+      if (selectedFilter.value === 'today' && o.created_at) {
+        const orderDateStr = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Bangkok',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(new Date(o.created_at))
+        if (orderDateStr !== todayDateStr) {
+          return // ข้ามออเดอร์ของวันก่อนหน้า
+        }
+      }
+
       const formatted = formatOrder(o)
       const st = (o.status || '').toUpperCase()
       if (['SERVED', 'READY', 'COMPLETED'].includes(st)) {
@@ -265,8 +300,8 @@ onBeforeUnmount(() => {
     <!-- Content Area -->
     <div style="padding: 32px; display: flex; flex-direction: column; gap: 24px;">
       
-      <!-- Tab Switcher Bar -->
-      <div style="display: flex; justify-content: flex-start;">
+      <!-- Tab Switcher Bar & Date Filter Controls -->
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
         <div style="background-color: #F3EBDD; padding: 6px; border-radius: 9999px; display: inline-flex; gap: 6px; border: 1px solid #EBE1D0; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);">
           <button
             @click="activeTab = 'incoming'"
@@ -302,6 +337,48 @@ onBeforeUnmount(() => {
             }"
           >
             เสร็จสิ้น (Completed: {{ completedOrders.length }})
+          </button>
+        </div>
+
+        <!-- Date Filter Toggle (รีเซ็ตออเดอร์เป็นวันๆ ไป) -->
+        <div style="display: inline-flex; align-items: center; gap: 6px; background-color: #F3EBDD; padding: 5px 8px; border-radius: 9999px; border: 1px solid #EBE1D0; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+          <span style="font-size: 13px; font-weight: 500; color: #5C5246; margin-left: 6px; display: flex; align-items: center; gap: 4px;">
+            <span>📅</span>
+            <span>คิวอาหาร:</span>
+          </span>
+          <button
+            @click="changeFilter('today')"
+            :style="{
+              padding: '7px 16px',
+              borderRadius: '9999px',
+              fontSize: '13px',
+              fontWeight: '600',
+              border: 'none',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.2s',
+              backgroundColor: selectedFilter === 'today' ? '#4B7B61' : 'transparent',
+              color: selectedFilter === 'today' ? '#FFFFFF' : '#5C5246'
+            }"
+          >
+            วันนี้ ({{ todayDateLabel }})
+          </button>
+          <button
+            @click="changeFilter('all')"
+            :style="{
+              padding: '7px 16px',
+              borderRadius: '9999px',
+              fontSize: '13px',
+              fontWeight: '600',
+              border: 'none',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.2s',
+              backgroundColor: selectedFilter === 'all' ? '#4B7B61' : 'transparent',
+              color: selectedFilter === 'all' ? '#FFFFFF' : '#5C5246'
+            }"
+          >
+            ประวัติทั้งหมด
           </button>
         </div>
       </div>
@@ -383,7 +460,7 @@ onBeforeUnmount(() => {
       <!-- Completed Grid -->
       <div v-if="activeTab === 'completed'">
         <div v-if="completedOrders.length === 0" style="text-align: center; padding: 80px 0; color: #9CA3AF;">
-          ยังไม่มีออเดอร์ที่เสร็จสิ้น
+          ยังไม่มีออเดอร์ที่เสร็จสิ้น{{ selectedFilter === 'today' ? 'ในวันนี้' : '' }}
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 28px;">
