@@ -24,3 +24,13 @@ jobs:
           
           # รัน Docker ที่โฟลเดอร์หลักสุดเลย (ลบ cd backend ออกแล้ว)
           sudo docker-compose up -d --build
+
+          # รอให้ Database และ Backend พร้อมทำงาน
+          sleep 8
+
+          # ซิงค์โครงสร้างตารางฐานข้อมูลและใส่ข้อมูลสูตรอาหารลงในเซิร์ฟเวอร์จริง
+          sudo docker-compose exec -T backend npx prisma db push --accept-data-loss
+          sudo docker-compose exec -T backend npx prisma db seed
+
+          # รีสตาร์ท Backend เพื่อโหลดสูตรและคลังวัตถุดิบใหม่เข้าสู่ระบบ
+          sudo docker-compose restart backend
