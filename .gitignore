@@ -29,3 +29,4 @@ backend/node_modules
 
 # Documents
 *.docx
+*.bak

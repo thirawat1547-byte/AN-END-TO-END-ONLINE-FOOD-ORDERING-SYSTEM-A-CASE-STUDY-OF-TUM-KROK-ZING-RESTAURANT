@@ -47,12 +47,14 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
             try {
                 await this.$executeRawUnsafe(`
           UPDATE TABLES t
-          SET t.status = 'OCCUPIED'
-          WHERE EXISTS (
-            SELECT 1 FROM ORDERS o
-            WHERE o.table_id = t.table_id
-            AND o.status IN ('PENDING', 'COOKING', 'READY', 'PAID')
-          );
+          SET t.status = CASE
+            WHEN EXISTS (
+              SELECT 1 FROM ORDERS o
+              WHERE o.table_id = t.table_id
+              AND o.status IN ('PENDING', 'COOKING', 'READY', 'SERVED')
+            ) THEN 'OCCUPIED'
+            ELSE 'AVAILABLE'
+          END;
         `);
             }
             catch (e) { }

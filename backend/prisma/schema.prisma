@@ -152,14 +152,15 @@ model Transaction {
 
 model Ingredient {
   ingredient_id Int      @id @default(autoincrement())
-  name          String   @db.VarChar(100)
-  quantity      Float    @default(0)
-  unit          String   @db.VarChar(20)
-  min_quantity  Float    @default(5)
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  name          String   @map("ingredient_name") @db.VarChar(100)
+  quantity      Decimal  @map("quantity_in_stock") @default(0) @db.Decimal(10, 2)
+  unit          String   @db.VarChar(50)
+  min_quantity  Decimal  @map("reorder_level") @default(5) @db.Decimal(10, 2)
+  updated_at    DateTime @map("last_updated") @default(now()) @updatedAt
 
   menu_ingredients MenuIngredient[]
+
+  @@map("INGREDIENTS")
 }
 
 model MenuIngredient {

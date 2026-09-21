@@ -43,6 +43,12 @@ let MenusController = class MenusController {
     remove(id) {
         return this.menusService.remove(id);
     }
+    updateIngredients(id, body) {
+        return this.menusService.updateIngredients(id, body.ingredients || []);
+    }
+    saveIngredients(id, body) {
+        return this.menusService.updateIngredients(id, body.ingredients || []);
+    }
 };
 exports.MenusController = MenusController;
 __decorate([
@@ -107,6 +113,26 @@ __decorate([
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], MenusController.prototype, "remove", null);
+__decorate([
+    (0, common_1.Put)(':id/ingredients'),
+    (0, swagger_1.ApiOperation)({ summary: 'ผูกสูตรอาหาร / ปรับปรุงสัดส่วนวัตถุดิบ (Recipe Formulation)' }),
+    (0, swagger_1.ApiParam)({ name: 'id', description: 'รหัสเมนูอาหาร (menu_id)' }),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:returntype", void 0)
+], MenusController.prototype, "updateIngredients", null);
+__decorate([
+    (0, common_1.Post)(':id/ingredients'),
+    (0, swagger_1.ApiOperation)({ summary: 'ผูกสูตรอาหาร / ปรับปรุงสัดส่วนวัตถุดิบ (Recipe Formulation)' }),
+    (0, swagger_1.ApiParam)({ name: 'id', description: 'รหัสเมนูอาหาร (menu_id)' }),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:returntype", void 0)
+], MenusController.prototype, "saveIngredients", null);
 exports.MenusController = MenusController = __decorate([
     (0, swagger_1.ApiTags)('Menus'),
     (0, common_1.Controller)('menus'),

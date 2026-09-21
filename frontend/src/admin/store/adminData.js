@@ -27,6 +27,38 @@ import imgYumtalay from '../../assets/yumtalay.jpg'
 import imgKao from '../../assets/kao.jpg'
 import imgKaon from '../../assets/kaon.jpg'
 
+export const MENU_IMAGE_MAP = {
+  'กะเพราหมู': imgKapaomu,
+  'กระเพราหมู': imgKapaomu,
+  'กะเพราทะเล/หมึก/กุ้ง': imgKapaotaley,
+  'กระเพราทะเล/หมึก/กุ้ง': imgKapaotaley,
+  'ข้าวผัดหมู': imgKhaopadmu,
+  'ข้าวผัดกุ้ง': imgKhaopadkung,
+  'ข้าวผัดทะเล/หมึก/กุ้ง': imgKhaopadtalay,
+  'ผัดพริกแกงหมู': imgPikkangmu,
+  'ผัดพริกแกงทะเล/หมึก/กุ้ง': imgPrikkangtalay,
+  'ผัดคะน้าหมู': imgKanamokrop,
+  'ผัดคะน้าหมูกรอบ': imgKanamokrop,
+  'ผัดคะน้าทะเล/หมึก/กุ้ง': imgKanatalay,
+  'ข้าวหมูกระเทียม': imgMookratiem,
+  'ข้าวไข่เจียวหมูสับ': imgKaijeawmoosub,
+  'ข้าวไข่เจียวกุ้ง': imgKaikung,
+  'ยำวุ้นเส้นทะเล': imgYumtalay,
+  'ส้มตำปูปลาร้า': imgTumprara,
+  'ส้มตำไทย': imgTumtai,
+  'ลาบหมู': imgLarbmoo,
+  'ไก่ทอด (ปีก)': imgWingchick,
+  'ไก่ทอด (สะโพก)': imgChick,
+  'น้ำเก๊กฮวย': imgGek,
+  'โค้ก (Coke)': imgCoke,
+  'โค้ก (กระป๋อง)': imgCoke,
+  'สไปรท์ (Sprite)': imgSprite,
+  'น้ำเปล่า': imgWater,
+  'น้ำดื่ม': imgWater,
+  'ข้าวเปล่า': imgKao,
+  'ข้าวเหนียว': imgKaon
+}
+
 export const adminStore = reactive({
   // ===== สถิติแดชบอร์ดที่ดึงจาก Backend จริง =====
   dashboardStats: {
@@ -90,7 +122,8 @@ export const adminStore = reactive({
     { ingredient_id: 19, ingredient_name: 'ดอกเก๊กฮวยอบแห้ง', quantity_in_stock: 10, unit: 'ห่อ', reorder_level: 3, cost_per_unit: 40, last_updated: '2026-09-01 10:00' },
     { ingredient_id: 20, ingredient_name: 'โค้ก (Coke)', quantity_in_stock: 48, unit: 'ขวด', reorder_level: 12, cost_per_unit: 12, last_updated: '2026-09-02 10:00' },
     { ingredient_id: 21, ingredient_name: 'สไปรท์ (Sprite)', quantity_in_stock: 36, unit: 'ขวด', reorder_level: 12, cost_per_unit: 12, last_updated: '2026-09-02 10:00' },
-    { ingredient_id: 22, ingredient_name: 'น้ำดื่มสะอาด', quantity_in_stock: 60, unit: 'ขวด', reorder_level: 20, cost_per_unit: 5, last_updated: '2026-09-02 10:00' }
+    { ingredient_id: 22, ingredient_name: 'น้ำดื่มสะอาด', quantity_in_stock: 60, unit: 'ขวด', reorder_level: 20, cost_per_unit: 5, last_updated: '2026-09-02 10:00' },
+    { ingredient_id: 23, ingredient_name: 'ข้าวเหนียว', quantity_in_stock: 30.0, unit: 'กิโลกรัม', reorder_level: 8.0, cost_per_unit: 40, last_updated: '2026-09-02 10:00' }
   ],
 
   menus: [
@@ -432,7 +465,9 @@ export const adminStore = reactive({
     { menu_id: 19, ingredient_id: 19, quantity_used: 1 },
     { menu_id: 20, ingredient_id: 20, quantity_used: 1 },
     { menu_id: 21, ingredient_id: 21, quantity_used: 1 },
-    { menu_id: 22, ingredient_id: 22, quantity_used: 1 }
+    { menu_id: 22, ingredient_id: 22, quantity_used: 1 },
+    { menu_id: 23, ingredient_id: 13, quantity_used: 0.15 },
+    { menu_id: 24, ingredient_id: 23, quantity_used: 0.15 }
   ],
 
   promotions: [
@@ -668,7 +703,7 @@ export const adminStore = reactive({
           price: Number(m.price),
           calories: m.calories || 0,
           is_available: m.is_available ?? true,
-          image_url: m.image_url || 'https://images.unsplash.com/photo-1569562211093-4ed0d0758f12?w=500&auto=format&fit=crop&q=80',
+          image_url: MENU_IMAGE_MAP[m.menu_name] || m.image_url || 'https://images.unsplash.com/photo-1569562211093-4ed0d0758f12?w=500&auto=format&fit=crop&q=80',
           allergen_ids: m.allergens ? m.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean) : [],
           total_sold: m.total_sold || 0,
           ingredients: m.ingredients ? m.ingredients.map(mi => ({

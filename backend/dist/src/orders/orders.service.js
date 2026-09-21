@@ -13,10 +13,12 @@ exports.OrdersService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma.service");
 const settings_service_1 = require("../settings/settings.service");
+const orders_gateway_1 = require("./orders.gateway");
 let OrdersService = class OrdersService {
-    constructor(prisma, settingsService) {
+    constructor(prisma, settingsService, ordersGateway) {
         this.prisma = prisma;
         this.settingsService = settingsService;
+        this.ordersGateway = ordersGateway;
     }
     async create(createOrderDto) {
         const storeSettings = await this.settingsService.getSettings();
@@ -26,7 +28,7 @@ let OrdersService = class OrdersService {
         if (!createOrderDto.items || createOrderDto.items.length === 0) {
             throw new common_1.BadRequestException('รายการสั่งซื้อต้องมีอาหารอย่างน้อย 1 รายการ');
         }
-        return this.prisma.$transaction(async (tx) => {
+        const createdOrder = await this.prisma.$transaction(async (tx) => {
             let totalAmount = 0;
             const orderItemsData = [];
             for (const item of createOrderDto.items) {
@@ -167,13 +169,44 @@ let OrdersService = class OrdersService {
             }
             return order;
         });
+        try {
+            this.ordersGateway.sendNewOrder(createdOrder);
+        }
+        catch (wsErr) {
+            console.warn('[WebSocket] ไม่สามารถส่งสัญญาณ new_order:', wsErr);
+        }
+        return createdOrder;
     }
-    async findAll(status, tableId, orderType) {
+    async findAll(status, tableId, orderType, date) {
+        let dateFilter = undefined;
+        if (date === 'today') {
+            const bangkokDateStr = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'Asia/Bangkok',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+            }).format(new Date());
+            const startOfThaiDay = new Date(`${bangkokDateStr}T00:00:00+07:00`);
+            const endOfThaiDay = new Date(`${bangkokDateStr}T23:59:59.999+07:00`);
+            dateFilter = {
+                gte: startOfThaiDay,
+                lte: endOfThaiDay,
+            };
+        }
+        else if (date && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            const startOfThaiDay = new Date(`${date}T00:00:00+07:00`);
+            const endOfThaiDay = new Date(`${date}T23:59:59.999+07:00`);
+            dateFilter = {
+                gte: startOfThaiDay,
+                lte: endOfThaiDay,
+            };
+        }
         return this.prisma.order.findMany({
             where: {
                 ...(status && { status: status }),
                 ...(tableId && { table_id: tableId }),
                 ...(orderType && { order_type: orderType }),
+                ...(dateFilter && { created_at: dateFilter }),
             },
             include: {
                 order_items: {
@@ -195,6 +228,9 @@ let OrdersService = class OrdersService {
         });
     }
     async findByUser(userId) {
+        if (!userId || isNaN(userId) || userId <= 0) {
+            return [];
+        }
         return this.prisma.order.findMany({
             where: { user_id: userId },
             include: {
@@ -347,6 +383,12 @@ let OrdersService = class OrdersService {
                 }
             }
         }
+        try {
+            this.ordersGateway.sendOrderStatusUpdated(updated);
+        }
+        catch (wsErr) {
+            console.warn('[WebSocket] ไม่สามารถส่งสัญญาณ order_status_updated:', wsErr);
+        }
         return updated;
     }
 };
@@ -354,6 +396,7 @@ exports.OrdersService = OrdersService;
 exports.OrdersService = OrdersService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        settings_service_1.SettingsService])
+        settings_service_1.SettingsService,
+        orders_gateway_1.OrdersGateway])
 ], OrdersService);
 //# sourceMappingURL=orders.service.js.map

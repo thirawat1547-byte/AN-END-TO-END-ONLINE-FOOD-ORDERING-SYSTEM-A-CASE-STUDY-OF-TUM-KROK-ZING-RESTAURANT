@@ -31,16 +31,24 @@ let OrdersController = class OrdersController {
         }
         return this.ordersService.create(createOrderDto);
     }
-    findAll(status, tableId, orderType) {
-        return this.ordersService.findAll(status, tableId ? parseInt(tableId, 10) : undefined, orderType);
+    findAll(status, tableId, orderType, date) {
+        return this.ordersService.findAll(status, tableId ? parseInt(tableId, 10) : undefined, orderType, date);
     }
     findMyActiveOrder(req, orderId) {
-        const userId = req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub;
-        return this.ordersService.findActiveUserOrder(Number(userId), orderId ? parseInt(orderId, 10) : undefined);
+        const rawUserId = req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub;
+        const userId = Number(rawUserId);
+        if (!userId || isNaN(userId) || userId <= 0) {
+            return null;
+        }
+        return this.ordersService.findActiveUserOrder(userId, orderId ? parseInt(orderId, 10) : undefined);
     }
     findMyOrders(req) {
-        const userId = req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub;
-        return this.ordersService.findByUser(Number(userId));
+        const rawUserId = req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub;
+        const userId = Number(rawUserId);
+        if (!userId || isNaN(userId) || userId <= 0) {
+            return [];
+        }
+        return this.ordersService.findByUser(userId);
     }
     findOne(id) {
         return this.ordersService.findOne(id);
@@ -68,11 +76,13 @@ __decorate([
     (0, swagger_1.ApiQuery)({ name: 'status', required: false, description: 'กรองตามสถานะ (PENDING, COOKING, READY, IN_DELIVERY, DELIVERED, COMPLETED)' }),
     (0, swagger_1.ApiQuery)({ name: 'tableId', required: false, type: Number, description: 'กรองตามหมายเลขโต๊ะ' }),
     (0, swagger_1.ApiQuery)({ name: 'orderType', required: false, description: 'กรองตามประเภท (DELIVERY, DINE_IN, TAKEAWAY)' }),
+    (0, swagger_1.ApiQuery)({ name: 'date', required: false, description: 'กรองตามวันที่ (YYYY-MM-DD หรือ today)' }),
     __param(0, (0, common_1.Query)('status')),
     __param(1, (0, common_1.Query)('tableId')),
     __param(2, (0, common_1.Query)('orderType')),
+    __param(3, (0, common_1.Query)('date')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String]),
+    __metadata("design:paramtypes", [String, String, String, String]),
     __metadata("design:returntype", void 0)
 ], OrdersController.prototype, "findAll", null);
 __decorate([

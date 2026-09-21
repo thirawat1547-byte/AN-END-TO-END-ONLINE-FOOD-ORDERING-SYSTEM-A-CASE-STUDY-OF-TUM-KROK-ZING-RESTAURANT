@@ -25,6 +25,9 @@ let IngredientsController = class IngredientsController {
     findAll() {
         return this.ingredientsService.findAll();
     }
+    translateAllToThai() {
+        return this.ingredientsService.translateAllToThai();
+    }
     findOne(id) {
         return this.ingredientsService.findOne(id);
     }
@@ -46,6 +49,13 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], IngredientsController.prototype, "findAll", null);
+__decorate([
+    (0, common_1.Post)('translate-thai'),
+    (0, swagger_1.ApiOperation)({ summary: 'แปลงชื่อและหน่วยวัตถุดิบทั้งหมดในฐานข้อมูลเป็นภาษาไทย' }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], IngredientsController.prototype, "translateAllToThai", null);
 __decorate([
     (0, common_1.Get)(':id'),
     (0, swagger_1.ApiOperation)({ summary: 'ดูรายละเอียดวัตถุดิบตาม ID' }),

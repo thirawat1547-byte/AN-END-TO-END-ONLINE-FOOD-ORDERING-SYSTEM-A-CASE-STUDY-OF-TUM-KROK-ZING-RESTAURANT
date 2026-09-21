@@ -33,6 +33,9 @@ let MenusService = class MenusService {
                 allergens: {
                     include: { allergen: true },
                 },
+                ingredients: {
+                    include: { ingredient: true },
+                },
             },
             orderBy: { menu_id: 'asc' },
         });
@@ -68,6 +71,34 @@ let MenusService = class MenusService {
         return this.prisma.menu.delete({
             where: { menu_id: id },
         });
+    }
+    async updateIngredients(menuId, ingredients) {
+        await this.findOne(menuId);
+        await this.prisma.menuIngredient.deleteMany({
+            where: { menu_id: menuId },
+        });
+        if (ingredients && ingredients.length > 0) {
+            const uniqueIngredients = [];
+            const seen = new Set();
+            for (const item of ingredients) {
+                const ingId = Number(item.ingredient_id);
+                const qty = Number(item.quantity_used);
+                if (ingId && qty > 0 && !seen.has(ingId)) {
+                    seen.add(ingId);
+                    uniqueIngredients.push({
+                        menu_id: menuId,
+                        ingredient_id: ingId,
+                        quantity_used: qty,
+                    });
+                }
+            }
+            if (uniqueIngredients.length > 0) {
+                await this.prisma.menuIngredient.createMany({
+                    data: uniqueIngredients,
+                });
+            }
+        }
+        return this.findOne(menuId);
     }
 };
 exports.MenusService = MenusService;

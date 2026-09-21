@@ -5,27 +5,27 @@ export declare class TablesService {
     private readonly prisma;
     constructor(prisma: PrismaService);
     findAll(): Promise<{
-        table_number: string;
-        status: string;
         table_id: number;
+        table_number: string;
         capacity: number;
+        status: string;
     }[]>;
     findOne(table_id: number): Promise<{
-        table_number: string;
-        status: string;
         table_id: number;
+        table_number: string;
         capacity: number;
+        status: string;
     }>;
     create(createTableDto: CreateTableDto): Promise<{
-        table_number: string;
-        status: string;
         table_id: number;
+        table_number: string;
         capacity: number;
+        status: string;
     }>;
     updateStatus(table_id: number, updateDto: UpdateTableStatusDto): Promise<{
-        table_number: string;
-        status: string;
         table_id: number;
+        table_number: string;
         capacity: number;
+        status: string;
     }>;
 }

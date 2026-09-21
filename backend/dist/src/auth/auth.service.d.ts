@@ -17,11 +17,11 @@ export declare class AuthService implements OnModuleInit {
     logout(userId: number): Promise<void>;
     register(dto: RegisterDto): Promise<{
         role: string;
+        user_id: number;
         username: string;
         email: string | null;
         phone_number: string | null;
         address: string | null;
-        user_id: number;
     }>;
     login(dto: LoginDto): Promise<{
         access_token: string;
@@ -36,18 +36,18 @@ export declare class AuthService implements OnModuleInit {
     }>;
     getProfile(userId: number): Promise<{
         role: string;
+        user_id: number;
         username: string;
         email: string;
         phone_number: string;
         address: string;
-        user_id: number;
     }>;
     updateProfile(userId: number, dto: UpdateProfileDto): Promise<{
+        user_id: number;
         username: string;
         email: string;
         phone_number: string;
         address: string;
         role: string;
-        user_id: number;
     }>;
 }

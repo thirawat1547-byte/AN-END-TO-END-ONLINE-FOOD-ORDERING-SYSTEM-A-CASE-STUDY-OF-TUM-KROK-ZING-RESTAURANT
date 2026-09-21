@@ -22,10 +22,10 @@ export declare class OrdersController {
         };
         order_items: ({
             menu: {
+                description: string | null;
                 menu_id: number;
                 category_id: number;
                 menu_name: string;
-                description: string | null;
                 price: import("@prisma/client/runtime/library").Decimal;
                 image_url: string | null;
                 calories: number | null;
@@ -36,6 +36,7 @@ export declare class OrdersController {
             order_id: number;
             quantity: number;
             unit_price: number;
+            notes: string | null;
             order_item_id: number;
             menu_id: number;
         })[];
@@ -49,7 +50,7 @@ export declare class OrdersController {
         table_id: number | null;
         promo_id: number | null;
     }>;
-    findAll(status?: string, tableId?: string, orderType?: string): Promise<({
+    findAll(status?: string, tableId?: string, orderType?: string, date?: string): Promise<({
         user: {
             user_id: number;
             username: string;
@@ -73,10 +74,10 @@ export declare class OrdersController {
         }[];
         order_items: ({
             menu: {
+                description: string | null;
                 menu_id: number;
                 category_id: number;
                 menu_name: string;
-                description: string | null;
                 price: import("@prisma/client/runtime/library").Decimal;
                 image_url: string | null;
                 calories: number | null;
@@ -87,6 +88,7 @@ export declare class OrdersController {
             order_id: number;
             quantity: number;
             unit_price: number;
+            notes: string | null;
             order_item_id: number;
             menu_id: number;
         })[];
@@ -123,10 +125,10 @@ export declare class OrdersController {
         }[];
         order_items: ({
             menu: {
+                description: string | null;
                 menu_id: number;
                 category_id: number;
                 menu_name: string;
-                description: string | null;
                 price: import("@prisma/client/runtime/library").Decimal;
                 image_url: string | null;
                 calories: number | null;
@@ -137,6 +139,7 @@ export declare class OrdersController {
             order_id: number;
             quantity: number;
             unit_price: number;
+            notes: string | null;
             order_item_id: number;
             menu_id: number;
         })[];
@@ -150,7 +153,7 @@ export declare class OrdersController {
         table_id: number | null;
         promo_id: number | null;
     }>;
-    findMyOrders(req: any): Promise<({
+    findMyOrders(req: any): any[] | Promise<({
         table: {
             status: string;
             table_id: number;
@@ -167,10 +170,10 @@ export declare class OrdersController {
         }[];
         order_items: ({
             menu: {
+                description: string | null;
                 menu_id: number;
                 category_id: number;
                 menu_name: string;
-                description: string | null;
                 price: import("@prisma/client/runtime/library").Decimal;
                 image_url: string | null;
                 calories: number | null;
@@ -181,6 +184,7 @@ export declare class OrdersController {
             order_id: number;
             quantity: number;
             unit_price: number;
+            notes: string | null;
             order_item_id: number;
             menu_id: number;
         })[];
@@ -217,10 +221,10 @@ export declare class OrdersController {
         }[];
         order_items: ({
             menu: {
+                description: string | null;
                 menu_id: number;
                 category_id: number;
                 menu_name: string;
-                description: string | null;
                 price: import("@prisma/client/runtime/library").Decimal;
                 image_url: string | null;
                 calories: number | null;
@@ -231,6 +235,7 @@ export declare class OrdersController {
             order_id: number;
             quantity: number;
             unit_price: number;
+            notes: string | null;
             order_item_id: number;
             menu_id: number;
         })[];

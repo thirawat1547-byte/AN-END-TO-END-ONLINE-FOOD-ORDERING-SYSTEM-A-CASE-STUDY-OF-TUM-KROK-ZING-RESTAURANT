@@ -10,6 +10,7 @@ exports.OrdersModule = void 0;
 const common_1 = require("@nestjs/common");
 const orders_controller_1 = require("./orders.controller");
 const orders_service_1 = require("./orders.service");
+const orders_gateway_1 = require("./orders.gateway");
 const prisma_service_1 = require("../prisma.service");
 const settings_module_1 = require("../settings/settings.module");
 let OrdersModule = class OrdersModule {
@@ -19,8 +20,8 @@ exports.OrdersModule = OrdersModule = __decorate([
     (0, common_1.Module)({
         imports: [settings_module_1.SettingsModule],
         controllers: [orders_controller_1.OrdersController],
-        providers: [orders_service_1.OrdersService, prisma_service_1.PrismaService],
-        exports: [orders_service_1.OrdersService],
+        providers: [orders_service_1.OrdersService, prisma_service_1.PrismaService, orders_gateway_1.OrdersGateway],
+        exports: [orders_service_1.OrdersService, orders_gateway_1.OrdersGateway],
     })
 ], OrdersModule);
 //# sourceMappingURL=orders.module.js.map
