@@ -546,7 +546,11 @@ const openOrderPage = () => {
 }
 
 const goBack = () => {
-  router.push('/kitchen/tables')
+  if (window.history.length > 1) {
+    router.back()
+  } else {
+    router.push('/admin/tables')
+  }
 }
 </script>
 
