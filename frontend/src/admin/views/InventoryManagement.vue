@@ -265,6 +265,16 @@ function getMaxPortions(menuId) {
   return minPortions === Infinity ? '-' : minPortions + ' จาน'
 }
 
+function canChooseDishType(menu) {
+  if (!menu) return false
+  const name = menu.menu_name || menu.name || ''
+  // เมนูข้าวผัด, ข้าวเปล่า, ข้าวเหนียว, เครื่องดื่ม, ส้มตำ, ลาบ, ยำ ไม่มีตัวเลือกกับข้าว/ราดข้าว
+  if (name.includes('ข้าวผัด') || name.includes('ข้าวเปล่า') || name.includes('ข้าวเหนียว')) return false
+  if (name.includes('เครื่องดื่ม') || name.includes('น้ำ') || name.includes('โค้ก') || name.includes('สไปรท์') || name.includes('เก๊กฮวย')) return false
+  if (name.includes('ส้มตำ') || name.includes('ลาบ') || name.includes('ยำ') || name.includes('ไก่ทอด')) return false
+  return true
+}
+
 // Recipe editing / formulation modal state
 const isRecipeModalOpen = ref(false)
 const selectedMenuForRecipe = ref(null)
@@ -580,7 +590,7 @@ async function saveRecipeFormula() {
                   <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
                   <span class="font-semibold text-slate-800">{{ r.ingredient_name }}</span>
                   <span 
-                    v-if="(r.ingredient_name.includes('ข้าวสาร') || r.ingredient_name.includes('ข้าวหอมมะลิ')) && menu.category_id !== 5"
+                    v-if="(r.ingredient_name.includes('ข้าวสาร') || r.ingredient_name.includes('ข้าวหอมมะลิ')) && canChooseDishType(menu)"
                     class="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-semibold"
                     title="ระบบจะตัดสต็อกเฉพาะเมื่อสั่งแบบราดข้าว หากสั่งเป็นกับข้าวจะไม่ดึงสต็อกรายการนี้"
                   >

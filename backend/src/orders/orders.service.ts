@@ -177,13 +177,20 @@ export class OrdersService {
 
       // ตัดสต็อกวัตถุดิบอัตโนมัติตามสูตรอาหาร (MenuIngredient) ตรงตาม Sequence Diagram
       for (const item of createOrderDto.items) {
+        // เมนูข้าวผัด, ข้าวเปล่า, ข้าวเหนียว เป็นเมนูข้าวโดยตรง จะต้องตัดสต็อกข้าวตามสูตรเสมอ
+        const menu = await tx.menu.findUnique({ where: { menu_id: item.menu_id } });
+        const menuName = menu?.menu_name || '';
+        const isRiceDishItself = menuName.includes('ข้าวผัด') || menuName.includes('ข้าวเปล่า') || menuName.includes('ข้าวเหนียว');
+
         // ตรวจสอบว่าสั่งเป็น "กับข้าว" หรือไม่ (ถ้าเป็นกับข้าว จะไม่ตัดสต็อกข้าวสารหอมมะลิ)
         const dishType = (item as any).dish_type || (item as any).dishType || '';
         const notes = item.notes || '';
         const isKabKhao =
-          dishType.includes('กับข้าว') ||
-          notes.includes('กับข้าว') ||
-          notes.includes('แบบกับข้าว');
+          !isRiceDishItself && (
+            dishType.includes('กับข้าว') ||
+            notes.includes('กับข้าว') ||
+            notes.includes('แบบกับข้าว')
+          );
 
         const menuIngredients = await tx.menuIngredient.findMany({
           where: { menu_id: item.menu_id },
@@ -447,8 +454,12 @@ export class OrdersService {
     const statusUpper = updateOrderStatusDto.status.toUpperCase();
     if (statusUpper === 'CANCELLED' && order.status.toUpperCase() !== 'CANCELLED') {
       for (const item of order.order_items) {
+        const menu = await this.prisma.menu.findUnique({ where: { menu_id: item.menu_id } });
+        const menuName = menu?.menu_name || '';
+        const isRiceDishItself = menuName.includes('ข้าวผัด') || menuName.includes('ข้าวเปล่า') || menuName.includes('ข้าวเหนียว');
+
         const notes = item.notes || '';
-        const isKabKhao = notes.includes('กับข้าว') || notes.includes('แบบกับข้าว');
+        const isKabKhao = !isRiceDishItself && (notes.includes('กับข้าว') || notes.includes('แบบกับข้าว'));
 
         const menuIngredients = await this.prisma.menuIngredient.findMany({
           where: { menu_id: item.menu_id },
