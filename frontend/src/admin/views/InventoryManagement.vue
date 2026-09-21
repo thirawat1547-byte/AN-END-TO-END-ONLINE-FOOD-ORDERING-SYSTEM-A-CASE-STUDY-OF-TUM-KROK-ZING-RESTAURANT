@@ -539,7 +539,7 @@ async function saveRecipeFormula() {
         <div>
           <p class="font-bold">ระบบตัดสต็อกวัตถุดิบอัตโนมัติ (Automated Stock Deduction Logic)</p>
           <p class="text-[11px] text-emerald-800/90 mt-0.5">
-            เมื่อลูกค้าสั่งอาหารและชำระเงินสำเร็จ ระบบจะคำนวณและตัดจำนวนวัตถุดิบตามสูตร (Quantity Used) ในตาราง MENU_INGREDIENTS ทันที
+            เมื่อลูกค้าสั่งอาหารและชำระเงินสำเร็จ ระบบจะคำนวณและตัดจำนวนวัตถุดิบตามสูตร (Quantity Used) ในตาราง MENU_INGREDIENTS ทันที <span class="bg-emerald-100/80 text-emerald-900 px-1.5 py-0.5 rounded font-bold">✨ กรณีสั่งแบบ "กับข้าว" ระบบจะไม่ตัดสต็อกข้าวสารหอมมะลิ</span>
           </p>
         </div>
       </div>
@@ -576,9 +576,16 @@ async function saveRecipeFormula() {
                 :key="r.ingredient_id"
                 class="flex items-center justify-between text-xs py-1 px-2.5 rounded-lg bg-slate-50"
               >
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
                   <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
                   <span class="font-semibold text-slate-800">{{ r.ingredient_name }}</span>
+                  <span 
+                    v-if="(r.ingredient_name.includes('ข้าวสาร') || r.ingredient_name.includes('ข้าวหอมมะลิ')) && menu.category_id !== 5"
+                    class="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-semibold"
+                    title="ระบบจะตัดสต็อกเฉพาะเมื่อสั่งแบบราดข้าว หากสั่งเป็นกับข้าวจะไม่ดึงสต็อกรายการนี้"
+                  >
+                    เฉพาะราดข้าว (สั่งกับข้าวไม่ตัด)
+                  </span>
                 </div>
                 <div class="text-slate-500">
                   <span class="font-bold text-slate-900">{{ r.quantity_used }}</span> {{ r.unit }} 

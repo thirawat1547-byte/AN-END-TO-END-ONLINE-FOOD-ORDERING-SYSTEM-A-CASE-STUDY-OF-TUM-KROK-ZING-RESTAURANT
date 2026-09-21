@@ -137,11 +137,19 @@ const placeOrder = async () => {
           notesList.push('เพิ่ม: ' + item.addons.map(a => a.name).join(', '))
         }
 
+        let dishTypeVal = undefined
+        if (item.specialInstructions && item.specialInstructions.includes('กับข้าว')) {
+          dishTypeVal = 'กับข้าว'
+        } else if (item.specialInstructions && item.specialInstructions.includes('ราดข้าว')) {
+          dishTypeVal = 'ราดข้าว'
+        }
+
         const validMenuId = Number(item.menu_id || item.id)
         return {
           menu_id: validMenuId,
           quantity: Number(item.quantity || 1),
-          notes: notesList.join(' | ') || undefined
+          notes: notesList.join(' | ') || undefined,
+          dish_type: dishTypeVal
         }
       })
     }

@@ -45,12 +45,18 @@ export class OrdersService {
         const unitPrice = Number(menu.price);
         totalAmount += unitPrice * item.quantity;
 
+        const dishType = (item as any).dish_type || (item as any).dishType;
+        let finalNotes = item.notes || '';
+        if (dishType && !finalNotes.includes(dishType)) {
+          finalNotes = finalNotes ? `${dishType} | ${finalNotes}` : dishType;
+        }
+
         // บันทึกข้อมูลรายการอาหาร พร้อมหมายเหตุตัวเลือกที่ลูกค้าเลือก (notes)
         orderItemsData.push({
           menu_id: item.menu_id,
           quantity: item.quantity,
           unit_price: unitPrice,
-          notes: item.notes || null,
+          notes: finalNotes || null,
         });
       }
 
@@ -171,11 +177,30 @@ export class OrdersService {
 
       // ตัดสต็อกวัตถุดิบอัตโนมัติตามสูตรอาหาร (MenuIngredient) ตรงตาม Sequence Diagram
       for (const item of createOrderDto.items) {
+        // ตรวจสอบว่าสั่งเป็น "กับข้าว" หรือไม่ (ถ้าเป็นกับข้าว จะไม่ตัดสต็อกข้าวสารหอมมะลิ)
+        const dishType = (item as any).dish_type || (item as any).dishType || '';
+        const notes = item.notes || '';
+        const isKabKhao =
+          dishType.includes('กับข้าว') ||
+          notes.includes('กับข้าว') ||
+          notes.includes('แบบกับข้าว');
+
         const menuIngredients = await tx.menuIngredient.findMany({
           where: { menu_id: item.menu_id },
+          include: {
+            ingredient: true,
+          },
         });
 
         for (const mi of menuIngredients) {
+          // ถ้าสั่งแบบ "กับข้าว" ให้ยกเว้นการตัดสต็อกข้าวสารหอมมะลิ
+          const ingName = mi.ingredient?.name || '';
+          const isRice = ingName.includes('ข้าวสาร') || ingName.includes('ข้าวหอมมะลิ');
+          if (isKabKhao && isRice) {
+            console.log(`[Stock Deduction] เมนู #${item.menu_id} สั่งเป็น "กับข้าว" -> ยกเว้นการตัดสต็อกวัตถุดิบ "${ingName}"`);
+            continue;
+          }
+
           const deductAmount = Number(mi.quantity_used) * item.quantity;
           if (deductAmount > 0) {
             await tx.ingredient.update({
@@ -422,10 +447,23 @@ export class OrdersService {
     const statusUpper = updateOrderStatusDto.status.toUpperCase();
     if (statusUpper === 'CANCELLED' && order.status.toUpperCase() !== 'CANCELLED') {
       for (const item of order.order_items) {
+        const notes = item.notes || '';
+        const isKabKhao = notes.includes('กับข้าว') || notes.includes('แบบกับข้าว');
+
         const menuIngredients = await this.prisma.menuIngredient.findMany({
           where: { menu_id: item.menu_id },
+          include: {
+            ingredient: true,
+          },
         });
         for (const mi of menuIngredients) {
+          // ถ้าสั่งแบบ "กับข้าว" ตอนตัดสต็อกไม่ได้ตัดข้าวสาร ดังนั้นตอนยกเลิกก็ไม่ต้องคืนข้าวสาร
+          const ingName = mi.ingredient?.name || '';
+          const isRice = ingName.includes('ข้าวสาร') || ingName.includes('ข้าวหอมมะลิ');
+          if (isKabKhao && isRice) {
+            continue;
+          }
+
           const restoreAmount = Number(mi.quantity_used) * item.quantity;
           if (restoreAmount > 0) {
             await this.prisma.ingredient.update({

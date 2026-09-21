@@ -26,6 +26,16 @@ export class OrderItemDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @ApiPropertyOptional({ example: 'กับข้าว', description: 'รูปแบบอาหาร: กับข้าว หรือ ราดข้าว' })
+  @IsString()
+  @IsOptional()
+  dish_type?: string;
+
+  @ApiPropertyOptional({ example: 'กับข้าว', description: 'รูปแบบอาหาร: กับข้าว หรือ ราดข้าว (alias)' })
+  @IsString()
+  @IsOptional()
+  dishType?: string;
 }
 
 export class CreateOrderDto {

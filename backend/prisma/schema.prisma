@@ -127,12 +127,14 @@ model OrderItem {
   order_id      Int
   menu_id       Int
   quantity      Int
-  unit_price    Float
+  unit_price    Float    @default(0)
   notes         String?  @db.Text
   created_at    DateTime @default(now())
 
   order Order @relation(fields: [order_id], references: [order_id], onDelete: Cascade)
   menu  Menu  @relation(fields: [menu_id], references: [menu_id])
+
+  @@map("ORDER_ITEMS")
 }
 
 model Transaction {

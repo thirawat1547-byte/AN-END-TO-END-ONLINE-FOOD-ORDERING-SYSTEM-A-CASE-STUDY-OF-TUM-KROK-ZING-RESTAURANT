@@ -697,7 +697,8 @@ async validateAndCheckout() {
             return {
               menu_id: Number(realMenuId),
               quantity: Number(item.qty || item.quantity || 1),
-              notes: options.join(' | ')
+              notes: options.join(' | '),
+              dish_type: item.dishType || undefined
             };
           })
         };
