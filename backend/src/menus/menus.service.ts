@@ -17,7 +17,7 @@ export class MenusService {
 
   // 2. ดึงรายการอาหารทั้งหมด (กรองตามหมวดหมู่ / สถานะขาย) พร้อมสูตรวัตถุดิบ
   async findAll(categoryId?: number, isAvailable?: boolean) {
-    return this.prisma.menu.findMany({
+    const menus = await this.prisma.menu.findMany({
       where: {
         ...(categoryId && { category_id: categoryId }),
         ...(isAvailable !== undefined && { is_available: isAvailable }),
@@ -33,6 +33,12 @@ export class MenusService {
       },
       orderBy: { menu_id: 'asc' },
     });
+
+    return menus.map((m) => ({
+      ...m,
+      allergens: (m.allergens || []).filter((a) => a.allergen != null),
+      ingredients: (m.ingredients || []).filter((i) => i.ingredient != null),
+    }));
   }
 
   // 3. ดูรายละเอียดเมนูรายตัว
@@ -53,7 +59,12 @@ export class MenusService {
     if (!menu) {
       throw new NotFoundException(`ไม่พบเมนูอาหารรหัส ${id}`);
     }
-    return menu;
+
+    return {
+      ...menu,
+      allergens: (menu.allergens || []).filter((a) => a.allergen != null),
+      ingredients: (menu.ingredients || []).filter((i) => i.ingredient != null),
+    };
   }
 
   // 4. แก้ไขข้อมูลเมนูอาหาร

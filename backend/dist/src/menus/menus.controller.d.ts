@@ -19,11 +19,7 @@ export declare class MenusController {
         calories: number | null;
         is_available: boolean;
     }>;
-    findAll(categoryId?: string, isAvailable?: string): Promise<({
-        category: {
-            category_id: number;
-            category_name: string;
-        };
+    findAll(categoryId?: string, isAvailable?: string): Promise<{
         allergens: ({
             allergen: {
                 allergen_id: number;
@@ -48,7 +44,10 @@ export declare class MenusController {
             ingredient_id: number;
             quantity_used: import("@prisma/client/runtime/library").Decimal;
         })[];
-    } & {
+        category: {
+            category_id: number;
+            category_name: string;
+        };
         category_id: number;
         menu_id: number;
         menu_name: string;
@@ -57,12 +56,8 @@ export declare class MenusController {
         image_url: string | null;
         calories: number | null;
         is_available: boolean;
-    })[]>;
+    }[]>;
     findOne(id: number): Promise<{
-        category: {
-            category_id: number;
-            category_name: string;
-        };
         allergens: ({
             allergen: {
                 allergen_id: number;
@@ -87,7 +82,10 @@ export declare class MenusController {
             ingredient_id: number;
             quantity_used: import("@prisma/client/runtime/library").Decimal;
         })[];
-    } & {
+        category: {
+            category_id: number;
+            category_name: string;
+        };
         category_id: number;
         menu_id: number;
         menu_name: string;
@@ -128,10 +126,6 @@ export declare class MenusController {
             quantity_used: number;
         }>;
     }): Promise<{
-        category: {
-            category_id: number;
-            category_name: string;
-        };
         allergens: ({
             allergen: {
                 allergen_id: number;
@@ -156,7 +150,10 @@ export declare class MenusController {
             ingredient_id: number;
             quantity_used: import("@prisma/client/runtime/library").Decimal;
         })[];
-    } & {
+        category: {
+            category_id: number;
+            category_name: string;
+        };
         category_id: number;
         menu_id: number;
         menu_name: string;
@@ -172,10 +169,6 @@ export declare class MenusController {
             quantity_used: number;
         }>;
     }): Promise<{
-        category: {
-            category_id: number;
-            category_name: string;
-        };
         allergens: ({
             allergen: {
                 allergen_id: number;
@@ -200,7 +193,10 @@ export declare class MenusController {
             ingredient_id: number;
             quantity_used: import("@prisma/client/runtime/library").Decimal;
         })[];
-    } & {
+        category: {
+            category_id: number;
+            category_name: string;
+        };
         category_id: number;
         menu_id: number;
         menu_name: string;

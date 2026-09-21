@@ -90,8 +90,8 @@ model MenuAllergen {
   menu_id     Int
   allergen_id Int
 
-  menu     Menu     @relation(fields: [menu_id], references: [menu_id])
-  allergen Allergen @relation(fields: [allergen_id], references: [allergen_id])
+  menu     Menu      @relation(fields: [menu_id], references: [menu_id])
+  allergen Allergen? @relation(fields: [allergen_id], references: [allergen_id])
 
   @@id([menu_id, allergen_id])
   @@index([menu_id])
@@ -168,8 +168,8 @@ model MenuIngredient {
   ingredient_id Int
   quantity_used Decimal @db.Decimal(10, 2)
 
-  menu       Menu       @relation(fields: [menu_id], references: [menu_id])
-  ingredient Ingredient @relation(fields: [ingredient_id], references: [ingredient_id])
+  menu       Menu        @relation(fields: [menu_id], references: [menu_id])
+  ingredient Ingredient? @relation(fields: [ingredient_id], references: [ingredient_id])
 
   @@id([menu_id, ingredient_id])
   @@index([menu_id])

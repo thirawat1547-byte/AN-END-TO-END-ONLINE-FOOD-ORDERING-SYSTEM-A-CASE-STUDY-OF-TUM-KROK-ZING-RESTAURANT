@@ -23,7 +23,7 @@ let MenusService = class MenusService {
         });
     }
     async findAll(categoryId, isAvailable) {
-        return this.prisma.menu.findMany({
+        const menus = await this.prisma.menu.findMany({
             where: {
                 ...(categoryId && { category_id: categoryId }),
                 ...(isAvailable !== undefined && { is_available: isAvailable }),
@@ -39,6 +39,11 @@ let MenusService = class MenusService {
             },
             orderBy: { menu_id: 'asc' },
         });
+        return menus.map((m) => ({
+            ...m,
+            allergens: (m.allergens || []).filter((a) => a.allergen != null),
+            ingredients: (m.ingredients || []).filter((i) => i.ingredient != null),
+        }));
     }
     async findOne(id) {
         const menu = await this.prisma.menu.findUnique({
@@ -56,7 +61,11 @@ let MenusService = class MenusService {
         if (!menu) {
             throw new common_1.NotFoundException(`ไม่พบเมนูอาหารรหัส ${id}`);
         }
-        return menu;
+        return {
+            ...menu,
+            allergens: (menu.allergens || []).filter((a) => a.allergen != null),
+            ingredients: (menu.ingredients || []).filter((i) => i.ingredient != null),
+        };
     }
     async update(id, updateMenuDto) {
         await this.findOne(id);

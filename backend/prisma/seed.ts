@@ -609,6 +609,23 @@ async function main() {
     { menuName: 'ข้าวเหนียว', ingName: 'ข้าวเหนียว', qty: 0.15 },
   ];
 
+  // ล้างความสัมพันธ์เก่าที่ตกค้างหรืออ้างอิง ID ที่ไม่มีอยู่จริง (ป้องกัน 500 error)
+  try {
+    await prisma.$executeRawUnsafe(`
+      DELETE FROM MENU_INGREDIENTS 
+      WHERE ingredient_id NOT IN (SELECT ingredient_id FROM INGREDIENTS)
+         OR menu_id NOT IN (SELECT menu_id FROM MENUS);
+    `);
+    await prisma.$executeRawUnsafe(`
+      DELETE FROM MENU_ALLERGENS 
+      WHERE allergen_id NOT IN (SELECT allergen_id FROM ALLERGENS)
+         OR menu_id NOT IN (SELECT menu_id FROM MENUS);
+    `);
+    console.log('🧹 ทำความสะอาดข้อมูลความสัมพันธ์ตกค้างเรียบร้อยแล้ว');
+  } catch (e) {
+    console.warn('Orphan cleanup notice:', e.message);
+  }
+
   let addedRecipes = 0;
   for (const r of recipes) {
     const mId = getMenuId(r.menuName);
