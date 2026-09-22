@@ -5,6 +5,18 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 export declare class AuthController {
     private readonly authService;
     constructor(authService: AuthService);
+    checkUsername(username: string): Promise<{
+        available: boolean;
+        message: string;
+    }>;
+    checkPhone(phone: string): Promise<{
+        available: boolean;
+        message: string;
+    }>;
+    checkEmail(email: string): Promise<{
+        available: boolean;
+        message: string;
+    }>;
     register(registerDto: RegisterDto): Promise<{
         role: string;
         user_id: number;

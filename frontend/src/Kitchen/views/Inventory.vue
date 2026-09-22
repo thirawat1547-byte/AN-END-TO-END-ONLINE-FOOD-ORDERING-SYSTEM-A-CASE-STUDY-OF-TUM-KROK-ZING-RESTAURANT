@@ -25,11 +25,7 @@ const fetchMenus = async () => {
       id: m.menu_id,
       name: m.menu_name,
       price: Number(m.price || 0),
-<<<<<<< HEAD
       category: m.category?.category_name?.includes('เครื่องดื่ม') || m.category_id === 5 ? 'drink' : 'food',
-=======
-      category: m.category?.category_name?.includes('เครื่องดื่ม') || m.category_id === 2 ? 'drink' : 'food',
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
       image: m.image_url || '/images/kapaomu.jpg',
       available: m.is_available ?? true
     }))

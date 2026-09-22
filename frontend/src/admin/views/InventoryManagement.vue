@@ -34,7 +34,7 @@ const THAI_MAP = {
   'chicken breast': { name: 'อกไก่สด', unit: 'กก.' },
   'chicken': { name: 'เนื้อไก่สด', unit: 'กก.' },
   'shrimp': { name: 'กุ้งสด', unit: 'กก.' },
-  'squid': { name: 'ปลาหมึกสด', unit: 'กก.' },
+  'squid': { name: 'หมึกสด', unit: 'กก.' },
   'seafood': { name: 'อาหารทะเลรวม', unit: 'กก.' },
   'papaya': { name: 'มะละกอดิบขูด', unit: 'กก.' },
   'chili': { name: 'พริกสดจินดาแดง', unit: 'กก.' },
@@ -549,7 +549,7 @@ async function saveRecipeFormula() {
         <div>
           <p class="font-bold">ระบบตัดสต็อกวัตถุดิบอัตโนมัติ (Automated Stock Deduction Logic)</p>
           <p class="text-[11px] text-emerald-800/90 mt-0.5">
-            เมื่อลูกค้าสั่งอาหารและชำระเงินสำเร็จ ระบบจะคำนวณและตัดจำนวนวัตถุดิบตามสูตร (Quantity Used) ในตาราง MENU_INGREDIENTS ทันที <span class="bg-emerald-100/80 text-emerald-900 px-1.5 py-0.5 rounded font-bold">✨ กรณีสั่งแบบ "กับข้าว" ระบบจะไม่ตัดสต็อกข้าวสารหอมมะลิ</span>
+            เมื่อลูกค้าสั่งอาหารและชำระเงินสำเร็จ ระบบจะคำนวณและตัดจำนวนวัตถุดิบตามสูตร (Quantity Used) ในตาราง MENU_INGREDIENTS ทันที <span class="bg-emerald-100/80 text-emerald-900 px-1.5 py-0.5 rounded font-bold">✨ กรณีสั่งแบบ "กับข้าว" ระบบจะไม่ตัดสต็อกข้าวสารหอมมะลิ</span> <span class="bg-sky-100/90 text-sky-900 px-1.5 py-0.5 rounded font-bold ml-1">🦐🦑 เมนูทะเลแยก "เฉพาะกุ้ง" หรือ "เฉพาะหมึก" ระบบจะตัดเฉพาะวัตถุดิบที่ลูกค้าเลือก</span>
           </p>
         </div>
       </div>
@@ -595,6 +595,20 @@ async function saveRecipeFormula() {
                     title="ระบบจะตัดสต็อกเฉพาะเมื่อสั่งแบบราดข้าว หากสั่งเป็นกับข้าวจะไม่ดึงสต็อกรายการนี้"
                   >
                     เฉพาะราดข้าว (สั่งกับข้าวไม่ตัด)
+                  </span>
+                  <span 
+                    v-if="(r.ingredient_name.includes('กุ้ง') && !r.ingredient_name.includes('กุ้งแห้ง')) && (menu.menu_name.includes('ทะเล') || menu.menu_name.includes('/กุ้ง'))"
+                    class="text-[10px] bg-sky-100 text-sky-800 px-1.5 py-0.2 rounded font-semibold"
+                    title="ระบบจะตัดสต็อกกุ้งสดเมื่อสั่งรวมทะเลหรือสั่งเฉพาะกุ้ง (หากสั่งเฉพาะหมึกจะไม่ตัด)"
+                  >
+                    🦐 ทะเล/กุ้ง (สั่งเฉพาะหมึกไม่ตัด)
+                  </span>
+                  <span 
+                    v-if="r.ingredient_name.includes('หมึก') && (menu.menu_name.includes('ทะเล') || menu.menu_name.includes('หมึก'))"
+                    class="text-[10px] bg-purple-100 text-purple-800 px-1.5 py-0.2 rounded font-semibold"
+                    title="ระบบจะตัดสต็อกหมึกสดเมื่อสั่งรวมทะเลหรือสั่งเฉพาะหมึก (หากสั่งเฉพาะกุ้งจะไม่ตัด)"
+                  >
+                    🦑 ทะเล/หมึก (สั่งเฉพาะกุ้งไม่ตัด)
                   </span>
                 </div>
                 <div class="text-slate-500">
@@ -642,7 +656,21 @@ async function saveRecipeFormula() {
             class="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80"
           >
             <div class="flex-1 min-w-0">
-              <div class="font-bold text-slate-800 truncate">{{ item.ingredient_name }}</div>
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="font-bold text-slate-800 truncate">{{ item.ingredient_name }}</span>
+                <span 
+                  v-if="(item.ingredient_name.includes('กุ้ง') && !item.ingredient_name.includes('กุ้งแห้ง')) && (selectedMenuForRecipe?.menu_name.includes('ทะเล') || selectedMenuForRecipe?.menu_name.includes('/กุ้ง'))"
+                  class="text-[9px] bg-sky-100 text-sky-800 px-1.5 py-0.2 rounded font-semibold"
+                >
+                  🦐 เฉพาะกุ้ง/รวม
+                </span>
+                <span 
+                  v-if="item.ingredient_name.includes('หมึก') && (selectedMenuForRecipe?.menu_name.includes('ทะเล') || selectedMenuForRecipe?.menu_name.includes('หมึก'))"
+                  class="text-[9px] bg-purple-100 text-purple-800 px-1.5 py-0.2 rounded font-semibold"
+                >
+                  🦑 เฉพาะหมึก/รวม
+                </span>
+              </div>
               <div class="text-[10px] text-slate-400">คงเหลือในสต็อก: {{ item.in_stock }} {{ item.unit }}</div>
             </div>
 

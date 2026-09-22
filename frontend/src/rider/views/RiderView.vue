@@ -110,6 +110,7 @@
           <!-- Step 1 or 2: Highlight Customer Destination Card -->
           <div :class="{ 'ring-2 ring-blue-500 rounded-2xl': currentStep >= 1 }">
             <CustomerCard 
+              :customer="customerInfo"
               :unread-count="unreadChatCount"
               @open-chat="isChatOpen = true"
               @open-map="handleOpenMap"
@@ -225,8 +226,20 @@ const isSuccessOpen = ref(false)
 const toastMessage = ref('')
 const unreadChatCount = ref(1)
 
+const customerInfo = ref({
+  name: 'คุณณัฐวุฒิ ใจดี',
+  phone: '081-992-8811',
+  address: 'คอนโด The Grand Rama 9 (อาคาร B)',
+  addressDetail: 'ชั้น 14 ห้อง 1408 • แขวงห้วยขวาง เขตห้วยขวาง กทม.',
+  note: '📦 ฝากไว้ที่โต๊ะพนักงานส่งอาหารล็อบบี้ชั้น 1',
+  lat: 13.7570,
+  lng: 100.5695,
+  isRealGps: false
+})
+
 const activeMapData = ref({
   targetName: 'คอนโด The Grand Rama 9 (จุดส่งลูกค้า)',
+  customerCoord: [13.7570, 100.5695],
   distance: '3.2 กม.',
   eta: '12 นาที'
 })
@@ -294,11 +307,40 @@ const fetchActiveOrders = async () => {
     // ค้นหาออเดอร์ที่กำลังดำเนินการ (COOKING, READY, หรือ IN_DELIVERY)
     const active = orders.find(o => ['READY', 'COOKING', 'IN_DELIVERY', 'PENDING'].includes(o.status)) || orders[0]
     
+    // ดึงพิกัดที่ปักหมุดไว้ล่าสุดจากระบบสั่งซื้อ (ถ้ามี)
+    let pinnedGps = null
+    try {
+      pinnedGps = JSON.parse(localStorage.getItem('latest_order_gps') || '{}')
+    } catch (e) {}
+
     if (active && active.order_id) {
       isRealOrder.value = true
       realOrderId.value = active.order_id
       orderDisplayId.value = `TKZ-${active.order_id}`
       
+      // อัปเดตข้อมูลลูกค้าและพิกัด GPS จริงจากออเดอร์
+      if (active.user) {
+        customerInfo.value.name = active.user.username || active.user.name || customerInfo.value.name
+        customerInfo.value.phone = active.user.phone_number || active.user.phone || customerInfo.value.phone
+        customerInfo.value.address = active.user.address || customerInfo.value.address
+      }
+
+      if (pinnedGps && pinnedGps.lat && pinnedGps.lng) {
+        customerInfo.value.lat = Number(pinnedGps.lat)
+        customerInfo.value.lng = Number(pinnedGps.lng)
+        customerInfo.value.isRealGps = true
+        if (pinnedGps.address) customerInfo.value.address = pinnedGps.address
+        if (pinnedGps.name) customerInfo.value.name = pinnedGps.name
+        if (pinnedGps.phone) customerInfo.value.phone = pinnedGps.phone
+      }
+
+      activeMapData.value = {
+        targetName: customerInfo.value.address,
+        customerCoord: [customerInfo.value.lat, customerInfo.value.lng],
+        distance: '3.2 กม.',
+        eta: '12 นาที'
+      }
+
       // แปลงรายการอาหาร
       if (active.order_items && active.order_items.length > 0) {
         orderItems.value = active.order_items.map((item, index) => ({
@@ -339,6 +381,22 @@ const switchToDemo = () => {
   orderItems.value = [...demoOrderItems]
   isFoodReady.value = true
   currentStep.value = 0
+  customerInfo.value = {
+    name: 'คุณณัฐวุฒิ ใจดี',
+    phone: '081-992-8811',
+    address: 'คอนโด The Grand Rama 9 (อาคาร B)',
+    addressDetail: 'ชั้น 14 ห้อง 1408 • แขวงห้วยขวาง เขตห้วยขวาง กทม.',
+    note: '📦 ฝากไว้ที่โต๊ะพนักงานส่งอาหารล็อบบี้ชั้น 1',
+    lat: 13.7570,
+    lng: 100.5695,
+    isRealGps: false
+  }
+  activeMapData.value = {
+    targetName: 'คอนโด The Grand Rama 9 (จุดส่งลูกค้า)',
+    customerCoord: [13.7570, 100.5695],
+    distance: '3.2 กม.',
+    eta: '12 นาที'
+  }
 }
 
 const handleToggleFoodReady = async () => {
@@ -408,7 +466,12 @@ const handleResetFlow = () => {
 }
 
 const handleOpenMap = (data) => {
-  activeMapData.value = data
+  if (data) {
+    activeMapData.value = {
+      ...data,
+      customerCoord: data.customerCoord || [customerInfo.value.lat, customerInfo.value.lng]
+    }
+  }
   isMapOpen.value = true
 }
 

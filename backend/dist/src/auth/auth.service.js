@@ -85,12 +85,104 @@ let AuthService = AuthService_1 = class AuthService {
             this.logger.warn(`Failed to delete session for user #${userId}:`, err.message);
         }
     }
+    async checkUsernameAvailable(username) {
+        if (!username || !username.trim()) {
+            return { available: false, message: 'กรุณากรอกชื่อผู้ใช้ (Username)' };
+        }
+        const cleanUsername = username.trim();
+        if (cleanUsername.length < 3) {
+            return { available: false, message: 'ชื่อผู้ใช้ต้องมีความยาวอย่างน้อย 3 ตัวอักษร' };
+        }
+        const existingUser = await this.prisma.user.findFirst({
+            where: { username: cleanUsername },
+        });
+        if (existingUser) {
+            return { available: false, message: 'ชื่อผู้ใช้นี้ถูกใช้งานในระบบแล้ว กรุณาใช้ชื่ออื่น' };
+        }
+        return { available: true, message: 'ชื่อผู้ใช้นี้สามารถใช้งานได้' };
+    }
+    async checkPhoneAvailable(phone) {
+        if (!phone || !phone.trim()) {
+            return { available: false, message: 'กรุณากรอกเบอร์โทรศัพท์' };
+        }
+        const cleanPhone = phone.trim().replace(/[-\s]/g, '');
+        if (cleanPhone.length !== 10) {
+            return { available: false, message: 'รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง (ต้องมี 10 หลัก)' };
+        }
+        const existingUser = await this.prisma.user.findFirst({
+            where: {
+                OR: [
+                    { phone_number: cleanPhone },
+                    { phone_number: phone.trim() },
+                ],
+            },
+        });
+        if (existingUser) {
+            return { available: false, message: 'เบอร์โทรศัพท์นี้ถูกใช้งานในระบบแล้ว กรุณาใช้เบอร์อื่น' };
+        }
+        return { available: true, message: 'เบอร์โทรศัพท์นี้สามารถใช้งานได้' };
+    }
+    async checkEmailAvailable(email) {
+        if (!email || !email.trim()) {
+            return { available: false, message: 'กรุณากรอกอีเมล' };
+        }
+        const cleanEmail = email.trim().toLowerCase();
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@(gmail\.com|hotmail\.com)$/i;
+        if (!emailRegex.test(cleanEmail)) {
+            return { available: false, message: 'อีเมลต้องลงท้ายด้วย @gmail.com หรือ @hotmail.com เท่านั้น' };
+        }
+        const existingUser = await this.prisma.user.findFirst({
+            where: { email: cleanEmail },
+        });
+        if (existingUser) {
+            return { available: false, message: 'อีเมลนี้ถูกใช้งานในระบบแล้ว กรุณาใช้อีเมลอื่น' };
+        }
+        return { available: true, message: 'อีเมลนี้สามารถใช้งานได้' };
+    }
     async register(dto) {
         const existingUser = await this.prisma.user.findFirst({
             where: { username: dto.username },
         });
         if (existingUser) {
             throw new common_1.ConflictException('ชื่อผู้ใช้นี้ถูกใช้งานแล้ว');
+        }
+        let cleanEmail = null;
+        if (dto.email && dto.email.trim()) {
+            cleanEmail = dto.email.trim().toLowerCase();
+            const emailRegex = /^[a-zA-Z0-9._%+-]+@(gmail\.com|hotmail\.com)$/i;
+            if (!emailRegex.test(cleanEmail)) {
+                throw new common_1.BadRequestException('อีเมลต้องลงท้ายด้วย @gmail.com หรือ @hotmail.com เท่านั้น');
+            }
+            const existingEmail = await this.prisma.user.findFirst({
+                where: { email: cleanEmail },
+            });
+            if (existingEmail) {
+                throw new common_1.ConflictException('อีเมลนี้ถูกใช้งานในระบบแล้ว กรุณาใช้อีเมลอื่น');
+            }
+        }
+        else {
+            throw new common_1.BadRequestException('กรุณากรอกอีเมล');
+        }
+        let cleanPhone = null;
+        if (dto.phone_number && dto.phone_number.trim()) {
+            cleanPhone = dto.phone_number.trim().replace(/[-\s]/g, '');
+            if (cleanPhone.length !== 10) {
+                throw new common_1.BadRequestException('เบอร์โทรศัพท์ต้องมีครบ 10 หลัก');
+            }
+            const existingPhone = await this.prisma.user.findFirst({
+                where: {
+                    OR: [
+                        { phone_number: cleanPhone },
+                        { phone_number: dto.phone_number.trim() },
+                    ],
+                },
+            });
+            if (existingPhone) {
+                throw new common_1.ConflictException('เบอร์โทรศัพท์นี้ถูกใช้งานในระบบแล้ว กรุณาใช้เบอร์อื่น');
+            }
+        }
+        else {
+            throw new common_1.BadRequestException('กรุณากรอกเบอร์โทรศัพท์');
         }
         const saltRounds = 10;
         const hashedPassword = await bcrypt.hash(dto.password, saltRounds);
@@ -99,8 +191,9 @@ let AuthService = AuthService_1 = class AuthService {
             data: {
                 username: dto.username,
                 password: hashedPassword,
-                email: dto.email,
-                phone_number: dto.phone_number,
+                email: dto.email ? dto.email.trim() : null,
+                phone_number: cleanPhone,
+                address: dto.address ? dto.address.trim().substring(0, 255) : null,
                 role: normalizedRole,
             },
         });

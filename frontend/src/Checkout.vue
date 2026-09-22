@@ -37,19 +37,80 @@
                 <span class="phone-text">({{ userProfile.phone }})</span>
               </h4>
               
-              <!-- โหมดปกติ: แสดงที่อยู่และปุ่มแก้ไข -->
+              <!-- โหมดปกติ: แสดงที่อยู่, พิกัด GPS และปุ่มแก้ไข/ปักหมุด -->
               <div v-if="!isEditingAddress">
                 <p class="address-text">{{ userProfile.address }}</p>
-                <p class="address-note">หมายเหตุ: กรุณาโทรแจ้งเมื่อมาถึง</p>
-                <button class="edit-address-btn" @click="startEditAddress">แก้ไขที่อยู่</button>
+
+                <!-- ป้ายแสดงพิกัด GPS จริงที่ปักหมุดไว้ -->
+                <div class="gps-pinned-badge" v-if="deliveryLat && deliveryLng">
+                  <span class="gps-badge-icon">📍</span>
+                  <div class="gps-badge-info">
+                    <span class="gps-badge-title">พิกัด GPS ปักหมุด:</span>
+                    <span class="gps-badge-coords">{{ Number(deliveryLat).toFixed(5) }}, {{ Number(deliveryLng).toFixed(5) }}</span>
+                  </div>
+                  <span class="gps-badge-tag">พิกัดจริง</span>
+                </div>
+
+                <div v-if="gpsNotice" class="gps-notice-banner">
+                  {{ gpsNotice }}
+                </div>
+
+                <p class="address-note">หมายเหตุ: ไรเดอร์จะนำทางตามพิกัด GPS นี้เพื่อความแม่นยำสูงสุด</p>
+
+                <div class="address-action-row">
+                  <button 
+                    type="button"
+                    class="gps-pin-btn" 
+                    :disabled="isGettingGps"
+                    @click="pinCurrentGpsLocation"
+                  >
+                    <span v-if="isGettingGps">⏳ กำลังระบุพิกัด...</span>
+                    <span v-else>📍 ปักหมุดพิกัด GPS ปัจจุบัน</span>
+                  </button>
+                  <button class="edit-address-btn" @click="startEditAddress">✏️ แก้ไขที่อยู่ / พิกัด</button>
+                </div>
               </div>
 
               <!-- โหมดแก้ไข: แสดงกล่องพิมพ์และปุ่มบันทึก -->
               <div v-else class="edit-address-form">
-                <textarea v-model="editAddressText" class="edit-textarea" rows="3" placeholder="กรอกที่อยู่จัดส่งใหม่..."></textarea>
+                <label class="edit-field-label">รายละเอียดสถานที่ / บ้านเลขที่:</label>
+                <textarea v-model="editAddressText" class="edit-textarea" rows="2" placeholder="กรอกที่อยู่จัดส่งใหม่..."></textarea>
+
+                <div class="gps-latlng-row">
+                  <div class="gps-field-col">
+                    <label class="edit-field-label">ละติจูด (Latitude):</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      v-model="editDeliveryLat" 
+                      placeholder="13.7570" 
+                      class="gps-coord-input"
+                    />
+                  </div>
+                  <div class="gps-field-col">
+                    <label class="edit-field-label">ลองจิจูด (Longitude):</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      v-model="editDeliveryLng" 
+                      placeholder="100.5695" 
+                      class="gps-coord-input"
+                    />
+                  </div>
+                </div>
+
+                <button 
+                  type="button" 
+                  class="gps-detect-btn" 
+                  :disabled="isGettingGps"
+                  @click="detectLocationForEdit"
+                >
+                  <span>📍 ดึงพิกัดจากตำแหน่งปัจจุบัน (GPS)</span>
+                </button>
+
                 <div class="edit-actions">
                   <button class="cancel-edit-btn" @click="isEditingAddress = false">ยกเลิก</button>
-                  <button class="save-edit-btn" @click="saveAddress">บันทึก</button>
+                  <button class="save-edit-btn" @click="saveAddress">บันทึกที่อยู่และพิกัด</button>
                 </div>
               </div>
 
@@ -149,7 +210,16 @@
 
             <!-- คูปองที่เก็บไว้ในบัญชีของผู้ใช้ -->
             <div v-if="myClaimedCoupons.length > 0" class="my-coupons-box">
-              <div class="my-coupons-title">คูปองที่คุณกดเก็บไว้:</div>
+              <div class="my-coupons-header-row">
+                <div class="my-coupons-title">🎟️ คูปองที่คุณกดเก็บไว้ ({{ myAvailableCoupons.length }} ใบ):</div>
+                <button 
+                  type="button" 
+                  class="open-picker-pill-btn" 
+                  @click="showCouponPickerModal = true"
+                >
+                  เลือกคูปอง ➔
+                </button>
+              </div>
               <div class="coupon-chips-list">
                 <div 
                   v-for="coupon in myAvailableCoupons" 
@@ -271,6 +341,56 @@
         </div>
       </div>
     </div>
+
+    <!-- Popup Modal เลือกคูปองที่เก็บไว้ (Promotion Store) -->
+    <div v-if="showCouponPickerModal" class="coupon-modal-backdrop" @click.self="showCouponPickerModal = false">
+      <div class="coupon-modal-card">
+        <div class="coupon-modal-header">
+          <div class="coupon-modal-title-group">
+            <span class="coupon-modal-icon">🎁</span>
+            <h3 class="coupon-modal-title">เลือกคูปองส่วนลดที่เก็บไว้</h3>
+          </div>
+          <button class="coupon-modal-close-btn" @click="showCouponPickerModal = false">✕</button>
+        </div>
+
+        <div class="coupon-modal-body" v-if="myAvailableCoupons.length > 0">
+          <div 
+            v-for="coupon in myAvailableCoupons" 
+            :key="coupon.promo_id"
+            class="modal-coupon-item"
+            :class="{
+              'is-applied': appliedPromo && appliedPromo.promo_id === coupon.promo_id,
+              'is-disabled': subtotal < (coupon.min_order_price || 0)
+            }"
+            @click="pickAndApplyCouponFromModal(coupon)"
+          >
+            <div class="item-left">
+              <div class="item-code-badge">{{ coupon.code }}</div>
+              <div class="item-val">
+                {{ coupon.discount_type === 'PERCENTAGE' ? `ลด ${coupon.discount_value}%` : `ลด ฿${coupon.discount_value}` }}
+              </div>
+              <div class="item-cond">ยอดสั่งซื้อขั้นต่ำ ฿{{ coupon.min_order_price || 0 }}</div>
+            </div>
+            <div class="item-right">
+              <button 
+                type="button" 
+                class="apply-pill-btn"
+                :class="{ 'btn-using': appliedPromo && appliedPromo.promo_id === coupon.promo_id }"
+                :disabled="subtotal < (coupon.min_order_price || 0)"
+              >
+                {{ (appliedPromo && appliedPromo.promo_id === coupon.promo_id) ? '✓ ใช้อยู่' : 'ใช้คูปองนี้' }}
+              </button>
+            </div>
+          </div>
+        </div>
+        <div v-else class="empty-coupons-modal">
+          <p>ยังไม่มีคูปองที่เก็บไว้ในระบบ</p>
+          <router-link to="/promotions" class="goto-promos-link" @click="showCouponPickerModal = false">
+            ไปหน้าคูปองโปรโมชั่น ➔
+          </router-link>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -282,6 +402,7 @@ import { API_BASE } from './config/api';
 import { socket } from './config/socket';
 import CustomerNavbar from './components/CustomerNavbar.vue';
 import { authStore } from './store/authStore';
+import { usePromotionStore } from './store/promotionStore';
 
 // คำนวณรหัส CRC16 สำหรับ PromptPay EMVCo
 function crc16(data) {
@@ -324,6 +445,7 @@ export default {
   data() {
     return {
       authStore,
+      promotionStore: usePromotionStore(),
       isLoggedIn: false,
       selectedPayment: 'qr',
       userProfile: {
@@ -332,6 +454,13 @@ export default {
         address: ''
       },
       cartItems: [],
+      // ที่อยู่และพิกัด GPS ของลูกค้า
+      deliveryLat: 13.7570,
+      deliveryLng: 100.5695,
+      editDeliveryLat: 13.7570,
+      editDeliveryLng: 100.5695,
+      isGettingGps: false,
+      gpsNotice: '',
       isEditingAddress: false,
       editAddressText: '',
       showQrModal: false,
@@ -344,7 +473,8 @@ export default {
       appliedPromo: null,
       promoError: '',
       promoSuccess: '',
-      isValidatingPromo: false
+      isValidatingPromo: false,
+      showCouponPickerModal: false
     }
   },
   computed: {
@@ -382,6 +512,9 @@ export default {
       return Math.max(0, raw);
     },
     mapUrl() {
+      if (this.deliveryLat && this.deliveryLng) {
+        return `https://maps.google.com/maps?q=${this.deliveryLat},${this.deliveryLng}&t=&z=16&ie=UTF8&iwloc=&output=embed`;
+      }
       const address = this.userProfile.address || 'ตลาดปากเกร็ด นนทบุรี'; 
       const encodedAddress = encodeURIComponent(address);
       return `https://maps.google.com/maps?q=${encodedAddress}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
@@ -411,14 +544,39 @@ export default {
       };
     }
 
+    // โหลดพิกัด GPS ที่เคยปักหมุดไว้ (ถ้ามี)
+    try {
+      const savedGps = localStorage.getItem('latest_delivery_gps');
+      if (savedGps) {
+        const parsed = JSON.parse(savedGps);
+        if (parsed.lat && parsed.lng) {
+          this.deliveryLat = Number(parsed.lat);
+          this.deliveryLng = Number(parsed.lng);
+          this.editDeliveryLat = this.deliveryLat;
+          this.editDeliveryLng = this.deliveryLng;
+        }
+      }
+    } catch (e) {}
+
     const savedCart = sessionStorage.getItem('cartData') || localStorage.getItem('cartData');
     if (savedCart) {
       this.cartItems = JSON.parse(savedCart);
     }
 
-    // โหลดคูปองโปรโมชันที่ผู้ใช้กดรับไว้ (เฉพาะสมาชิก)
-    if (this.isLoggedIn) {
+    // เชื่อมต่อ Promotion Store: โหลดคูปองโปรโมชันที่ผู้ใช้กดรับไว้
+    await this.promotionStore.loadClaimedCoupons();
+    if (this.promotionStore.claimedCoupons.length > 0) {
+      this.myClaimedCoupons = this.promotionStore.claimedCoupons;
+    } else if (this.isLoggedIn) {
       await this.loadMyCoupons();
+    }
+
+    // ตรวจจับและ Auto-fill คูปองที่เลือกมาจากหน้า /promotions อัตโนมัติ
+    if (this.promotionStore.selectedCoupon) {
+      const promo = this.promotionStore.selectedCoupon;
+      this.inputPromoCode = promo.code;
+      await this.applyCustomPromoCode();
+      this.promoSuccess = `🎉 Auto-fill: นำคูปองส่วนลด "${promo.code}" ที่เก็บไว้มาใช้งานเรียบร้อยแล้ว`;
     }
 
     // ตรวจสอบสถานะเปิด-ปิดร้านค้าล่าสุดจากเซิร์ฟเวอร์
@@ -469,6 +627,17 @@ export default {
       this.appliedPromo = coupon;
       this.inputPromoCode = coupon.code;
       this.promoSuccess = `ใช้คูปองส่วนลด "${coupon.code}" เรียบร้อยแล้ว!`;
+      this.promotionStore.selectCouponForCheckout(coupon);
+    },
+
+    pickAndApplyCouponFromModal(coupon) {
+      const minOrder = Number(coupon.min_order_price || 0);
+      if (this.subtotal < minOrder) {
+        alert(`คูปองนี้ต้องมียอดสั่งซื้อขั้นต่ำ ฿${minOrder} ครับ (ยอดปัจจุบัน ฿${this.subtotal})`);
+        return;
+      }
+      this.selectCoupon(coupon);
+      this.showCouponPickerModal = false;
     },
 
     removeCoupon() {
@@ -476,6 +645,7 @@ export default {
       this.inputPromoCode = '';
       this.promoError = '';
       this.promoSuccess = '';
+      this.promotionStore.clearSelectedCoupon();
     },
 
     async applyCustomPromoCode() {
@@ -531,16 +701,78 @@ export default {
     
     startEditAddress() {
       this.editAddressText = this.userProfile.address;
+      this.editDeliveryLat = this.deliveryLat;
+      this.editDeliveryLng = this.deliveryLng;
       this.isEditingAddress = true;
     },
-    
+
+    pinCurrentGpsLocation() {
+      if (!navigator.geolocation) {
+        alert('เบราว์เซอร์ของคุณไม่รองรับการดึงพิกัด GPS อัตโนมัติ กรุณากรอกพิกัดละติจูด/ลองจิจูดด้วยตนเองครับ');
+        return;
+      }
+      this.isGettingGps = true;
+      this.gpsNotice = 'กำลังค้นหาตำแหน่งพิกัด GPS ของคุณ...';
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          this.deliveryLat = Number(position.coords.latitude);
+          this.deliveryLng = Number(position.coords.longitude);
+          this.editDeliveryLat = this.deliveryLat;
+          this.editDeliveryLng = this.deliveryLng;
+          this.isGettingGps = false;
+          this.gpsNotice = `ปักหมุดพิกัดเรียบร้อย (${this.deliveryLat.toFixed(5)}, ${this.deliveryLng.toFixed(5)})`;
+
+          try {
+            const gpsData = {
+              lat: this.deliveryLat,
+              lng: this.deliveryLng,
+              address: this.userProfile.address,
+              name: this.userProfile.name,
+              phone: this.userProfile.phone
+            };
+            localStorage.setItem('latest_delivery_gps', JSON.stringify(gpsData));
+            localStorage.setItem('latest_order_gps', JSON.stringify(gpsData));
+          } catch (e) {}
+        },
+        (error) => {
+          this.isGettingGps = false;
+          let msg = 'ไม่สามารถดึงตำแหน่ง GPS ได้';
+          if (error.code === 1) msg = 'กรุณาอนุญาตการเข้าถึงตำแหน่ง (Allow Location) ในเบราว์เซอร์ หรือกรอกพิกัดด้วยตนเองครับ';
+          else if (error.code === 2) msg = 'ไม่พบสัญญาณพิกัด GPS บนอุปกรณ์';
+          else if (error.code === 3) msg = 'หมดเวลาเชื่อมต่อ GPS';
+          alert(msg);
+          this.gpsNotice = '';
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    },
+
+    detectLocationForEdit() {
+      this.pinCurrentGpsLocation();
+    },
+
     async saveAddress() {
       if (!this.editAddressText.trim()) {
         alert('กรุณากรอกที่อยู่สำหรับจัดส่งครับ');
         return;
       }
       this.userProfile.address = this.editAddressText;
+      if (this.editDeliveryLat && this.editDeliveryLng) {
+        this.deliveryLat = Number(this.editDeliveryLat);
+        this.deliveryLng = Number(this.editDeliveryLng);
+      }
       localStorage.setItem('userProfile', JSON.stringify(this.userProfile));
+      try {
+        const gpsData = {
+          lat: this.deliveryLat,
+          lng: this.deliveryLng,
+          address: this.userProfile.address,
+          name: this.userProfile.name,
+          phone: this.userProfile.phone
+        };
+        localStorage.setItem('latest_delivery_gps', JSON.stringify(gpsData));
+        localStorage.setItem('latest_order_gps', JSON.stringify(gpsData));
+      } catch (e) {}
       this.isEditingAddress = false;
 
       const token = localStorage.getItem('access_token');
@@ -729,6 +961,20 @@ async validateAndCheckout() {
             console.warn('บันทึก transaction ไม่สำเร็จ:', txnErr);
           }
         }
+
+        try {
+          const gpsPayload = {
+            lat: this.deliveryLat,
+            lng: this.deliveryLng,
+            address: this.userProfile.address,
+            name: this.userProfile.name,
+            phone: this.userProfile.phone,
+            order_id: createdOrder?.order_id
+          };
+          localStorage.setItem('latest_order_gps', JSON.stringify(gpsPayload));
+          localStorage.setItem('latest_delivery_gps', JSON.stringify(gpsPayload));
+          this.promotionStore.clearSelectedCoupon();
+        } catch (e) {}
 
         alert(`สั่งซื้อสำเร็จ!\nเลขออเดอร์: #${orderId}\nทางร้านได้รับคำสั่งซื้อเรียบร้อยแล้วครับ`);
 
@@ -1379,5 +1625,321 @@ async validateAndCheckout() {
 .discount-price {
   color: #16a34a;
   font-weight: 700;
+}
+
+/* 📍 สไตล์สำหรับพิกัด GPS ของลูกค้า */
+.gps-pinned-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  margin: 8px 0;
+}
+
+.gps-badge-icon {
+  font-size: 16px;
+}
+
+.gps-badge-info {
+  flex: 1;
+  font-size: 12px;
+  color: #166534;
+}
+
+.gps-badge-title {
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.gps-badge-coords {
+  font-family: monospace;
+  font-weight: 600;
+}
+
+.gps-badge-tag {
+  background: #22c55e;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  letter-spacing: 0.3px;
+}
+
+.gps-notice-banner {
+  font-size: 11px;
+  color: #15803d;
+  background: #dcfce7;
+  padding: 6px 10px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+}
+
+.address-action-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.gps-pin-btn {
+  background: #059669;
+  color: white;
+  border: none;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2);
+}
+
+.gps-pin-btn:hover:not(:disabled) {
+  background: #047857;
+}
+
+.gps-pin-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.gps-latlng-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.gps-field-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.edit-field-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: 4px;
+}
+
+.gps-coord-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+.gps-coord-input:focus {
+  outline: none;
+  border-color: #059669;
+}
+
+.gps-detect-btn {
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.gps-detect-btn:hover {
+  background: #e2e8f0;
+}
+
+/* 🎟️ สไตล์เลือกคูปองโปรโมชั่น */
+.my-coupons-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.open-picker-pill-btn {
+  background: #ff6b35;
+  color: white;
+  border: none;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.open-picker-pill-btn:hover {
+  background: #e85924;
+}
+
+/* Modal สำหรับเลือกคูปอง */
+.coupon-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.coupon-modal-card {
+  background: white;
+  width: 100%;
+  max-width: 440px;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 80vh;
+  overflow: hidden;
+}
+
+.coupon-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.coupon-modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.coupon-modal-icon {
+  font-size: 20px;
+}
+
+.coupon-modal-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0;
+}
+
+.coupon-modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.coupon-modal-close-btn:hover {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.coupon-modal-body {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 4px;
+}
+
+.modal-coupon-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modal-coupon-item:hover:not(.not-eligible) {
+  border-color: #ff6b35;
+  background: #fffbf9;
+}
+
+.modal-coupon-item.is-applied {
+  border-color: #16a34a;
+  background: #f0fdf4;
+}
+
+.modal-coupon-item.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.item-left {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.item-code-badge {
+  font-size: 13px;
+  font-weight: 800;
+  color: #ea580c;
+  letter-spacing: 0.5px;
+}
+
+.item-val {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.item-cond {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.apply-pill-btn {
+  padding: 6px 14px;
+  border-radius: 9999px;
+  border: none;
+  background: #ff6b35;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.apply-pill-btn.btn-using {
+  background: #16a34a;
+}
+
+.empty-coupons-modal {
+  text-align: center;
+  padding: 24px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.goto-promos-link {
+  display: inline-block;
+  margin-top: 8px;
+  color: #ff6b35;
+  font-weight: 700;
+  text-decoration: underline;
 }
 </style>

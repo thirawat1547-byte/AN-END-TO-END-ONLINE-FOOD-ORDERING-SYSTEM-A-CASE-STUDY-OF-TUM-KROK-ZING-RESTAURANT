@@ -4,10 +4,7 @@ import {
   Get,
   Patch,
   Body,
-<<<<<<< HEAD
   Query,
-=======
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -28,7 +25,13 @@ import { CurrentUser } from './decorators/current-user.decorator';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-<<<<<<< HEAD
+  @Get('check-username')
+  @ApiOperation({ summary: 'ตรวจสอบว่าชื่อผู้ใช้ (Username) ซ้ำหรือไม่' })
+  @ApiResponse({ status: 200, description: 'ผลการตรวจสอบชื่อผู้ใช้' })
+  checkUsername(@Query('username') username: string) {
+    return this.authService.checkUsernameAvailable(username);
+  }
+
   @Get('check-phone')
   @ApiOperation({ summary: 'ตรวจสอบว่าเบอร์โทรศัพท์ซ้ำหรือไม่' })
   @ApiResponse({ status: 200, description: 'ผลการตรวจสอบเบอร์โทรศัพท์' })
@@ -36,16 +39,17 @@ export class AuthController {
     return this.authService.checkPhoneAvailable(phone);
   }
 
+  @Get('check-email')
+  @ApiOperation({ summary: 'ตรวจสอบว่าอีเมลซ้ำหรือไม่' })
+  @ApiResponse({ status: 200, description: 'ผลการตรวจสอบอีเมล' })
+  checkEmail(@Query('email') email: string) {
+    return this.authService.checkEmailAvailable(email);
+  }
+
   @Post('register')
   @ApiOperation({ summary: 'ลงทะเบียนผู้ใช้งานใหม่' })
   @ApiResponse({ status: 201, description: 'ลงทะเบียนสำเร็จ' })
   @ApiResponse({ status: 409, description: 'ชื่อผู้ใช้งานหรือเบอร์โทรศัพท์ซ้ำในระบบ' })
-=======
-  @Post('register')
-  @ApiOperation({ summary: 'ลงทะเบียนผู้ใช้งานใหม่' })
-  @ApiResponse({ status: 201, description: 'ลงทะเบียนสำเร็จ' })
-  @ApiResponse({ status: 409, description: 'ชื่อผู้ใช้งานซ้ำในระบบ' })
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
   register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }

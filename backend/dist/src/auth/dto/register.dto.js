@@ -22,10 +22,10 @@ __decorate([
     __metadata("design:type", String)
 ], RegisterDto.prototype, "username", void 0);
 __decorate([
-    (0, swagger_1.ApiProperty)({ example: 'password1234', description: 'รหัสผ่านอย่างน้อย 4 ตัวอักษร' }),
+    (0, swagger_1.ApiProperty)({ example: 'password1234', description: 'รหัสผ่านอย่างน้อย 6 ตัวอักษร' }),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsNotEmpty)({ message: 'กรุณากรอกรหัสผ่าน' }),
-    (0, class_validator_1.MinLength)(4, { message: 'รหัสผ่านต้องมีความยาวอย่างน้อย 4 ตัวอักษร' }),
+    (0, class_validator_1.MinLength)(6, { message: 'รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร' }),
     __metadata("design:type", String)
 ], RegisterDto.prototype, "password", void 0);
 __decorate([
@@ -40,6 +40,12 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], RegisterDto.prototype, "phone_number", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: '99 ซ.ศูนย์วิจัย 7 ถ.เพชรบุรีตัดใหม่ แขวงบางกะปิ เขตห้วยขวาง กรุงเทพมหานคร 10310', description: 'ที่อยู่' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], RegisterDto.prototype, "address", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({ example: 'CUSTOMER', description: 'สิทธิ์ผู้ใช้งาน (ADMIN, CASHIER, CUSTOMER)' }),
     (0, class_validator_1.IsString)(),

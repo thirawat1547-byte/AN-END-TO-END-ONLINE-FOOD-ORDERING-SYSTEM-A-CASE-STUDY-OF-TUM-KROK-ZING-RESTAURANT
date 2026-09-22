@@ -8,10 +8,10 @@
         </div>
         <div>
           <div class="flex items-center gap-1.5">
-            <h3 class="font-bold text-xs text-slate-800">คุณณัฐวุฒิ ใจดี</h3>
-            <span class="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.2 rounded font-medium">ลูกค้าประจำ</span>
+            <h3 class="font-bold text-xs text-slate-800">{{ customer?.name || 'คุณณัฐวุฒิ ใจดี' }}</h3>
+            <span class="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.2 rounded font-medium">ลูกค้า</span>
           </div>
-          <p class="text-[11px] text-slate-500">โทร 081-992-8811</p>
+          <p class="text-[11px] text-slate-500">โทร {{ customer?.phone || '081-992-8811' }}</p>
         </div>
       </div>
 
@@ -25,10 +25,17 @@
     <div class="mt-3 bg-slate-50 p-2.5 rounded-xl flex items-start gap-2.5 text-xs">
       <Building2 class="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
       <div class="flex-1">
-        <p class="font-bold text-slate-800">คอนโด The Grand Rama 9 (อาคาร B)</p>
-        <p class="text-slate-600 mt-0.5">ชั้น 14 ห้อง 1408 • แขวงห้วยขวาง เขตห้วยขวาง กทม.</p>
+        <p class="font-bold text-slate-800">{{ customer?.address || 'คอนโด The Grand Rama 9 (อาคาร B)' }}</p>
+        <p class="text-slate-600 mt-0.5" v-if="customer?.addressDetail">{{ customer.addressDetail }}</p>
+        
+        <!-- พิกัด GPS จัดส่ง -->
+        <div v-if="customer?.lat && customer?.lng" class="mt-1 flex items-center gap-1.5 text-[10px] text-blue-800 bg-blue-100/70 border border-blue-200 px-2 py-0.5 rounded-md font-mono inline-flex">
+          <span>📍 GPS: {{ Number(customer.lat).toFixed(4) }}, {{ Number(customer.lng).toFixed(4) }}</span>
+          <span v-if="customer?.isRealGps" class="text-[8px] bg-blue-600 text-white px-1 rounded font-sans font-bold">พิกัดจริง</span>
+        </div>
+
         <div class="mt-1.5 flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50/80 px-2 py-0.5 rounded-md font-medium inline-flex">
-          <span>📦 ฝากไว้ที่โต๊ะพนักงานส่งอาหารล็อบบี้ชั้น 1</span>
+          <span>{{ customer?.note || '📦 ฝากไว้ที่โต๊ะพนักงานส่งอาหารล็อบบี้ชั้น 1' }}</span>
         </div>
       </div>
     </div>
@@ -36,7 +43,7 @@
     <!-- Quick Communication & Navigation -->
     <div class="grid grid-cols-3 gap-2 mt-3">
       <a 
-        href="tel:0819928811"
+        :href="'tel:' + (customer?.phone || '0819928811').replace(/\D/g, '')"
         class="flex items-center justify-center gap-1 py-2 px-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs shadow-sm transition active:scale-95"
       >
         <Phone class="w-3.5 h-3.5 text-blue-600" />
@@ -87,6 +94,19 @@ const props = defineProps({
   unreadCount: {
     type: Number,
     default: 1
+  },
+  customer: {
+    type: Object,
+    default: () => ({
+      name: 'คุณณัฐวุฒิ ใจดี',
+      phone: '081-992-8811',
+      address: 'คอนโด The Grand Rama 9 (อาคาร B)',
+      addressDetail: 'ชั้น 14 ห้อง 1408 • แขวงห้วยขวาง เขตห้วยขวาง กทม.',
+      note: '📦 ฝากไว้ที่โต๊ะพนักงานส่งอาหารล็อบบี้ชั้น 1',
+      lat: 13.7570,
+      lng: 100.5695,
+      isRealGps: false
+    })
   }
 })
 
@@ -101,7 +121,8 @@ const emit = defineEmits(['open-chat', 'open-map', 'send-quick-message'])
 
 const openChatModal = () => emit('open-chat')
 const openMapModal = () => emit('open-map', {
-  targetName: 'คอนโด The Grand Rama 9 (จุดส่งลูกค้า)',
+  targetName: props.customer?.address || 'จุดส่งลูกค้า',
+  customerCoord: [props.customer?.lat || 13.7570, props.customer?.lng || 100.5695],
   distance: '3.2 กิโลเมตร',
   eta: '12 นาที'
 })

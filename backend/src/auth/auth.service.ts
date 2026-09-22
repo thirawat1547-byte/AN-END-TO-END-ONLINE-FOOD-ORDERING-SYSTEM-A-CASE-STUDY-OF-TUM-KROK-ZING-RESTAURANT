@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -100,15 +101,34 @@ export class AuthService implements OnModuleInit {
     }
   }
 
-<<<<<<< HEAD
+  // ตรวจสอบว่าชื่อผู้ใช้ (Username) ถูกใช้งานแล้วหรือยัง
+  async checkUsernameAvailable(username: string): Promise<{ available: boolean; message: string }> {
+    if (!username || !username.trim()) {
+      return { available: false, message: 'กรุณากรอกชื่อผู้ใช้ (Username)' };
+    }
+    const cleanUsername = username.trim();
+    if (cleanUsername.length < 3) {
+      return { available: false, message: 'ชื่อผู้ใช้ต้องมีความยาวอย่างน้อย 3 ตัวอักษร' };
+    }
+
+    const existingUser = await this.prisma.user.findFirst({
+      where: { username: cleanUsername },
+    });
+
+    if (existingUser) {
+      return { available: false, message: 'ชื่อผู้ใช้นี้ถูกใช้งานในระบบแล้ว กรุณาใช้ชื่ออื่น' };
+    }
+    return { available: true, message: 'ชื่อผู้ใช้นี้สามารถใช้งานได้' };
+  }
+
   // ตรวจสอบว่าเบอร์โทรศัพท์ถูกใช้งานแล้วหรือยัง
   async checkPhoneAvailable(phone: string): Promise<{ available: boolean; message: string }> {
     if (!phone || !phone.trim()) {
       return { available: false, message: 'กรุณากรอกเบอร์โทรศัพท์' };
     }
     const cleanPhone = phone.trim().replace(/[-\s]/g, '');
-    if (cleanPhone.length < 9 || cleanPhone.length > 15) {
-      return { available: false, message: 'รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง (ควรมี 9-10 หลัก)' };
+    if (cleanPhone.length !== 10) {
+      return { available: false, message: 'รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง (ต้องมี 10 หลัก)' };
     }
 
     const existingUser = await this.prisma.user.findFirst({
@@ -126,8 +146,27 @@ export class AuthService implements OnModuleInit {
     return { available: true, message: 'เบอร์โทรศัพท์นี้สามารถใช้งานได้' };
   }
 
-=======
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
+  // ตรวจสอบว่าอีเมลถูกใช้งานแล้วหรือยัง (ต้องเป็น @gmail.com หรือ @hotmail.com และห้ามซ้ำ)
+  async checkEmailAvailable(email: string): Promise<{ available: boolean; message: string }> {
+    if (!email || !email.trim()) {
+      return { available: false, message: 'กรุณากรอกอีเมล' };
+    }
+    const cleanEmail = email.trim().toLowerCase();
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@(gmail\.com|hotmail\.com)$/i;
+    if (!emailRegex.test(cleanEmail)) {
+      return { available: false, message: 'อีเมลต้องลงท้ายด้วย @gmail.com หรือ @hotmail.com เท่านั้น' };
+    }
+
+    const existingUser = await this.prisma.user.findFirst({
+      where: { email: cleanEmail },
+    });
+
+    if (existingUser) {
+      return { available: false, message: 'อีเมลนี้ถูกใช้งานในระบบแล้ว กรุณาใช้อีเมลอื่น' };
+    }
+    return { available: true, message: 'อีเมลนี้สามารถใช้งานได้' };
+  }
+
   async register(dto: RegisterDto) {
     const existingUser = await this.prisma.user.findFirst({
       where: { username: dto.username },
@@ -137,11 +176,34 @@ export class AuthService implements OnModuleInit {
       throw new ConflictException('ชื่อผู้ใช้นี้ถูกใช้งานแล้ว');
     }
 
-<<<<<<< HEAD
-    // 🛑 ตรวจสอบเบอร์โทรศัพท์ซ้ำ
+    // 📧 ตรวจสอบโดเมนอีเมลต้องเป็น @gmail.com หรือ @hotmail.com เท่านั้น และห้ามซ้ำในระบบ
+    let cleanEmail: string | null = null;
+    if (dto.email && dto.email.trim()) {
+      cleanEmail = dto.email.trim().toLowerCase();
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@(gmail\.com|hotmail\.com)$/i;
+      if (!emailRegex.test(cleanEmail)) {
+        throw new BadRequestException('อีเมลต้องลงท้ายด้วย @gmail.com หรือ @hotmail.com เท่านั้น');
+      }
+
+      const existingEmail = await this.prisma.user.findFirst({
+        where: { email: cleanEmail },
+      });
+
+      if (existingEmail) {
+        throw new ConflictException('อีเมลนี้ถูกใช้งานในระบบแล้ว กรุณาใช้อีเมลอื่น');
+      }
+    } else {
+      throw new BadRequestException('กรุณากรอกอีเมล');
+    }
+
+    // 🛑 ตรวจสอบเบอร์โทรศัพท์ต้องครบ 10 หลัก และห้ามซ้ำในระบบ
     let cleanPhone: string | null = null;
     if (dto.phone_number && dto.phone_number.trim()) {
       cleanPhone = dto.phone_number.trim().replace(/[-\s]/g, '');
+      if (cleanPhone.length !== 10) {
+        throw new BadRequestException('เบอร์โทรศัพท์ต้องมีครบ 10 หลัก');
+      }
+
       const existingPhone = await this.prisma.user.findFirst({
         where: {
           OR: [
@@ -154,10 +216,9 @@ export class AuthService implements OnModuleInit {
       if (existingPhone) {
         throw new ConflictException('เบอร์โทรศัพท์นี้ถูกใช้งานในระบบแล้ว กรุณาใช้เบอร์อื่น');
       }
+    } else {
+      throw new BadRequestException('กรุณากรอกเบอร์โทรศัพท์');
     }
-
-=======
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(dto.password, saltRounds);
 
@@ -166,14 +227,9 @@ export class AuthService implements OnModuleInit {
       data: {
         username: dto.username,
         password: hashedPassword,
-<<<<<<< HEAD
         email: dto.email ? dto.email.trim() : null,
         phone_number: cleanPhone,
         address: dto.address ? dto.address.trim().substring(0, 255) : null,
-=======
-        email: dto.email,
-        phone_number: dto.phone_number,
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
         role: normalizedRole,
       },
     });

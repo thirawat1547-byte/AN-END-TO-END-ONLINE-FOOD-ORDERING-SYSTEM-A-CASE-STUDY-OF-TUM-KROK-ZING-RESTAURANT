@@ -15,6 +15,18 @@ export declare class AuthService implements OnModuleInit {
     private loadActiveSessions;
     getActiveSession(userId: number): Promise<string | null>;
     logout(userId: number): Promise<void>;
+    checkUsernameAvailable(username: string): Promise<{
+        available: boolean;
+        message: string;
+    }>;
+    checkPhoneAvailable(phone: string): Promise<{
+        available: boolean;
+        message: string;
+    }>;
+    checkEmailAvailable(email: string): Promise<{
+        available: boolean;
+        message: string;
+    }>;
     register(dto: RegisterDto): Promise<{
         role: string;
         user_id: number;

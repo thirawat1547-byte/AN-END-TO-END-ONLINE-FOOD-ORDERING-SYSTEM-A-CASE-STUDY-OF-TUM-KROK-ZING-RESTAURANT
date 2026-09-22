@@ -8,10 +8,10 @@ export class RegisterDto {
   @IsNotEmpty({ message: 'กรุณากรอก Username' })
   username: string;
 
-  @ApiProperty({ example: 'password1234', description: 'รหัสผ่านอย่างน้อย 4 ตัวอักษร' })
+  @ApiProperty({ example: 'password1234', description: 'รหัสผ่านอย่างน้อย 6 ตัวอักษร' })
   @IsString()
   @IsNotEmpty({ message: 'กรุณากรอกรหัสผ่าน' })
-  @MinLength(4, { message: 'รหัสผ่านต้องมีความยาวอย่างน้อย 4 ตัวอักษร' })
+  @MinLength(6, { message: 'รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร' })
   password: string;
 
   @ApiPropertyOptional({ example: 'somchai@example.com', description: 'อีเมลผู้ใช้งาน' })
@@ -24,14 +24,10 @@ export class RegisterDto {
   @IsOptional()
   phone_number?: string;
 
-<<<<<<< HEAD
   @ApiPropertyOptional({ example: '99 ซ.ศูนย์วิจัย 7 ถ.เพชรบุรีตัดใหม่ แขวงบางกะปิ เขตห้วยขวาง กรุงเทพมหานคร 10310', description: 'ที่อยู่' })
   @IsString()
   @IsOptional()
   address?: string;
-
-=======
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
   @ApiPropertyOptional({ example: 'CUSTOMER', description: 'สิทธิ์ผู้ใช้งาน (ADMIN, CASHIER, CUSTOMER)' })
   @IsString()
   @IsOptional()

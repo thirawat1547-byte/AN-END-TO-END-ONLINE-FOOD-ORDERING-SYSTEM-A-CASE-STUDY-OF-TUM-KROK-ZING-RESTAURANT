@@ -385,9 +385,22 @@ async function main() {
   console.log(`✅ เตรียมรายการอาหารเรียบร้อยแล้ว (${menus.length} รายการ)`);
 
   // 5. Seed วัตถุดิบ (Ingredients) ครบทุกรายการตามสูตรและคลังสินค้า
+  // ลบวัตถุดิบเดิม "กุ้งและหมึกสด" ที่เคยรวมกันไว้ เพื่อแยกเป็น "กุ้งสด" และ "หมึกสด"
+  try {
+    await prisma.ingredient.deleteMany({
+      where: {
+        OR: [
+          { name: 'กุ้งและหมึกสด' },
+          { name: { contains: 'กุ้งและหมึก' } },
+        ],
+      },
+    });
+  } catch (e) {}
+
   const ingredients = [
     { name: 'หมูสด / หมูสับ', quantity: 20.0, unit: 'กก.', min_quantity: 5.0 },
-    { name: 'กุ้งและหมึกสด', quantity: 15.0, unit: 'กก.', min_quantity: 3.0 },
+    { name: 'กุ้งสด', quantity: 15.0, unit: 'กก.', min_quantity: 3.0 },
+    { name: 'หมึกสด', quantity: 15.0, unit: 'กก.', min_quantity: 3.0 },
     { name: 'หมูกรอบ', quantity: 10.0, unit: 'กก.', min_quantity: 3.0 },
     { name: 'เนื้อสะโพกไก่', quantity: 18.0, unit: 'กก.', min_quantity: 4.0 },
     { name: 'ปีกไก่สด', quantity: 15.0, unit: 'กก.', min_quantity: 4.0 },
@@ -474,7 +487,9 @@ async function main() {
       const n = normalizeName(i.name);
       return (
         (target.includes('หมูสับ') && (n.includes('หมูสับ') || n.includes('หมูสด'))) ||
-        ((target.includes('กุ้ง') || target.includes('หมึก')) && (n.includes('กุ้ง') || n.includes('หมึก'))) ||
+        (target.includes('กุ้งสด') && n.includes('กุ้งสด')) ||
+        (target.includes('กุ้งแห้ง') && n.includes('กุ้งแห้ง')) ||
+        (target.includes('หมึก') && n.includes('หมึก')) ||
         (target.includes('ไก่') && target.includes('สะโพก') && n.includes('สะโพก')) ||
         (target.includes('ไก่') && target.includes('ปีก') && n.includes('ปีก')) ||
         (target.includes('มะละกอ') && n.includes('มะละกอ')) ||
@@ -498,7 +513,8 @@ async function main() {
     { menuName: 'กะเพราหมู', ingName: 'ข้าวสารหอมมะลิ', qty: 0.15 },
 
     // 2. กะเพราทะเล / หมึก / กุ้ง
-    { menuName: 'กะเพราทะเล/หมึก/กุ้ง', ingName: 'กุ้งและหมึกสด', qty: 0.15 },
+    { menuName: 'กะเพราทะเล/หมึก/กุ้ง', ingName: 'กุ้งสด', qty: 0.08 },
+    { menuName: 'กะเพราทะเล/หมึก/กุ้ง', ingName: 'หมึกสด', qty: 0.07 },
     { menuName: 'กะเพราทะเล/หมึก/กุ้ง', ingName: 'ใบกะเพราสด', qty: 0.02 },
     { menuName: 'กะเพราทะเล/หมึก/กุ้ง', ingName: 'พริกสดจินดาแดง', qty: 0.01 },
     { menuName: 'กะเพราทะเล/หมึก/กุ้ง', ingName: 'กระเทียมสด', qty: 0.01 },
@@ -511,13 +527,14 @@ async function main() {
     { menuName: 'ข้าวผัดหมู', ingName: 'ผักคะน้าสด', qty: 0.02 },
 
     // 4. ข้าวผัดกุ้ง
-    { menuName: 'ข้าวผัดกุ้ง', ingName: 'กุ้งและหมึกสด', qty: 0.12 },
+    { menuName: 'ข้าวผัดกุ้ง', ingName: 'กุ้งสด', qty: 0.12 },
     { menuName: 'ข้าวผัดกุ้ง', ingName: 'ไข่ไก่สด', qty: 1.0 },
     { menuName: 'ข้าวผัดกุ้ง', ingName: 'ข้าวสารหอมมะลิ', qty: 0.18 },
     { menuName: 'ข้าวผัดกุ้ง', ingName: 'ผักคะน้าสด', qty: 0.02 },
 
     // 5. ข้าวผัดทะเล / หมึก / กุ้ง
-    { menuName: 'ข้าวผัดทะเล/หมึก/กุ้ง', ingName: 'กุ้งและหมึกสด', qty: 0.14 },
+    { menuName: 'ข้าวผัดทะเล/หมึก/กุ้ง', ingName: 'กุ้งสด', qty: 0.07 },
+    { menuName: 'ข้าวผัดทะเล/หมึก/กุ้ง', ingName: 'หมึกสด', qty: 0.07 },
     { menuName: 'ข้าวผัดทะเล/หมึก/กุ้ง', ingName: 'ไข่ไก่สด', qty: 1.0 },
     { menuName: 'ข้าวผัดทะเล/หมึก/กุ้ง', ingName: 'ข้าวสารหอมมะลิ', qty: 0.18 },
     { menuName: 'ข้าวผัดทะเล/หมึก/กุ้ง', ingName: 'ผักคะน้าสด', qty: 0.02 },
@@ -529,7 +546,8 @@ async function main() {
     { menuName: 'ผัดพริกแกงหมู', ingName: 'ข้าวสารหอมมะลิ', qty: 0.15 },
 
     // 7. ผัดพริกแกงทะเล / หมึก / กุ้ง
-    { menuName: 'ผัดพริกแกงทะเล/หมึก/กุ้ง', ingName: 'กุ้งและหมึกสด', qty: 0.14 },
+    { menuName: 'ผัดพริกแกงทะเล/หมึก/กุ้ง', ingName: 'กุ้งสด', qty: 0.07 },
+    { menuName: 'ผัดพริกแกงทะเล/หมึก/กุ้ง', ingName: 'หมึกสด', qty: 0.07 },
     { menuName: 'ผัดพริกแกงทะเล/หมึก/กุ้ง', ingName: 'พริกแกงเผ็ด', qty: 0.03 },
     { menuName: 'ผัดพริกแกงทะเล/หมึก/กุ้ง', ingName: 'ถั่วฝักยาว', qty: 0.03 },
     { menuName: 'ผัดพริกแกงทะเล/หมึก/กุ้ง', ingName: 'ข้าวสารหอมมะลิ', qty: 0.15 },
@@ -542,7 +560,8 @@ async function main() {
     { menuName: 'ผัดคะน้าหมูกรอบ', ingName: 'ข้าวสารหอมมะลิ', qty: 0.15 },
 
     // 9. ผัดคะน้าทะเล / หมึก / กุ้ง
-    { menuName: 'ผัดคะน้าทะเล/หมึก/กุ้ง', ingName: 'กุ้งและหมึกสด', qty: 0.14 },
+    { menuName: 'ผัดคะน้าทะเล/หมึก/กุ้ง', ingName: 'กุ้งสด', qty: 0.07 },
+    { menuName: 'ผัดคะน้าทะเล/หมึก/กุ้ง', ingName: 'หมึกสด', qty: 0.07 },
     { menuName: 'ผัดคะน้าทะเล/หมึก/กุ้ง', ingName: 'ผักคะน้าสด', qty: 0.10 },
     { menuName: 'ผัดคะน้าทะเล/หมึก/กุ้ง', ingName: 'กระเทียมสด', qty: 0.01 },
     { menuName: 'ผัดคะน้าทะเล/หมึก/กุ้ง', ingName: 'ข้าวสารหอมมะลิ', qty: 0.15 },
@@ -559,7 +578,7 @@ async function main() {
 
     // 12. ข้าวไข่เจียวกุ้ง
     { menuName: 'ข้าวไข่เจียวกุ้ง', ingName: 'ไข่ไก่สด', qty: 2.0 },
-    { menuName: 'ข้าวไข่เจียวกุ้ง', ingName: 'กุ้งและหมึกสด', qty: 0.06 },
+    { menuName: 'ข้าวไข่เจียวกุ้ง', ingName: 'กุ้งสด', qty: 0.06 },
     { menuName: 'ข้าวไข่เจียวกุ้ง', ingName: 'ข้าวสารหอมมะลิ', qty: 0.15 },
 
     // 13. ส้มตำปูปลาร้า
@@ -587,7 +606,8 @@ async function main() {
 
     // 16. ยำวุ้นเส้นทะเล
     { menuName: 'ยำวุ้นเส้นทะเล', ingName: 'วุ้นเส้น', qty: 1.0 },
-    { menuName: 'ยำวุ้นเส้นทะเล', ingName: 'กุ้งและหมึกสด', qty: 0.12 },
+    { menuName: 'ยำวุ้นเส้นทะเล', ingName: 'กุ้งสด', qty: 0.06 },
+    { menuName: 'ยำวุ้นเส้นทะเล', ingName: 'หมึกสด', qty: 0.06 },
     { menuName: 'ยำวุ้นเส้นทะเล', ingName: 'หมูสด / หมูสับ', qty: 0.04 },
     { menuName: 'ยำวุ้นเส้นทะเล', ingName: 'มะนาวสด', qty: 1.0 },
     { menuName: 'ยำวุ้นเส้นทะเล', ingName: 'มะเขือเทศสีดา', qty: 0.03 },

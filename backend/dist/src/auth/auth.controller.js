@@ -25,6 +25,15 @@ let AuthController = class AuthController {
     constructor(authService) {
         this.authService = authService;
     }
+    checkUsername(username) {
+        return this.authService.checkUsernameAvailable(username);
+    }
+    checkPhone(phone) {
+        return this.authService.checkPhoneAvailable(phone);
+    }
+    checkEmail(email) {
+        return this.authService.checkEmailAvailable(email);
+    }
     register(registerDto) {
         return this.authService.register(registerDto);
     }
@@ -57,10 +66,37 @@ let AuthController = class AuthController {
 };
 exports.AuthController = AuthController;
 __decorate([
+    (0, common_1.Get)('check-username'),
+    (0, swagger_1.ApiOperation)({ summary: 'ตรวจสอบว่าชื่อผู้ใช้ (Username) ซ้ำหรือไม่' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'ผลการตรวจสอบชื่อผู้ใช้' }),
+    __param(0, (0, common_1.Query)('username')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "checkUsername", null);
+__decorate([
+    (0, common_1.Get)('check-phone'),
+    (0, swagger_1.ApiOperation)({ summary: 'ตรวจสอบว่าเบอร์โทรศัพท์ซ้ำหรือไม่' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'ผลการตรวจสอบเบอร์โทรศัพท์' }),
+    __param(0, (0, common_1.Query)('phone')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "checkPhone", null);
+__decorate([
+    (0, common_1.Get)('check-email'),
+    (0, swagger_1.ApiOperation)({ summary: 'ตรวจสอบว่าอีเมลซ้ำหรือไม่' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'ผลการตรวจสอบอีเมล' }),
+    __param(0, (0, common_1.Query)('email')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "checkEmail", null);
+__decorate([
     (0, common_1.Post)('register'),
     (0, swagger_1.ApiOperation)({ summary: 'ลงทะเบียนผู้ใช้งานใหม่' }),
     (0, swagger_1.ApiResponse)({ status: 201, description: 'ลงทะเบียนสำเร็จ' }),
-    (0, swagger_1.ApiResponse)({ status: 409, description: 'ชื่อผู้ใช้งานซ้ำในระบบ' }),
+    (0, swagger_1.ApiResponse)({ status: 409, description: 'ชื่อผู้ใช้งานหรือเบอร์โทรศัพท์ซ้ำในระบบ' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [register_dto_1.RegisterDto]),

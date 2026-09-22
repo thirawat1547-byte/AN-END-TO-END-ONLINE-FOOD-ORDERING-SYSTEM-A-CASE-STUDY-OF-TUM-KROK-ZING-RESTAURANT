@@ -10,8 +10,8 @@ export declare class PromotionsService implements OnModuleInit {
     private ensureUserClaimedPromotionsTable;
     private seedDefaultPromotionsIfEmpty;
     findAll(): Promise<{
-        created_at: Date;
         promo_id: number;
+        created_at: Date;
         code: string;
         discount_type: string;
         discount_value: import("@prisma/client/runtime/library").Decimal;
@@ -19,8 +19,8 @@ export declare class PromotionsService implements OnModuleInit {
         expiry_date: Date;
     }[]>;
     findActive(): Promise<{
-        created_at: Date;
         promo_id: number;
+        created_at: Date;
         code: string;
         discount_type: string;
         discount_value: import("@prisma/client/runtime/library").Decimal;
@@ -28,8 +28,8 @@ export declare class PromotionsService implements OnModuleInit {
         expiry_date: Date;
     }[]>;
     findOne(promo_id: number): Promise<{
-        created_at: Date;
         promo_id: number;
+        created_at: Date;
         code: string;
         discount_type: string;
         discount_value: import("@prisma/client/runtime/library").Decimal;
@@ -37,8 +37,8 @@ export declare class PromotionsService implements OnModuleInit {
         expiry_date: Date;
     }>;
     findByCode(code: string): Promise<{
-        created_at: Date;
         promo_id: number;
+        created_at: Date;
         code: string;
         discount_type: string;
         discount_value: import("@prisma/client/runtime/library").Decimal;
@@ -65,8 +65,8 @@ export declare class PromotionsService implements OnModuleInit {
         is_expired: boolean;
     }[]>;
     create(createDto: CreatePromotionDto): Promise<{
-        created_at: Date;
         promo_id: number;
+        created_at: Date;
         code: string;
         discount_type: string;
         discount_value: import("@prisma/client/runtime/library").Decimal;
@@ -74,8 +74,8 @@ export declare class PromotionsService implements OnModuleInit {
         expiry_date: Date;
     }>;
     update(promo_id: number, updateDto: UpdatePromotionDto): Promise<{
-        created_at: Date;
         promo_id: number;
+        created_at: Date;
         code: string;
         discount_type: string;
         discount_value: import("@prisma/client/runtime/library").Decimal;
@@ -83,8 +83,8 @@ export declare class PromotionsService implements OnModuleInit {
         expiry_date: Date;
     }>;
     remove(promo_id: number): Promise<{
-        created_at: Date;
         promo_id: number;
+        created_at: Date;
         code: string;
         discount_type: string;
         discount_value: import("@prisma/client/runtime/library").Decimal;

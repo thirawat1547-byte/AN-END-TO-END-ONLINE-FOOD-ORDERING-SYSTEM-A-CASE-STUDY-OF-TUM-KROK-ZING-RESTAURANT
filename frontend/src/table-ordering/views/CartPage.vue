@@ -50,11 +50,58 @@
         class="checkout-btn" 
         :disabled="!isStoreOpen || isSubmitting"
         :class="{ 'disabled-btn': !isStoreOpen }"
-        @click="placeOrder"
+        @click="promptConfirmOrder"
       >
         {{ !isStoreOpen ? '🛑 ร้านปิดบริการชั่วคราว' : 'สั่งอาหาร' }}
         <svg v-if="isStoreOpen" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
       </button>
+    </div>
+
+    <!-- 🛑 Pop-up Confirm Modal ยืนยันก่อนส่งออเดอร์เข้าครัว ป้องกันการสั่งซ้ำ -->
+    <div v-if="showConfirmModal" class="confirm-modal-backdrop" @click.self="showConfirmModal = false">
+      <div class="confirm-modal-box">
+        <div class="confirm-modal-header">
+          <div class="confirm-icon-circle">🍲</div>
+          <h3 class="confirm-title">ยืนยันส่งรายการอาหารเข้าครัว?</h3>
+          <p class="confirm-subtitle">โต๊ะอาหารหมายเลข <strong>{{ tableId }}</strong></p>
+        </div>
+
+        <div class="confirm-items-preview">
+          <div class="preview-item-row" v-for="item in cart" :key="item.cartItemId">
+            <span class="preview-item-name">{{ item.quantity }}x {{ item.name || item.menu_name }}</span>
+            <span class="preview-item-price">฿{{ ((item.price || 0) * item.quantity).toFixed(2) }}</span>
+          </div>
+        </div>
+
+        <div class="confirm-total-row">
+          <span>รวมทั้งสิ้น ({{ cartItemCount }} รายการ)</span>
+          <strong class="confirm-total-amount">฿{{ cartTotal.toFixed(2) }}</strong>
+        </div>
+
+        <div class="confirm-warning-note">
+          ⚠️ เมื่อกดยืนยัน รายการจะถูกส่งตรงเข้าจอครัวและเริ่มปรุงอาหารทันที กรุณาตรวจสอบความถูกต้องเพื่อป้องกันการสั่งซ้ำครับ
+        </div>
+
+        <div class="confirm-modal-actions">
+          <button 
+            type="button" 
+            class="modal-btn-cancel" 
+            :disabled="isSubmitting"
+            @click="showConfirmModal = false"
+          >
+            ตรวจสอบอีกครั้ง
+          </button>
+          <button 
+            type="button" 
+            class="modal-btn-confirm" 
+            :disabled="isSubmitting"
+            @click="executePlaceOrder"
+          >
+            <span v-if="isSubmitting">กำลังส่งเข้าครัว...</span>
+            <span v-else>✓ ยืนยันส่งอาหาร</span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -74,6 +121,7 @@ const router = useRouter()
 const tableId = route.params.tableId || '1'
 const isSubmitting = ref(false)
 const isStoreOpen = ref(true)
+const showConfirmModal = ref(false)
 
 import { onMounted } from 'vue'
 onMounted(async () => {
@@ -93,10 +141,11 @@ const goToMenu = () => {
   router.push(`/table/${tableId}`)
 }
 
-const placeOrder = async () => {
+// 1. กดสั่งอาหาร -> ตรวจสอบเงื่อนไขแล้วเปิด Pop-up Confirm Modal ก่อนส่งครัว
+const promptConfirmOrder = async () => {
   if (cart.value.length === 0 || isSubmitting.value) return
 
-  // ตรวจสอบสถานะร้านค้าจากเซิร์ฟเวอร์ก่อนส่งออเดอร์เสมอ
+  // ตรวจสอบสถานะร้านค้าจากเซิร์ฟเวอร์ก่อนเสมอ
   try {
     const checkRes = await axios.get(`${API_BASE}/settings`)
     if (checkRes.data && checkRes.data.is_open === false) {
@@ -118,6 +167,13 @@ const placeOrder = async () => {
     return
   }
 
+  // เปิด Confirm Modal เพื่อให้ลูกค้ายืนยัน ป้องกันการกดส่งซ้ำ
+  showConfirmModal.value = true
+}
+
+// 2. กดยืนยันใน Confirm Modal -> ส่งข้อมูลไปยังเซิร์ฟเวอร์และห้องครัว
+const executePlaceOrder = async () => {
+  if (cart.value.length === 0 || isSubmitting.value) return
   isSubmitting.value = true
   const finalTotal = cartTotal.value
 
@@ -164,6 +220,7 @@ const placeOrder = async () => {
       console.warn('ไม่สามารถส่งสัญญาณ socket place_order จากโต๊ะ:', socketErr)
     }
 
+    showConfirmModal.value = false
     placeOrderToHistory()
     router.push({ path: `/table/${tableId}/success`, query: { total: finalTotal, orderId: res.data?.order_id } })
   } catch (err) {
@@ -305,5 +362,179 @@ const placeOrder = async () => {
   padding: 2px 8px;
   border-radius: 9999px;
   white-space: nowrap;
+}
+
+/* 🛑 Pop-up Confirm Modal Styles */
+.confirm-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.confirm-modal-box {
+  background: white;
+  width: 100%;
+  max-width: 380px;
+  border-radius: 20px;
+  padding: 24px 20px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: scaleUp 0.2s ease-out;
+}
+
+.confirm-modal-header {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.confirm-icon-circle {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #ecfdf5;
+  border: 2px solid #a7f3d0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  margin-bottom: 12px;
+}
+
+.confirm-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0 0 4px 0;
+}
+
+.confirm-subtitle {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+}
+
+.confirm-items-preview {
+  max-height: 140px;
+  overflow-y: auto;
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 10px 14px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preview-item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.preview-item-name {
+  color: #334155;
+  font-weight: 600;
+}
+
+.preview-item-price {
+  color: #059669;
+  font-weight: 700;
+}
+
+.confirm-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 6px;
+  border-top: 1px dashed #cbd5e1;
+  font-size: 14px;
+  color: #1e293b;
+}
+
+.confirm-total-amount {
+  font-size: 18px;
+  font-weight: 900;
+  color: #047857;
+}
+
+.confirm-warning-note {
+  font-size: 11px;
+  line-height: 1.4;
+  color: #b45309;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  padding: 8px 12px;
+  border-radius: 10px;
+}
+
+.confirm-modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.modal-btn-cancel {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1.5px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modal-btn-cancel:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
+.modal-btn-confirm {
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  background: #059669;
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 6px -1px rgba(5, 150, 105, 0.3);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-btn-confirm:hover:not(:disabled) {
+  background: #047857;
+}
+
+.modal-btn-confirm:disabled,
+.modal-btn-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleUp {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }
 </style>

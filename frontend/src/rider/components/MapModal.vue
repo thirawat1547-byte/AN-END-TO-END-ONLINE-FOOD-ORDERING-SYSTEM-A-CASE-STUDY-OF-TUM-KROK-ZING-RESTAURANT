@@ -44,12 +44,12 @@
           </div>
           <div class="flex items-center gap-1.5 text-[11px] font-bold text-blue-700">
             <span class="w-2 h-2 rounded-full bg-blue-600 shrink-0"></span>
-            <span>จุดส่ง: คอนโด The Grand Rama 9</span>
+            <span class="truncate max-w-[210px]">จุดส่ง: {{ mapData?.targetName || 'คอนโด The Grand Rama 9' }}</span>
           </div>
         </div>
         <div class="text-right pl-2 border-l border-emerald-200 shrink-0">
-          <span class="font-black text-emerald-700 text-sm block">3.2 กม.</span>
-          <span class="text-[10px] text-slate-500">~12 นาที</span>
+          <span class="font-black text-emerald-700 text-sm block">{{ mapData?.distance || '3.2 กม.' }}</span>
+          <span class="text-[10px] text-slate-500">~{{ mapData?.eta || '12 นาที' }}</span>
         </div>
       </div>
 
@@ -93,7 +93,7 @@
             referrerpolicy="no-referrer-when-downgrade"
           ></iframe>
           <div class="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm text-[10px] text-slate-700 px-2 py-1 rounded-lg shadow border border-slate-200">
-            📍 แผนที่จริง Google Maps (พระราม 9 - รามคำแหง)
+            📍 แผนที่จริง Google Maps ({{ customerCoord[0].toFixed(4) }}, {{ customerCoord[1].toFixed(4) }})
           </div>
         </div>
 
@@ -153,6 +153,7 @@ const props = defineProps({
     type: Object,
     default: () => ({
       targetName: 'คอนโด The Grand Rama 9 (จุดส่งลูกค้า)',
+      customerCoord: [13.7570, 100.5695],
       distance: '3.2 กม.',
       eta: '12 นาที'
     })
@@ -175,11 +176,21 @@ const progressPercent = ref(0)
 // Real Bangkok Coordinates
 // Store: ร้านตำครกซิ่ง ซ.รามคำแหง 24 แยก 14
 const storeCoord = [13.7508, 100.6190]
-// Customer: คอนโด The Grand Rama 9
-const customerCoord = [13.7570, 100.5695]
 
-// Real coordinates corridor connecting Ramkhamhaeng 24 to Rama 9
-const routeCoordinates = [
+// Customer: Reactive coordinate from mapData or default
+const customerCoord = computed(() => {
+  if (props.mapData?.customerCoord && Array.isArray(props.mapData.customerCoord) && props.mapData.customerCoord.length === 2) {
+    const lat = Number(props.mapData.customerCoord[0])
+    const lng = Number(props.mapData.customerCoord[1])
+    if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+      return [lat, lng]
+    }
+  }
+  return [13.7570, 100.5695]
+})
+
+// Real coordinates corridor connecting Ramkhamhaeng 24 to Rama 9 (Default route)
+const defaultRouteCoordinates = [
   [13.7508, 100.6190], // ร้านตำครกซิ่ง ซอยรามคำแหง 24 แยก 14
   [13.7516, 100.6170], // ปากซอย 24 แยก 14
   [13.7528, 100.6145], // ถนนรามคำแหง 24 มุ่งหน้าแยกรามคำแหง
@@ -191,21 +202,46 @@ const routeCoordinates = [
   [13.7570, 100.5695]  // คอนโด The Grand Rama 9 (จุดส่ง)
 ]
 
+const routeCoordinates = computed(() => {
+  const cust = customerCoord.value
+  const isDefault = Math.abs(cust[0] - 13.7570) < 0.0005 && Math.abs(cust[1] - 100.5695) < 0.0005
+  if (isDefault) {
+    return defaultRouteCoordinates
+  }
+  // Generate smooth 8-point interpolated path from store to custom GPS coordinate
+  const start = storeCoord
+  const end = cust
+  const steps = 7
+  const points = []
+  for (let i = 0; i <= steps; i++) {
+    const ratio = i / steps
+    points.push([
+      Number((start[0] + (end[0] - start[0]) * ratio).toFixed(6)),
+      Number((start[1] + (end[1] - start[1]) * ratio).toFixed(6))
+    ])
+  }
+  return points
+})
+
 const currentTurnDistance = computed(() => {
-  if (simIndex.value >= routeCoordinates.length - 2) return 'อีก 50 เมตร'
+  const coords = routeCoordinates.value
+  if (simIndex.value >= coords.length - 2) return 'อีก 50 เมตร'
   if (simIndex.value > 3) return 'อีก 400 เมตร'
   return 'อีก 150 เมตร'
 })
 
 const currentTurnText = computed(() => {
-  if (simIndex.value >= routeCoordinates.length - 1) return 'ถึงคอนโด The Grand Rama 9 แล้ว'
-  if (simIndex.value > 4) return 'ตรงไปบนถนนพระราม 9 มุ่งหน้า อสมท.'
-  if (simIndex.value > 2) return 'เลี้ยวขวาเข้าสู่ถนนพระราม 9'
+  const coords = routeCoordinates.value
+  const targetLabel = props.mapData?.targetName || 'จุดส่งลูกค้า'
+  if (simIndex.value >= coords.length - 1) return `ถึง${targetLabel}แล้ว`
+  if (simIndex.value > 4) return 'มุ่งหน้าสู่ปลายทางตามเส้นทาง'
+  if (simIndex.value > 2) return 'เลี้ยวขวาเข้าสู่ถนนหลัก'
   return 'ออกจาก ซอยรามคำแหง 24 แยก 14'
 })
 
 const currentTurnIcon = computed(() => {
-  if (simIndex.value >= routeCoordinates.length - 1) return '🏢'
+  const coords = routeCoordinates.value
+  if (simIndex.value >= coords.length - 1) return '📍'
   if (simIndex.value > 4) return '⬆️'
   if (simIndex.value > 2) return '↗️'
   return '➡️'
@@ -213,11 +249,13 @@ const currentTurnIcon = computed(() => {
 
 // Google Maps links
 const googleEmbedUrl = computed(() => {
-  return `https://maps.google.com/maps?q=${customerCoord[0]},${customerCoord[1]}&hl=th&z=15&output=embed`
+  const [lat, lng] = customerCoord.value
+  return `https://maps.google.com/maps?q=${lat},${lng}&hl=th&z=15&output=embed`
 })
 
 const googleMapsExternalUrl = computed(() => {
-  return `https://www.google.com/maps/dir/?api=1&origin=${storeCoord[0]},${storeCoord[1]}&destination=${customerCoord[0]},${customerCoord[1]}&travelmode=two_wheeler`
+  const [lat, lng] = customerCoord.value
+  return `https://www.google.com/maps/dir/?api=1&origin=${storeCoord[0]},${storeCoord[1]}&destination=${lat},${lng}&travelmode=two_wheeler`
 })
 
 const createCustomIcon = (emoji, bgColor) => {
@@ -256,10 +294,14 @@ const initMap = () => {
   destroyMap()
 
   try {
+    const coords = routeCoordinates.value
+    const centerLat = (storeCoord[0] + customerCoord.value[0]) / 2
+    const centerLng = (storeCoord[1] + customerCoord.value[1]) / 2
+
     map = L.map(mapContainer.value, {
       zoomControl: true,
       attributionControl: false
-    }).setView([13.7540, 100.5940], 13)
+    }).setView([centerLat, centerLng], 13)
 
     // Using CartoDB Voyager tiles (high reliability, zero localhost rate-limiting)
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
@@ -268,7 +310,7 @@ const initMap = () => {
     }).addTo(map)
 
     // Background Glow Polyline
-    L.polyline(routeCoordinates, {
+    L.polyline(coords, {
       color: '#10B981',
       weight: 9,
       opacity: 0.3,
@@ -276,7 +318,7 @@ const initMap = () => {
     }).addTo(map)
 
     // Main Emerald Route Line
-    routePolyline = L.polyline(routeCoordinates, {
+    routePolyline = L.polyline(coords, {
       color: '#059669',
       weight: 5,
       opacity: 0.9,
@@ -299,15 +341,17 @@ const initMap = () => {
       .bindPopup('<b>ร้านตำครกซิ่ง</b><br><span style="font-size:11px;">จุดรับอาหาร (ซ.รามคำแหง 24)</span>')
       .addTo(map)
 
-    // Customer Pin (คอนโด The Grand Rama 9)
-    const customerIcon = createCustomIcon('🏢', '#2563eb')
-    L.marker(customerCoord, { icon: customerIcon })
-      .bindPopup('<b>คอนโด The Grand Rama 9</b><br><span style="font-size:11px;">จุดส่งลูกค้า (อาคาร B)</span>')
+    // Customer Pin
+    const customerIcon = createCustomIcon('📍', '#2563eb')
+    const customerLabel = props.mapData?.targetName || 'จุดส่งลูกค้า'
+    L.marker(customerCoord.value, { icon: customerIcon })
+      .bindPopup(`<b>${customerLabel}</b><br><span style="font-size:11px;">พิกัด: ${customerCoord.value[0].toFixed(5)}, ${customerCoord.value[1].toFixed(5)}</span>`)
       .addTo(map)
 
     // Rider Moving Pin
     const riderIcon = createCustomIcon('🛵', '#059669')
-    riderMarker = L.marker(routeCoordinates[simIndex.value], { icon: riderIcon })
+    const currentLoc = coords[simIndex.value] || coords[0]
+    riderMarker = L.marker(currentLoc, { icon: riderIcon })
       .bindPopup('<b>พนักงานส่งของร้าน</b><br><span style="font-size:11px;">กำลังนำส่งอาหาร</span>')
       .addTo(map)
 
@@ -352,21 +396,23 @@ const toggleSimulation = () => {
 }
 
 const startSimulation = () => {
-  if (simIndex.value >= routeCoordinates.length - 1) {
+  const coords = routeCoordinates.value
+  if (simIndex.value >= coords.length - 1) {
     simIndex.value = 0
   }
   isSimulating.value = true
   animInterval = setInterval(() => {
-    if (simIndex.value < routeCoordinates.length - 1) {
+    const currentCoords = routeCoordinates.value
+    if (simIndex.value < currentCoords.length - 1) {
       simIndex.value++
-      const coord = routeCoordinates[simIndex.value]
+      const coord = currentCoords[simIndex.value]
       if (riderMarker) {
         riderMarker.setLatLng(coord)
       }
       if (map) {
         map.panTo(coord, { animate: true, duration: 0.5 })
       }
-      progressPercent.value = (simIndex.value / (routeCoordinates.length - 1)) * 100
+      progressPercent.value = (simIndex.value / (currentCoords.length - 1)) * 100
     } else {
       stopSimulation()
     }

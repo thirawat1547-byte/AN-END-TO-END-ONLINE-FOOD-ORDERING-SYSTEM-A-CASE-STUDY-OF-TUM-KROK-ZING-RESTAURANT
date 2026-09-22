@@ -3,12 +3,14 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import axios from 'axios'
 import { API_BASE } from '../../config/api'
 import { socket } from '../../config/socket'
+import { useSocketStore } from '../../store/socketStore'
 
+const socketStore = useSocketStore()
 const activeTab = ref('incoming')
 const incomingOrders = ref([])
 const completedOrders = ref([])
 const isLoading = ref(false)
-const isSocketConnected = ref(socket.connected)
+const isSocketConnected = computed(() => socketStore.isConnected)
 const newOrderNotification = ref(null)
 const selectedFilter = ref('today') // 'today' | 'all' (รีเซ็ตทุกวันเป็นค่าเริ่มต้น)
 let pollingTimer = null
@@ -83,11 +85,11 @@ const onOrderStatusChanged = (order) => {
 }
 
 const onSocketConnect = () => {
-  isSocketConnected.value = true
+  socketStore.isConnected = true
 }
 
 const onSocketDisconnect = () => {
-  isSocketConnected.value = false
+  socketStore.isConnected = false
 }
 
 
@@ -225,8 +227,8 @@ const recallOrder = async (orderId) => {
 onMounted(() => {
   fetchOrders()
 
-  // เชื่อมต่อ Event ของ Socket.io
-  isSocketConnected.value = socket.connected
+  // เชื่อมต่อ Event ของ Socket.io และซิงค์สถานะผ่าน Pinia Store
+  socketStore.ensureConnection()
   socket.on('connect', onSocketConnect)
   socket.on('disconnect', onSocketDisconnect)
   socket.on('new_order', onNewOrderReceived)

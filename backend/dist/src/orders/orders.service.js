@@ -43,11 +43,16 @@ let OrdersService = class OrdersService {
                 }
                 const unitPrice = Number(menu.price);
                 totalAmount += unitPrice * item.quantity;
+                const dishType = item.dish_type || item.dishType;
+                let finalNotes = item.notes || '';
+                if (dishType && !finalNotes.includes(dishType)) {
+                    finalNotes = finalNotes ? `${dishType} | ${finalNotes}` : dishType;
+                }
                 orderItemsData.push({
                     menu_id: item.menu_id,
                     quantity: item.quantity,
                     unit_price: unitPrice,
-                    notes: item.notes || null,
+                    notes: finalNotes || null,
                 });
             }
             let validUserId = undefined;
@@ -148,11 +153,86 @@ let OrdersService = class OrdersService {
                 }
             }
             for (const item of createOrderDto.items) {
+                const menu = await tx.menu.findUnique({ where: { menu_id: item.menu_id } });
+                const menuName = menu?.menu_name || '';
+                const isRiceDishItself = menuName.includes('ข้าวผัด') || menuName.includes('ข้าวเปล่า') || menuName.includes('ข้าวเหนียว');
+                const dishType = item.dish_type || item.dishType || '';
+                const notes = item.notes || '';
+                const isKabKhao = !isRiceDishItself && (dishType.includes('กับข้าว') ||
+                    notes.includes('กับข้าว') ||
+                    notes.includes('แบบกับข้าว'));
                 const menuIngredients = await tx.menuIngredient.findMany({
                     where: { menu_id: item.menu_id },
+                    include: {
+                        ingredient: true,
+                    },
                 });
+                const isSeafoodDish = menuName.includes('ทะเล') || (menuName.includes('หมึก') && menuName.includes('กุ้ง'));
+                const combinedNotes = `${dishType} ${notes}`.toLowerCase();
+                const noShrimp = combinedNotes.includes('ไม่เอากุ้ง') || combinedNotes.includes('ไม่ใส่กุ้ง') || combinedNotes.includes('ไม่กุ้ง');
+                const noSquid = combinedNotes.includes('ไม่เอาหมึก') || combinedNotes.includes('ไม่ใส่หมึก') || combinedNotes.includes('ไม่หมึก') || combinedNotes.includes('ไม่เอาปลาหมึก') || combinedNotes.includes('ไม่ใส่ปลาหมึก');
+                let hasShrimpWord = (combinedNotes.includes('กุ้ง') || combinedNotes.includes('shrimp')) && !noShrimp;
+                let hasSquidWord = (combinedNotes.includes('หมึก') || combinedNotes.includes('squid')) && !noSquid;
+                const hasCombinedWord = !noShrimp && !noSquid && (combinedNotes.includes('รวม') || (hasShrimpWord && hasSquidWord));
+                let seafoodSelection = 'ALL';
+                if (isSeafoodDish) {
+                    if (noShrimp && !noSquid) {
+                        seafoodSelection = 'SQUID_ONLY';
+                    }
+                    else if (noSquid && !noShrimp) {
+                        seafoodSelection = 'SHRIMP_ONLY';
+                    }
+                    else if (hasCombinedWord) {
+                        seafoodSelection = 'ALL';
+                    }
+                    else if (hasShrimpWord && !hasSquidWord) {
+                        seafoodSelection = 'SHRIMP_ONLY';
+                    }
+                    else if (hasSquidWord && !hasShrimpWord) {
+                        seafoodSelection = 'SQUID_ONLY';
+                    }
+                }
+                const seafoodItemsInRecipe = menuIngredients.filter((mi) => {
+                    const n = mi.ingredient?.name || '';
+                    return (n.includes('กุ้ง') || n.includes('หมึก')) && !n.includes('กุ้งแห้ง');
+                });
+                const totalSeafoodPortion = seafoodItemsInRecipe.reduce((sum, mi) => sum + Number(mi.quantity_used), 0);
                 for (const mi of menuIngredients) {
-                    const deductAmount = Number(mi.quantity_used) * item.quantity;
+                    const ingName = mi.ingredient?.name || '';
+                    const isRice = ingName.includes('ข้าวสาร') || ingName.includes('ข้าวหอมมะลิ');
+                    if (isKabKhao && isRice) {
+                        console.log(`[Stock Deduction] เมนู #${item.menu_id} สั่งเป็น "กับข้าว" -> ยกเว้นการตัดสต็อกวัตถุดิบ "${ingName}"`);
+                        continue;
+                    }
+                    const isShrimpIng = (ingName.includes('กุ้ง') || ingName.toLowerCase().includes('shrimp')) && !ingName.includes('กุ้งแห้ง');
+                    const isSquidIng = ingName.includes('หมึก') || ingName.toLowerCase().includes('squid');
+                    let deductAmount = Number(mi.quantity_used) * item.quantity;
+                    if (isSeafoodDish && (isShrimpIng || isSquidIng)) {
+                        if (seafoodSelection === 'SHRIMP_ONLY') {
+                            if (isSquidIng) {
+                                console.log(`[Stock Deduction] เมนู #${item.menu_id} "${menuName}" ลูกค้าสั่งเฉพาะ "กุ้งสด" -> ยกเว้นการตัดสต็อก "${ingName}"`);
+                                continue;
+                            }
+                            if (isShrimpIng) {
+                                deductAmount = (totalSeafoodPortion > 0 ? totalSeafoodPortion : Number(mi.quantity_used)) * item.quantity;
+                                console.log(`[Stock Deduction] เมนู #${item.menu_id} "${menuName}" สั่งเฉพาะ "กุ้งสด" -> ตัดสต็อก "${ingName}" จำนวน ${deductAmount} กก.`);
+                            }
+                        }
+                        else if (seafoodSelection === 'SQUID_ONLY') {
+                            if (isShrimpIng) {
+                                console.log(`[Stock Deduction] เมนู #${item.menu_id} "${menuName}" ลูกค้าสั่งเฉพาะ "หมึกสด" -> ยกเว้นการตัดสต็อก "${ingName}"`);
+                                continue;
+                            }
+                            if (isSquidIng) {
+                                deductAmount = (totalSeafoodPortion > 0 ? totalSeafoodPortion : Number(mi.quantity_used)) * item.quantity;
+                                console.log(`[Stock Deduction] เมนู #${item.menu_id} "${menuName}" สั่งเฉพาะ "หมึกสด" -> ตัดสต็อก "${ingName}" จำนวน ${deductAmount} กก.`);
+                            }
+                        }
+                        else {
+                            console.log(`[Stock Deduction] เมนู #${item.menu_id} "${menuName}" สั่งแบบ "รวมทะเล" -> ตัดสต็อก "${ingName}" จำนวน ${deductAmount} กก.`);
+                        }
+                    }
+                    deductAmount = Math.round(deductAmount * 10000) / 10000;
                     if (deductAmount > 0) {
                         await tx.ingredient.update({
                             where: { ingredient_id: mi.ingredient_id },
@@ -365,10 +445,23 @@ let OrdersService = class OrdersService {
         const statusUpper = updateOrderStatusDto.status.toUpperCase();
         if (statusUpper === 'CANCELLED' && order.status.toUpperCase() !== 'CANCELLED') {
             for (const item of order.order_items) {
+                const menu = await this.prisma.menu.findUnique({ where: { menu_id: item.menu_id } });
+                const menuName = menu?.menu_name || '';
+                const isRiceDishItself = menuName.includes('ข้าวผัด') || menuName.includes('ข้าวเปล่า') || menuName.includes('ข้าวเหนียว');
+                const notes = item.notes || '';
+                const isKabKhao = !isRiceDishItself && (notes.includes('กับข้าว') || notes.includes('แบบกับข้าว'));
                 const menuIngredients = await this.prisma.menuIngredient.findMany({
                     where: { menu_id: item.menu_id },
+                    include: {
+                        ingredient: true,
+                    },
                 });
                 for (const mi of menuIngredients) {
+                    const ingName = mi.ingredient?.name || '';
+                    const isRice = ingName.includes('ข้าวสาร') || ingName.includes('ข้าวหอมมะลิ');
+                    if (isKabKhao && isRice) {
+                        continue;
+                    }
                     const restoreAmount = Number(mi.quantity_used) * item.quantity;
                     if (restoreAmount > 0) {
                         await this.prisma.ingredient.update({

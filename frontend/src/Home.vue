@@ -43,7 +43,6 @@
         <h2 class="section-heading">{{ searchQuery ? 'ผลการค้นหา' : currentCategory }}</h2>
 
         <!-- Product Grid ใน Home.vue -->
-<<<<<<< HEAD
         <div class="products-grid" :key="currentCategory">
           <div 
             class="food-card" 
@@ -54,15 +53,6 @@
               'drink-card': isDrink(item)
             }"
             @click="onCardClick(item)"
-=======
-        <div class="products-grid">
-          <div 
-            class="food-card" 
-            v-for="item in filteredMenu" 
-            :key="item.id" 
-            :class="{ 'out-of-stock-card': item.is_available === false }"
-            @click="item.is_available !== false ? openModalOrAdd(item) : null"
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
           >
             <div class="img-wrapper">
               <span class="badge-popular" v-if="item.isPopular">ยอดนิยม</span>
@@ -82,12 +72,8 @@
                 class="plus-btn" 
                 :disabled="item.is_available === false"
                 :class="{ 'disabled-btn': item.is_available === false }"
-<<<<<<< HEAD
                 @click.stop="onPlusClick(item)"
                 :title="isDrink(item) ? 'กด + เพื่อเพิ่มลงตะกร้า' : 'เลือกรายละเอียด'"
-=======
-                @click.stop="item.is_available !== false && openModalOrAdd(item)"
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
               >
                 {{ item.is_available === false ? 'หมด' : '+' }}
               </button>
@@ -336,33 +322,6 @@ export default {
 
       // รายการเมนูพร้อม Path รูปที่ Vite โหลดได้สมบูรณ์
       menuItems: [
-<<<<<<< HEAD
-        { id: 2, name: 'กระเพราหมู', price: 40, category: ['เมนูอาหาร', 'ขายดีที่สุด'], desc: 'หอมฟุ้ง อร่อยเด็ดสะใจ!', img: new URL('./assets/kapaomu.jpg', import.meta.url).href, isPopular: true, isSpicy: true, calories: 550, is_available: true },
-        { id: 3, name: 'กระเพราทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'เผ็ดร้อน ถึงเครื่อง', img: new URL('./assets/kapaotaley.jpg', import.meta.url).href, isSpicy: true, isSeafood: true, calories: 450, is_available: true },
-        { id: 4, name: 'ข้าวผัดหมู', price: 40, category: ['เมนูอาหาร'], desc: 'ข้าวผัดหอมกรุ่น', img: new URL('./assets/khaopadmu.jpg', import.meta.url).href, isSpicy: false, calories: 550, is_available: true },
-        { id: 5, name: 'ข้าวผัดทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'รวมมิตรทะเลผัด', img: new URL('./assets/khaopadtalay.jpg', import.meta.url).href, isSpicy: false, isSeafood: true, calories: 520, is_available: true },
-        { id: 14, name: 'ผัดพริกแกงหมู', price: 40, category: ['เมนูอาหาร'], desc: 'พริกแกงเข้มข้น', img: new URL('./assets/pikkangmu.jpg', import.meta.url).href, isSpicy: true, calories: 550, is_available: true },
-        { id: 15, name: 'ผัดพริกแกงทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'จัดจ้านถึงใจ', img: new URL('./assets/prikkangtalay.jpg', import.meta.url).href, isSpicy: true, isSeafood: true, calories: 480, is_available: true },
-        { id: 16, name: 'ผัดคะน้าหมู', price: 40, category: ['เมนูอาหาร'], desc: 'ผักกรอบ หมูนุ่ม', img: new URL('./assets/kanamokrop.jpg', import.meta.url).href, isSpicy: false, calories: 450, is_available: true },
-        { id: 17, name: 'ผัดคะน้าทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'คะน้ากรอบกับซีฟู้ด', img: new URL('./assets/kanatalay.jpg', import.meta.url).href, isSpicy: false, isSeafood: true, calories: 400, is_available: true },
-        { id: 18, name: 'ข้าวหมูกระเทียม', price: 40, category: ['เมนูอาหาร'], desc: 'หอมกระเทียมพริกไทย', img: new URL('./assets/mookratiem.jpg', import.meta.url).href, isSpicy: false, calories: 500, is_available: true },
-        { id: 27, name: 'ข้าวไข่เจียวหมูสับ', price: 40, category: ['เมนูอาหาร'], desc: 'ไข่เจียวฟูๆ หมูสับแน่นๆ', img: new URL('./assets/kaijeawmoosub.jpg', import.meta.url).href, isSpicy: false, calories: 600, is_available: true },
-        { id: 28, name: 'ข้าวไข่เจียวกุ้ง', price: 50, category: ['เมนูอาหาร'], desc: 'ไข่เจียวฟูกับกุ้ง', img: new URL('./assets/kaikung.jpg', import.meta.url).href, isSpicy: false, calories: 550, is_available: true },
-        { id: 9, name: 'ยำวุ้นเส้นทะเล', price: 70, category: ['เมนูอาหาร', 'ขายดีที่สุด'], desc: 'เปรี้ยวเผ็ดแซ่บ กุ้ง หมึก หมูสับ', img: new URL('./assets/yumtalay.jpg', import.meta.url).href, isSpicy: true, isSeafood: true, calories: 250, is_available: true },
-        
-        { id: 6, name: 'ส้มตำปูปลาร้า', price: 40, category: ['เมนูอาหารอีสาน', 'ขายดีที่สุด'], desc: 'เส้นมะละกอดิบ มะเขือเทศ และพริก', img: new URL('./assets/tumprara.jpg', import.meta.url).href, isPopular: true, isSpicy: true, calories: 120, is_available: true },
-        { id: 7, name: 'ส้มตำไทย', price: 40, category: ['เมนูอาหารอีสาน'], desc: 'เปรี้ยวหวาน สามรส', img: new URL('./assets/tumtai.jpg', import.meta.url).href, isSpicy: true, calories: 150, is_available: true },
-        { id: 8, name: 'ลาบหมู', price: 60, category: ['เมนูอาหารอีสาน'], desc: 'หอมข้าวคั่ว แซ่บถึงใจ', img: new URL('./assets/larbmoo.jpg', import.meta.url).href, isSpicy: true, calories: 200, is_available: true },
-        { id: 21, name: 'ไก่ทอด (ปีก)', price: 20, category: ['เมนูอาหารอีสาน'], desc: 'กรอบนอกนุ่มใน', img: new URL('./assets/wingchick.jpg', import.meta.url).href, isSpicy: false, calories: 150, is_available: true },
-        { id: 10, name: 'ไก่ทอด (สะโพก)', price: 50, category: ['เมนูอาหารอีสาน', 'ขายดีที่สุด'], desc: 'เนื้อฉ่ำๆ ชิ้นใหญ่', img: new URL('./assets/chick.jpg', import.meta.url).href, isSpicy: false, calories: 250, is_available: true },
-
-        { id: 22, name: 'น้ำเก๊กฮวย', price: 20, category: ['เครื่องดื่ม', 'ขายดีที่สุด'], desc: 'หวานเย็น ชื่นใจ', img: new URL('./assets/gek.jpg', import.meta.url).href, calories: 120, is_available: true },
-        { id: 12, name: 'โค้ก (Coke)', price: 20, category: ['เครื่องดื่ม'], desc: 'น้ำอัดลมซ่าสดชื่น', img: new URL('./assets/coke.jpg', import.meta.url).href, calories: 140, is_available: true },
-        { id: 23, name: 'สไปรท์ (Sprite)', price: 20, category: ['เครื่องดื่ม'], desc: 'ซ่า สดชื่น กลิ่นเลมอน', img: new URL('./assets/sprite.jpg', import.meta.url).href, calories: 140, is_available: true },
-        { id: 13, name: 'น้ำเปล่า', price: 10, category: ['เครื่องดื่ม'], desc: 'น้ำดื่มบริสุทธิ์', img: new URL('./assets/water.jpg', import.meta.url).href, calories: 0, is_available: true },
-        { id: 24, name: 'ข้าวเปล่า', price: 10, category: ['เมนูอาหาร'], desc: 'ข้าวสวยหอมมะลิ ร้อนๆ นุ่มอร่อย', img: new URL('./assets/kao.jpg', import.meta.url).href, isSpicy: false, calories: 150, is_available: true },
-        { id: 25, name: 'ข้าวเหนียว', price: 10, category: ['เมนูอาหารอีสาน', 'เมนูอาหาร'], desc: 'ข้าวเหนียวนุ่ม ร้อนๆ หอมอร่อย', img: new URL('./assets/kaon.jpg', import.meta.url).href, isSpicy: false, calories: 150, is_available: true }
-=======
         { id: 1, name: 'กระเพราหมู', price: 40, category: ['เมนูอาหาร', 'ขายดีที่สุด'], desc: 'หอมฟุ้ง อร่อยเด็ดสะใจ!', img: new URL('./assets/kapaomu.jpg', import.meta.url).href, isPopular: true, isSpicy: true, calories: 550, is_available: true },
         { id: 2, name: 'กระเพราทะเล/หมึก/กุ้ง', price: 60, category: ['เมนูอาหาร'], desc: 'เผ็ดร้อน ถึงเครื่อง', img: new URL('./assets/kapaotaley.jpg', import.meta.url).href, isSpicy: true, isSeafood: true, calories: 450, is_available: true },
         { id: 3, name: 'ข้าวผัดหมู', price: 40, category: ['เมนูอาหาร'], desc: 'ข้าวผัดหอมกรุ่น', img: new URL('./assets/khaopadmu.jpg', import.meta.url).href, isSpicy: false, calories: 550, is_available: true },
@@ -374,7 +333,7 @@ export default {
         { id: 10, name: 'ข้าวหมูกระเทียม', price: 40, category: ['เมนูอาหาร'], desc: 'หอมกระเทียมพริกไทย', img: new URL('./assets/mookratiem.jpg', import.meta.url).href, isSpicy: false, calories: 500, is_available: true },
         { id: 11, name: 'ข้าวไข่เจียวหมูสับ', price: 40, category: ['เมนูอาหาร'], desc: 'ไข่เจียวฟูๆ หมูสับแน่นๆ', img: new URL('./assets/kaijeawmoosub.jpg', import.meta.url).href, isSpicy: false, calories: 600, is_available: true },
         { id: 12, name: 'ข้าวไข่เจียวกุ้ง', price: 50, category: ['เมนูอาหาร'], desc: 'ไข่เจียวฟูกับกุ้ง', img: new URL('./assets/kaikung.jpg', import.meta.url).href, isSpicy: false, calories: 550, is_available: true },
-        { id: 13, name: 'ยำวุ้นเส้นทะเล', price: 70, category: ['เมนูอาหาร', 'ขายดีที่สุด'], desc: 'เปรี้ยวเผ็ดแซ่บ', img: new URL('./assets/yumtalay.jpg', import.meta.url).href, isSpicy: true, isSeafood: true, calories: 250, is_available: true },
+        { id: 13, name: 'ยำวุ้นเส้นทะเล', price: 70, category: ['เมนูอาหาร', 'ขายดีที่สุด'], desc: 'เปรี้ยวเผ็ดแซ่บ กุ้ง หมึก หมูสับ', img: new URL('./assets/yumtalay.jpg', import.meta.url).href, isSpicy: true, isSeafood: true, calories: 250, is_available: true },
         
         { id: 14, name: 'ส้มตำปูปลาร้า', price: 40, category: ['เมนูอาหารอีสาน', 'ขายดีที่สุด'], desc: 'เส้นมะละกอดิบ มะเขือเทศ และพริก', img: new URL('./assets/tumprara.jpg', import.meta.url).href, isPopular: true, isSpicy: true, calories: 120, is_available: true },
         { id: 15, name: 'ส้มตำไทย', price: 40, category: ['เมนูอาหารอีสาน'], desc: 'เปรี้ยวหวาน สามรส', img: new URL('./assets/tumtai.jpg', import.meta.url).href, isSpicy: true, calories: 150, is_available: true },
@@ -388,7 +347,6 @@ export default {
         { id: 22, name: 'น้ำเปล่า', price: 10, category: ['เครื่องดื่ม'], desc: 'น้ำดื่มบริสุทธิ์', img: new URL('./assets/water.jpg', import.meta.url).href, calories: 0, is_available: true },
         { id: 23, name: 'ข้าวเปล่า', price: 10, category: ['เมนูอาหาร'], desc: 'ข้าวสวยหอมมะลิ ร้อนๆ นุ่มอร่อย', img: new URL('./assets/kao.jpg', import.meta.url).href, isSpicy: false, calories: 150, is_available: true },
         { id: 24, name: 'ข้าวเหนียว', price: 10, category: ['เมนูอาหารอีสาน', 'เมนูอาหาร'], desc: 'ข้าวเหนียวนุ่ม ร้อนๆ หอมอร่อย', img: new URL('./assets/kaon.jpg', import.meta.url).href, isSpicy: false, calories: 150, is_available: true }
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
       ]
     }
   },
@@ -493,7 +451,6 @@ export default {
       }
     },
     
-<<<<<<< HEAD
     findMatchingDbMenu(localItem, dbMenus) {
       if (!dbMenus || !Array.isArray(dbMenus)) return null;
 
@@ -555,35 +512,20 @@ export default {
 
       return null;
     },
-
-=======
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
     async fetchMenus() {
       try {
         const response = await axios.get(`${API_BASE}/menus`);
         if (response.data && response.data.length > 0) {
           this.menuItems = this.menuItems.map(localItem => {
-<<<<<<< HEAD
             const dbItem = this.findMatchingDbMenu(localItem, response.data);
-=======
-            const dbItem = response.data.find(d => 
-              d.menu_name === localItem.name || 
-              d.name === localItem.name ||
-              d.menu_id === localItem.id
-            );
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
 
             if (dbItem) {
               return {
                 ...localItem,
                 id: dbItem.menu_id || dbItem.id || localItem.id,
                 price: Number(dbItem.price) || localItem.price,
-<<<<<<< HEAD
                 // คงคำอธิบายของเมนูให้ตรงกับเมนูและการ์ดอาหารเสมอ ไม่นำคำอธิบายผิดเมนูมาทับ
                 desc: localItem.desc || dbItem.description,
-=======
-                desc: dbItem.description || localItem.desc,
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
                 // 🛑 บรรทัดนี้สำคัญมาก: ดึงสถานะเปิด-ปิดจริงจาก Backend มาทับ
                 is_available: dbItem.is_available !== undefined ? dbItem.is_available : true
               };
@@ -624,7 +566,6 @@ export default {
       return false;
     },
 
-<<<<<<< HEAD
     isDrink(item) {
       if (!item) return false;
       const name = item.name || item.menu_name || '';
@@ -668,9 +609,6 @@ export default {
         this.openModalOrAdd(item);
       }
     },
-
-=======
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
     openModalOrAdd(item) {
       if (!this.isStoreOpen) {
         alert('🛑 ขออภัยครับ ขณะนี้ร้านปิดให้บริการชั่วคราว ไม่สามารถสั่งอาหารได้ในขณะนี้');
@@ -683,16 +621,12 @@ export default {
         return; 
       }
       
-<<<<<<< HEAD
       // เมนูน้ำห้าม add จากการคลิกการ์ด
       if (this.isDrink(item)) {
         return;
       }
 
       if (item.name.includes('ไก่ทอด') || item.name === 'ข้าวเปล่า' || item.name === 'ข้าวเหนียว') {
-=======
-      if (item.category.includes('เครื่องดื่ม') || item.name.includes('ไก่ทอด') || item.name === 'ข้าวเปล่า' || item.name === 'ข้าวเหนียว') {
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
         this.addDirectToCart(item);
       } else {
         this.selectedItem = item;
@@ -828,15 +762,12 @@ export default {
 .products-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
 .food-card { background: white; border-radius: 16px; padding: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); display: flex; flex-direction: column; position: relative; cursor: pointer; transition: 0.2s; }
 .food-card:hover { transform: translateY(-3px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-<<<<<<< HEAD
 .food-card.drink-card { cursor: default; }
 .food-card.drink-card .img-wrapper { cursor: default; }
 .food-card.drink-card .food-title { cursor: default; }
 .food-card.drink-card .food-desc { cursor: default; }
 .food-card.drink-card .plus-btn { cursor: pointer; transform: scale(1.05); }
 .food-card.drink-card .plus-btn:hover { background: #557c61; transform: scale(1.15); box-shadow: 0 2px 6px rgba(85, 124, 97, 0.4); }
-=======
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
 .img-wrapper { position: relative; width: 100%; height: 130px; border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
 .img-wrapper img { width: 100%; height: 100%; object-fit: cover; }
 .badge-popular { position: absolute; top: 8px; right: 8px; background: #6b8e73; color: white; font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }

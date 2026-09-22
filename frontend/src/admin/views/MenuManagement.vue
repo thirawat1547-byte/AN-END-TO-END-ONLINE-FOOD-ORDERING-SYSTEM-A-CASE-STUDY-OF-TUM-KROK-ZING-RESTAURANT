@@ -1,5 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import axios from 'axios'
+import { API_BASE } from '../../config/api'
 import { adminStore } from '../store/adminData'
 
 onMounted(async () => {
@@ -10,6 +12,9 @@ const selectedCategory = ref(0) // 0 = all
 const searchQuery = ref('')
 const isModalOpen = ref(false)
 const isEditing = ref(false)
+const fileInputRef = ref(null)
+const isUploadingImage = ref(false)
+const uploadError = ref('')
 
 const form = ref({
   menu_id: null,
@@ -24,17 +29,12 @@ const form = ref({
 })
 
 const filteredMenus = computed(() => {
-<<<<<<< HEAD
   const query = (searchQuery.value || '').trim().toLowerCase()
   return adminStore.menus.filter(m => {
     const matchCategory = selectedCategory.value === 0 || m.category_id === selectedCategory.value
-    const matchSearch = !query || (m.menu_name || '').toLowerCase().includes(query)
-=======
-  return adminStore.menus.filter(m => {
-    const matchCategory = selectedCategory.value === 0 || m.category_id === selectedCategory.value
-    const matchSearch = m.menu_name.toLowerCase().includes(searchQuery.value.toLowerCase()) || 
-                        m.description.toLowerCase().includes(searchQuery.value.toLowerCase())
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
+    const matchSearch = !query || 
+                        (m.menu_name || '').toLowerCase().includes(query) || 
+                        (m.description || '').toLowerCase().includes(query)
     return matchCategory && matchSearch
   })
 })
@@ -57,8 +57,58 @@ function openAddModal() {
 
 function openEditModal(menu) {
   isEditing.value = true
+  uploadError.value = ''
   form.value = { ...menu, allergen_ids: [...menu.allergen_ids] }
   isModalOpen.value = true
+}
+
+function triggerFileInput() {
+  if (fileInputRef.value) {
+    fileInputRef.value.click()
+  }
+}
+
+async function handleFileUpload(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+
+  // ตรวจสอบชนิดไฟล์
+  if (!file.type.match(/^image\/(jpeg|jpg|png|webp|gif)$/i)) {
+    uploadError.value = 'กรุณาเลือกไฟล์ภาพ (JPG, PNG, WEBP, GIF) เท่านั้น'
+    return
+  }
+
+  // ตรวจสอบขนาดไฟล์ (ไม่เกิน 5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    uploadError.value = 'ขนาดไฟล์ภาพต้องไม่เกิน 5MB'
+    return
+  }
+
+  uploadError.value = ''
+  isUploadingImage.value = true
+
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const res = await axios.post(`${API_BASE}/menus/upload`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+
+    if (res.data && res.data.url) {
+      form.value.image_url = res.data.url
+    }
+  } catch (err) {
+    console.error('เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ:', err)
+    uploadError.value = err.response?.data?.message || 'ไม่สามารถอัปโหลดรูปภาพได้ กรุณาลองใหม่อีกครั้ง'
+  } finally {
+    isUploadingImage.value = false
+    if (event.target) {
+      event.target.value = ''
+    }
+  }
 }
 
 function saveMenu() {
@@ -140,11 +190,7 @@ function getAllergenNames(ids) {
         <input 
           type="text" 
           v-model="searchQuery"
-<<<<<<< HEAD
-          placeholder="ค้นหาชื่อเมนู..."
-=======
           placeholder="ค้นหาชื่อเมนู หรือส่วนผสม..."
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
           class="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2d5a43]/50"
         />
       </div>
@@ -327,15 +373,67 @@ function getAllergenNames(ids) {
             </div>
           </div>
 
-          <!-- Image URL -->
+          <!-- Image Upload & URL (Multer File Upload) -->
           <div>
-            <label class="block font-bold text-slate-700 mb-1">ลิงก์รูปภาพอาหาร (Image URL)</label>
-            <input 
-              type="text" 
-              v-model="form.image_url"
-              placeholder="https://images.unsplash.com/..."
-              class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none"
-            />
+            <label class="block font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+              <span>รูปภาพอาหาร (Menu Image) *</span>
+              <span class="text-[10px] text-slate-400 font-normal">รองรับไฟล์ JPG, PNG, WEBP (สูงสุด 5MB)</span>
+            </label>
+
+            <!-- Upload Area & Preview -->
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
+              <div class="flex items-center gap-3">
+                <!-- Preview Thumbnail -->
+                <div class="w-16 h-16 rounded-xl border border-slate-300 bg-white overflow-hidden shrink-0 flex items-center justify-center shadow-sm">
+                  <img 
+                    v-if="form.image_url" 
+                    :src="form.image_url" 
+                    alt="Preview" 
+                    class="w-full h-full object-cover"
+                    @error="uploadError = 'ไม่สามารถโหลดรูปภาพตัวอย่างได้'"
+                  />
+                  <span v-else class="text-2xl text-slate-300">🍲</span>
+                </div>
+
+                <!-- Upload Buttons & Info -->
+                <div class="flex-1 space-y-1.5">
+                  <input 
+                    type="file" 
+                    ref="fileInputRef" 
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    class="hidden" 
+                    @change="handleFileUpload"
+                  />
+                  
+                  <button 
+                    type="button"
+                    @click="triggerFileInput"
+                    :disabled="isUploadingImage"
+                    class="px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-xs shadow-sm transition flex items-center gap-1.5 disabled:opacity-60"
+                  >
+                    <span v-if="isUploadingImage">⏳ กำลังอัปโหลด...</span>
+                    <span v-else>📁 อัปโหลดไฟล์ภาพตรง (Multer)</span>
+                  </button>
+
+                  <div v-if="uploadError" class="text-[11px] text-rose-600 font-medium">
+                    ⚠️ {{ uploadError }}
+                  </div>
+                  <div v-else class="text-[10px] text-slate-400">
+                    {{ form.image_url ? 'อัปโหลดแล้ว หรือแก้ไข URL ได้ที่ช่องด้านล่าง' : 'เลือกรูปภาพจากเครื่องเพื่ออัปโหลดเข้าเซิร์ฟเวอร์' }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Direct URL Fallback / Edit -->
+              <div>
+                <input 
+                  type="text" 
+                  v-model="form.image_url"
+                  placeholder="URL หรือเส้นทางไฟล์รูปภาพ (เช่น /uploads/... หรือ https://...)"
+                  class="w-full px-3 py-1.5 text-[11px] rounded-lg bg-white border border-slate-200 focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none"
+                />
+              </div>
+            </div>
           </div>
 
           <!-- Allergens Multi-select -->

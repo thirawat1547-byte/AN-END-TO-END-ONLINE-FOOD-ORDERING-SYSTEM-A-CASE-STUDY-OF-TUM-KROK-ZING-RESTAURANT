@@ -1,16 +1,11 @@
 <template>
   <div 
     class="menu-item-card" 
-<<<<<<< HEAD
     :class="{ 
       'is-out-of-stock': item.is_available === false,
       'is-drink-card': isDrink(item)
     }"
     @click="onCardClick"
-=======
-    :class="{ 'is-out-of-stock': item.is_available === false }"
-    @click="item.is_available !== false && $emit('select', item)"
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
   >
     <div class="image-container">
       <img :src="item.image_url || 'https://placehold.co/400x300?text=Food'" :alt="item.menu_name" class="item-image" />
@@ -28,10 +23,7 @@
         :disabled="item.is_available === false"
         :class="{ 'btn-disabled': item.is_available === false }"
         @click.stop="item.is_available !== false && $emit('add', item)"
-<<<<<<< HEAD
         :title="isDrink(item) ? 'กด + Add เพื่อเพิ่มลงตะกร้า' : 'เลือกรายละเอียด'"
-=======
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
       >
         {{ item.is_available === false ? 'สินค้าหมด' : '+ Add' }}
       </button>
@@ -40,17 +32,12 @@
 </template>
 
 <script setup>
-<<<<<<< HEAD
 const props = defineProps({
-=======
-defineProps({
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
   item: {
     type: Object,
     required: true
   }
 })
-<<<<<<< HEAD
 const emit = defineEmits(['select', 'add'])
 
 const isDrink = (item) => {
@@ -75,9 +62,6 @@ const onCardClick = () => {
   }
   emit('select', props.item);
 }
-=======
-defineEmits(['select', 'add'])
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
 </script>
 
 <style scoped>
@@ -93,7 +77,6 @@ defineEmits(['select', 'add'])
   transition: all 0.2s ease;
 }
 
-<<<<<<< HEAD
 .menu-item-card.is-drink-card {
   cursor: default;
 }
@@ -108,8 +91,6 @@ defineEmits(['select', 'add'])
   transform: scale(1.03);
 }
 
-=======
->>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
 .menu-item-card.is-out-of-stock {
   opacity: 0.65;
   cursor: not-allowed;

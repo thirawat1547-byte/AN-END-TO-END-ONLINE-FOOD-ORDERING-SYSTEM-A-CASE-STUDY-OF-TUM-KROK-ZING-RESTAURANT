@@ -14,6 +14,10 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MenusController = void 0;
 const common_1 = require("@nestjs/common");
+const platform_express_1 = require("@nestjs/platform-express");
+const multer_1 = require("multer");
+const path_1 = require("path");
+const fs = require("fs");
 const swagger_1 = require("@nestjs/swagger");
 const menus_service_1 = require("./menus.service");
 const create_menu_dto_1 = require("./dto/create-menu.dto");
@@ -21,6 +25,18 @@ const update_menu_dto_1 = require("./dto/update-menu.dto");
 let MenusController = class MenusController {
     constructor(menusService) {
         this.menusService = menusService;
+    }
+    uploadImage(file) {
+        if (!file) {
+            throw new common_1.BadRequestException('กรุณาเลือกไฟล์ภาพที่ต้องการอัปโหลด');
+        }
+        const fileUrl = `/uploads/${file.filename}`;
+        return {
+            success: true,
+            url: fileUrl,
+            filename: file.filename,
+            size: file.size,
+        };
     }
     create(createMenuDto) {
         return this.menusService.create(createMenuDto);
@@ -51,6 +67,40 @@ let MenusController = class MenusController {
     }
 };
 exports.MenusController = MenusController;
+__decorate([
+    (0, common_1.Post)('upload'),
+    (0, swagger_1.ApiOperation)({ summary: 'อัปโหลดไฟล์ภาพเมนูอาหารตรง (Multer)' }),
+    (0, swagger_1.ApiConsumes)('multipart/form-data'),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', {
+        storage: (0, multer_1.diskStorage)({
+            destination: (req, file, cb) => {
+                const uploadsDir = (0, path_1.join)(process.cwd(), 'uploads');
+                if (!fs.existsSync(uploadsDir)) {
+                    fs.mkdirSync(uploadsDir, { recursive: true });
+                }
+                cb(null, uploadsDir);
+            },
+            filename: (req, file, cb) => {
+                const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+                const ext = (0, path_1.extname)(file.originalname).toLowerCase();
+                cb(null, `menu-${uniqueSuffix}${ext}`);
+            },
+        }),
+        fileFilter: (req, file, cb) => {
+            if (!file.mimetype.match(/\/(jpg|jpeg|png|gif|webp)$/)) {
+                return cb(new common_1.BadRequestException('รองรับเฉพาะไฟล์รูปภาพ (jpg, jpeg, png, gif, webp) เท่านั้น'), false);
+            }
+            cb(null, true);
+        },
+        limits: {
+            fileSize: 5 * 1024 * 1024,
+        },
+    })),
+    __param(0, (0, common_1.UploadedFile)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], MenusController.prototype, "uploadImage", null);
 __decorate([
     (0, common_1.Post)(),
     (0, swagger_1.ApiOperation)({ summary: 'เพิ่มเมนูอาหารใหม่' }),

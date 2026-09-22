@@ -34,6 +34,18 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], OrderItemDto.prototype, "notes", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 'กับข้าว', description: 'รูปแบบอาหาร: กับข้าว หรือ ราดข้าว' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], OrderItemDto.prototype, "dish_type", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ example: 'กับข้าว', description: 'รูปแบบอาหาร: กับข้าว หรือ ราดข้าว (alias)' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], OrderItemDto.prototype, "dishType", void 0);
 class CreateOrderDto {
 }
 exports.CreateOrderDto = CreateOrderDto;

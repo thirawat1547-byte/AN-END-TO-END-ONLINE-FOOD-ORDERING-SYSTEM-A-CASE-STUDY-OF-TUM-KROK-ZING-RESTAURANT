@@ -89,9 +89,9 @@
             <button 
               v-else-if="isClaimed(promo.promo_id)"
               class="claim-btn claimed-btn"
-              @click="$router.push('/')"
+              @click="useCouponForOrder(promo)"
             >
-              ✓ เก็บแล้ว • ไปสั่งอาหาร ➔
+              ✓ เก็บแล้ว • นำไปใช้ที่ Checkout ➔
             </button>
 
             <!-- 4. ล็อกอินแล้ว และยังไม่ได้เก็บคูปองนี้ -->
@@ -131,6 +131,7 @@ import axios from 'axios';
 import CustomerNavbar from './components/CustomerNavbar.vue';
 import { API_BASE } from './config/api';
 import { authStore } from './store/authStore';
+import { usePromotionStore } from './store/promotionStore';
 
 export default {
   components: {
@@ -139,6 +140,7 @@ export default {
   data() {
     return {
       authStore,
+      promotionStore: usePromotionStore(),
       promotionsList: [],
       claimedPromos: [],
       claimingId: null,
@@ -220,6 +222,7 @@ export default {
         );
 
         this.showToast(`🎉 ${res.data?.message || 'เก็บโค้ดส่วนลดสำเร็จ!'}`);
+        await this.promotionStore.claimCoupon(promo);
         await this.loadMyClaimedPromotions();
       } catch (err) {
         const msg = err.response?.data?.message || err.message || 'เก็บโค้ดไม่สำเร็จ';
@@ -227,6 +230,11 @@ export default {
       } finally {
         this.claimingId = null;
       }
+    },
+
+    useCouponForOrder(promo) {
+      this.promotionStore.selectCouponForCheckout(promo);
+      this.$router.push('/checkout');
     },
 
     copyCode(code) {
