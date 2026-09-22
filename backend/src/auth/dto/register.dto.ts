@@ -24,11 +24,14 @@ export class RegisterDto {
   @IsOptional()
   phone_number?: string;
 
+<<<<<<< HEAD
   @ApiPropertyOptional({ example: '99 ซ.ศูนย์วิจัย 7 ถ.เพชรบุรีตัดใหม่ แขวงบางกะปิ เขตห้วยขวาง กรุงเทพมหานคร 10310', description: 'ที่อยู่' })
   @IsString()
   @IsOptional()
   address?: string;
 
+=======
+>>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
   @ApiPropertyOptional({ example: 'CUSTOMER', description: 'สิทธิ์ผู้ใช้งาน (ADMIN, CASHIER, CUSTOMER)' })
   @IsString()
   @IsOptional()

@@ -4,7 +4,10 @@ import {
   Get,
   Patch,
   Body,
+<<<<<<< HEAD
   Query,
+=======
+>>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -25,6 +28,7 @@ import { CurrentUser } from './decorators/current-user.decorator';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+<<<<<<< HEAD
   @Get('check-phone')
   @ApiOperation({ summary: 'ตรวจสอบว่าเบอร์โทรศัพท์ซ้ำหรือไม่' })
   @ApiResponse({ status: 200, description: 'ผลการตรวจสอบเบอร์โทรศัพท์' })
@@ -36,6 +40,12 @@ export class AuthController {
   @ApiOperation({ summary: 'ลงทะเบียนผู้ใช้งานใหม่' })
   @ApiResponse({ status: 201, description: 'ลงทะเบียนสำเร็จ' })
   @ApiResponse({ status: 409, description: 'ชื่อผู้ใช้งานหรือเบอร์โทรศัพท์ซ้ำในระบบ' })
+=======
+  @Post('register')
+  @ApiOperation({ summary: 'ลงทะเบียนผู้ใช้งานใหม่' })
+  @ApiResponse({ status: 201, description: 'ลงทะเบียนสำเร็จ' })
+  @ApiResponse({ status: 409, description: 'ชื่อผู้ใช้งานซ้ำในระบบ' })
+>>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
   register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }

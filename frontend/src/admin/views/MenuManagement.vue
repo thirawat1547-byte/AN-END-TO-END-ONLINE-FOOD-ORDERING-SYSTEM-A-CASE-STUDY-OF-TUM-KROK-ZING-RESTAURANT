@@ -24,10 +24,17 @@ const form = ref({
 })
 
 const filteredMenus = computed(() => {
+<<<<<<< HEAD
   const query = (searchQuery.value || '').trim().toLowerCase()
   return adminStore.menus.filter(m => {
     const matchCategory = selectedCategory.value === 0 || m.category_id === selectedCategory.value
     const matchSearch = !query || (m.menu_name || '').toLowerCase().includes(query)
+=======
+  return adminStore.menus.filter(m => {
+    const matchCategory = selectedCategory.value === 0 || m.category_id === selectedCategory.value
+    const matchSearch = m.menu_name.toLowerCase().includes(searchQuery.value.toLowerCase()) || 
+                        m.description.toLowerCase().includes(searchQuery.value.toLowerCase())
+>>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
     return matchCategory && matchSearch
   })
 })
@@ -133,7 +140,11 @@ function getAllergenNames(ids) {
         <input 
           type="text" 
           v-model="searchQuery"
+<<<<<<< HEAD
           placeholder="ค้นหาชื่อเมนู..."
+=======
+          placeholder="ค้นหาชื่อเมนู หรือส่วนผสม..."
+>>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
           class="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2d5a43]/50"
         />
       </div>

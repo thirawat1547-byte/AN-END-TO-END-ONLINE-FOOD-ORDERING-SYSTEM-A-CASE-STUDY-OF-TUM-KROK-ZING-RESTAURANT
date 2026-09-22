@@ -18,6 +18,7 @@ const searchQuery = ref('')
 const selectedOrder = ref(null)
 const slipModalUrl = ref(null)
 
+<<<<<<< HEAD
 const isCompletedOrder = (o) => {
   const pStatus = (o.payment_status || '').toUpperCase()
   const status = (o.status || '').toUpperCase()
@@ -64,6 +65,14 @@ const filteredOrders = computed(() => {
                     (numOnly !== '' && idStr.includes(numOnly))
     }
 
+=======
+const filteredOrders = computed(() => {
+  return adminStore.orders.filter(o => {
+    const matchStatus = selectedStatus.value === 'All' || o.payment_status === selectedStatus.value
+    const matchSearch = String(o.order_id).includes(searchQuery.value) || 
+                        (o.payment_method || '').toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+                        (o.customer_name || '').toLowerCase().includes(searchQuery.value.toLowerCase())
+>>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
     return matchStatus && matchSearch
   })
 })
@@ -138,7 +147,11 @@ function viewOrderDetails(order) {
             selectedStatus === 'Completed' ? 'bg-[#2d5a43] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
           ]"
         >
+<<<<<<< HEAD
           ชำระแล้ว (Completed) ({{ completedCount }})
+=======
+          ชำระแล้ว (Completed)
+>>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
         </button>
         <button 
           @click="selectedStatus = 'Pending'"
@@ -147,7 +160,11 @@ function viewOrderDetails(order) {
             selectedStatus === 'Pending' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
           ]"
         >
+<<<<<<< HEAD
           รอชำระ (Pending) ({{ pendingCount }})
+=======
+          รอชำระ (Pending)
+>>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
         </button>
       </div>
 
@@ -156,7 +173,11 @@ function viewOrderDetails(order) {
         <input 
           type="text" 
           v-model="searchQuery"
+<<<<<<< HEAD
           placeholder="ค้นหาเลข Order (เช่น 27 หรือ #ORD-27)..."
+=======
+          placeholder="ค้นหา Order ID หรือ ช่องทางชำระ..."
+>>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
           class="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none"
         />
       </div>
@@ -205,10 +226,17 @@ function viewOrderDetails(order) {
                 <span 
                   :class="[
                     'px-2.5 py-1 rounded-md text-[10px] font-bold',
+<<<<<<< HEAD
                     isCompletedOrder(order) ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                   ]"
                 >
                   {{ isCompletedOrder(order) ? '✅ ชำระแล้ว' : '⏳ รอชำระ' }}
+=======
+                    order.payment_status === 'Completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                  ]"
+                >
+                  {{ order.payment_status === 'Completed' ? '✅ ชำระแล้ว' : '⏳ รอชำระ' }}
+>>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
                 </span>
               </td>
               <td class="p-4 text-center no-print">

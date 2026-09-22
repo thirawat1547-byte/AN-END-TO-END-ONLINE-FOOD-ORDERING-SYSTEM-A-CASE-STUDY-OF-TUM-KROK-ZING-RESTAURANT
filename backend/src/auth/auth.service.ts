@@ -100,6 +100,7 @@ export class AuthService implements OnModuleInit {
     }
   }
 
+<<<<<<< HEAD
   // ตรวจสอบว่าเบอร์โทรศัพท์ถูกใช้งานแล้วหรือยัง
   async checkPhoneAvailable(phone: string): Promise<{ available: boolean; message: string }> {
     if (!phone || !phone.trim()) {
@@ -125,6 +126,8 @@ export class AuthService implements OnModuleInit {
     return { available: true, message: 'เบอร์โทรศัพท์นี้สามารถใช้งานได้' };
   }
 
+=======
+>>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
   async register(dto: RegisterDto) {
     const existingUser = await this.prisma.user.findFirst({
       where: { username: dto.username },
@@ -134,6 +137,7 @@ export class AuthService implements OnModuleInit {
       throw new ConflictException('ชื่อผู้ใช้นี้ถูกใช้งานแล้ว');
     }
 
+<<<<<<< HEAD
     // 🛑 ตรวจสอบเบอร์โทรศัพท์ซ้ำ
     let cleanPhone: string | null = null;
     if (dto.phone_number && dto.phone_number.trim()) {
@@ -152,6 +156,8 @@ export class AuthService implements OnModuleInit {
       }
     }
 
+=======
+>>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(dto.password, saltRounds);
 
@@ -160,9 +166,14 @@ export class AuthService implements OnModuleInit {
       data: {
         username: dto.username,
         password: hashedPassword,
+<<<<<<< HEAD
         email: dto.email ? dto.email.trim() : null,
         phone_number: cleanPhone,
         address: dto.address ? dto.address.trim().substring(0, 255) : null,
+=======
+        email: dto.email,
+        phone_number: dto.phone_number,
+>>>>>>> ef88a7f3e8d3f2bbf12b66b2459f49965c365656
         role: normalizedRole,
       },
     });
