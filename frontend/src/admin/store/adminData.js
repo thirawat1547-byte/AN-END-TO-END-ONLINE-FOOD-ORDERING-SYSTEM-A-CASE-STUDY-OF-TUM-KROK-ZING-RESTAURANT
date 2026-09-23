@@ -26,6 +26,7 @@ import imgWingchick from '../../assets/wingchick.jpg'
 import imgYumtalay from '../../assets/yumtalay.jpg'
 import imgKao from '../../assets/kao.jpg'
 import imgKaon from '../../assets/kaon.jpg'
+import imgNamtokmoo from '../../assets/namtokmoo.jpg'
 
 export const MENU_IMAGE_MAP = {
   'กะเพราหมู': imgKapaomu,
@@ -47,6 +48,7 @@ export const MENU_IMAGE_MAP = {
   'ส้มตำปูปลาร้า': imgTumprara,
   'ส้มตำไทย': imgTumtai,
   'ลาบหมู': imgLarbmoo,
+  'น้ำตกหมู': imgNamtokmoo,
   'ไก่ทอด (ปีก)': imgWingchick,
   'ไก่ทอด (สะโพก)': imgChick,
   'น้ำเก๊กฮวย': imgGek,

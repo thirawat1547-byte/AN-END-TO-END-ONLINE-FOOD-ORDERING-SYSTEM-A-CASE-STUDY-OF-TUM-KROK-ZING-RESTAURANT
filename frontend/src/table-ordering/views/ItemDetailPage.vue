@@ -177,6 +177,7 @@ const imageMap = {
   'ส้มตำปูปลาร้า': '/images/tumprara.jpg',
   'ส้มตำไทย': '/images/tumtai.jpg',
   'ลาบหมู': '/images/larbmoo.jpg',
+  'น้ำตกหมู': '/images/namtokmoo.jpg',
   'ยำวุ้นเส้นทะเล': '/images/yumtalay.jpg',
   'ไก่ทอด (สะโพก)': '/images/chick.jpg',
   'ไก่ทอด (ปีก)': '/images/wingchick.jpg',

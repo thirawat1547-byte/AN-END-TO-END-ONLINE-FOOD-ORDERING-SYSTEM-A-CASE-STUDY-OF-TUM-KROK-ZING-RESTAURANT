@@ -348,7 +348,7 @@ export default {
         { id: 22, name: 'น้ำเปล่า', price: 10, category: ['เครื่องดื่ม'], desc: 'น้ำดื่มบริสุทธิ์', img: new URL('./assets/water.jpg', import.meta.url).href, calories: 0, is_available: true },
         { id: 23, name: 'ข้าวเปล่า', price: 10, category: ['อาหารจานเดียว / ผัด'], desc: 'ข้าวสวยหอมมะลิ ร้อนๆ นุ่มอร่อย', img: new URL('./assets/kao.jpg', import.meta.url).href, isSpicy: false, calories: 150, is_available: true },
         { id: 24, name: 'ข้าวเหนียว', price: 10, category: ['ส้มตำแซ่บซิ่ง', 'อาหารจานเดียว / ผัด'], desc: 'ข้าวเหนียวนุ่ม ร้อนๆ หอมอร่อย', img: new URL('./assets/kaon.jpg', import.meta.url).href, isSpicy: false, calories: 150, is_available: true },
-        { id: 25, name: 'น้ำตกหมู', price: 70, category: ['ลาบ / ยำ'], desc: 'หมูนุ่ม หอมมะนาว ข้าวคั่ว รสจัดจ้าน', img: '/uploads/menu-1790145875129-857236985.jpg', isSpicy: true, calories: 200, is_available: true }
+        { id: 25, name: 'น้ำตกหมู', price: 70, category: ['ลาบ / ยำ'], desc: 'หมูนุ่ม หอมมะนาว ข้าวคั่ว รสจัดจ้าน', img: new URL('./assets/namtokmoo.jpg', import.meta.url).href, isSpicy: true, calories: 200, is_available: true }
       ]
     }
   },
@@ -589,11 +589,27 @@ export default {
     },
 
     onImgError(e, item) {
-      if (e.target.dataset.tried) return;
+      if (e.target.dataset.tried) {
+        // Fallback ขั้นสุดท้ายตามชื่อเมนู
+        const name = (item.name || item.menu_name || '').toLowerCase();
+        if (name.includes('น้ำตก')) e.target.src = '/images/namtokmoo.jpg';
+        else if (name.includes('ลาบ')) e.target.src = '/images/larbmoo.jpg';
+        else if (name.includes('ยำ')) e.target.src = '/images/yumtalay.jpg';
+        else if (name.includes('ส้มตำ')) e.target.src = '/images/tumtai.jpg';
+        else e.target.src = '/images/kapaomu.jpg';
+        return;
+      }
       e.target.dataset.tried = 'true';
       const filename = item.img ? item.img.split('/').pop().split('?')[0] : '';
-      if (filename) {
+      if (filename && !filename.startsWith('menu-')) {
         e.target.src = `/images/${filename}`;
+      } else {
+        const name = (item.name || item.menu_name || '').toLowerCase();
+        if (name.includes('น้ำตก')) e.target.src = '/images/namtokmoo.jpg';
+        else if (name.includes('ลาบ')) e.target.src = '/images/larbmoo.jpg';
+        else if (name.includes('ยำ')) e.target.src = '/images/yumtalay.jpg';
+        else if (name.includes('ส้มตำ')) e.target.src = '/images/tumtai.jpg';
+        else e.target.src = '/images/kapaomu.jpg';
       }
     },
 
