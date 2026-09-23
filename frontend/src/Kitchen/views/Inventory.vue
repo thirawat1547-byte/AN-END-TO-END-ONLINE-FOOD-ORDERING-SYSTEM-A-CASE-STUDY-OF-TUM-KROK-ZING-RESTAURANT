@@ -1,19 +1,118 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
 import { API_BASE } from '../../config/api'
+import { socket } from '../../config/socket'
 
 const search = ref('')
 const activeCategory = ref('all')
 const isLoading = ref(false)
+const menuItems = ref([])
+let pollTimer = null
 
-const categories = [
-  { id: 'all', label: 'ทั้งหมด' },
-  { id: 'food', label: 'อาหาร' },
-  { id: 'drink', label: 'เครื่องดื่ม' },
+// รายการหมวดหมู่อาหารหลักทั้งหมด 5 หมวดหมู่ + ทั้งหมด
+const CATEGORY_DEFINITIONS = [
+  { id: 'all', label: 'ทั้งหมด', icon: '🍽️' },
+  { id: 1, label: 'อาหารจานเดียว / ผัด', icon: '🍳' },
+  { id: 2, label: 'ส้มตำแซ่บซิ่ง', icon: '🌶️' },
+  { id: 3, label: 'ลาบ / ยำ', icon: '🥗' },
+  { id: 4, label: 'ของทอด', icon: '🍗' },
+  { id: 5, label: 'เครื่องดื่ม', icon: '🥤' }
 ]
 
-const menuItems = ref([])
+// แปลงข้อมูลหมวดหมู่ของเมนูให้ตรงตามฐานข้อมูล
+function resolveCategory(m) {
+  const catId = Number(m.category_id || m.category?.category_id || 0)
+  let catName = m.category?.category_name || m.category_name || ''
+
+  if (!catName) {
+    if (catId === 1) catName = 'อาหารจานเดียว / ผัด'
+    else if (catId === 2) catName = 'ส้มตำแซ่บซิ่ง'
+    else if (catId === 3) catName = 'ลาบ / ยำ'
+    else if (catId === 4) catName = 'ของทอด'
+    else if (catId === 5) catName = 'เครื่องดื่ม'
+    else {
+      const n = (m.menu_name || m.name || '').toLowerCase()
+      if (n.includes('น้ำ') || n.includes('โค้ก') || n.includes('สไปรท์') || n.includes('เก๊กฮวย') || n.includes('ดื่ม')) {
+        return { id: 5, name: 'เครื่องดื่ม', icon: '🥤' }
+      }
+      if (n.includes('ส้มตำ') || n.includes('ตำ')) {
+        return { id: 2, name: 'ส้มตำแซ่บซิ่ง', icon: '🌶️' }
+      }
+      if (n.includes('ลาบ') || n.includes('ยำ')) {
+        return { id: 3, name: 'ลาบ / ยำ', icon: '🥗' }
+      }
+      if (n.includes('ทอด') || n.includes('ปีกไก่') || n.includes('ไก่ทอด')) {
+        return { id: 4, name: 'ของทอด', icon: '🍗' }
+      }
+      return { id: 1, name: 'อาหารจานเดียว / ผัด', icon: '🍳' }
+    }
+  }
+
+  let icon = '🍽️'
+  if (catId === 1 || catName.includes('ผัด') || catName.includes('จานเดียว')) icon = '🍳'
+  else if (catId === 2 || catName.includes('ส้มตำ') || catName.includes('ตำ')) icon = '🌶️'
+  else if (catId === 3 || catName.includes('ลาบ') || catName.includes('ยำ')) icon = '🥗'
+  else if (catId === 4 || catName.includes('ทอด')) icon = '🍗'
+  else if (catId === 5 || catName.includes('เครื่องดื่ม') || catName.includes('น้ำ')) icon = '🥤'
+
+  return { id: catId || 1, name: catName, icon }
+}
+
+// จัดสี Badge ของแต่ละหมวดหมู่ให้สวยงาม อ่านง่าย
+const getCategoryBadgeStyle = (catId, catName) => {
+  const id = Number(catId)
+  if (id === 1 || catName?.includes('ผัด') || catName?.includes('จานเดียว')) {
+    return {
+      backgroundColor: '#FFF7ED',
+      color: '#C2410C',
+      border: '1px solid #FFEDD5'
+    }
+  }
+  if (id === 2 || catName?.includes('ส้มตำ') || catName?.includes('ตำ')) {
+    return {
+      backgroundColor: '#FEF2F2',
+      color: '#DC2626',
+      border: '1px solid #FEE2E2'
+    }
+  }
+  if (id === 3 || catName?.includes('ลาบ') || catName?.includes('ยำ')) {
+    return {
+      backgroundColor: '#ECFDF5',
+      color: '#047857',
+      border: '1px solid #D1FAE5'
+    }
+  }
+  if (id === 4 || catName?.includes('ทอด')) {
+    return {
+      backgroundColor: '#FEFCE8',
+      color: '#A16207',
+      border: '1px solid #FEF08A'
+    }
+  }
+  if (id === 5 || catName?.includes('เครื่องดื่ม') || catName?.includes('น้ำ')) {
+    return {
+      backgroundColor: '#F0F9FF',
+      color: '#0284C7',
+      border: '1px solid #E0F2FE'
+    }
+  }
+  return {
+    backgroundColor: '#FAF9F5',
+    color: '#374151',
+    border: '1px solid rgba(209,213,219,0.8)'
+  }
+}
+
+// หมวดหมู่พร้อมจำนวนเมนู
+const categories = computed(() => {
+  return CATEGORY_DEFINITIONS.map(c => {
+    const count = c.id === 'all'
+      ? menuItems.value.length
+      : menuItems.value.filter(m => m.categoryId === c.id || m.categoryName === c.label).length
+    return { ...c, count }
+  })
+})
 
 // ดึงรายการเมนูทั้งหมดจากฐานข้อมูลจริง
 const fetchMenus = async () => {
@@ -21,14 +120,19 @@ const fetchMenus = async () => {
     isLoading.value = true
     const res = await axios.get(`${API_BASE}/menus`)
     const data = res.data || []
-    menuItems.value = data.map(m => ({
-      id: m.menu_id,
-      name: m.menu_name,
-      price: Number(m.price || 0),
-      category: m.category?.category_name?.includes('เครื่องดื่ม') || m.category_id === 5 ? 'drink' : 'food',
-      image: m.image_url || '/images/kapaomu.jpg',
-      available: m.is_available ?? true
-    }))
+    menuItems.value = data.map(m => {
+      const cat = resolveCategory(m)
+      return {
+        id: m.menu_id,
+        name: m.menu_name,
+        price: Number(m.price || 0),
+        categoryId: cat.id,
+        categoryName: cat.name,
+        categoryIcon: cat.icon,
+        image: m.image_url || '/images/kapaomu.jpg',
+        available: m.is_available ?? true
+      }
+    })
   } catch (err) {
     console.error('โหลดเมนูไม่สำเร็จ:', err)
   } finally {
@@ -38,12 +142,30 @@ const fetchMenus = async () => {
 
 onMounted(() => {
   fetchMenus()
+  if (socket) {
+    socket.on('menu_updated', fetchMenus)
+    socket.on('new_order', fetchMenus)
+    socket.on('order_status_updated', fetchMenus)
+  }
+  pollTimer = setInterval(fetchMenus, 10000)
+})
+
+onUnmounted(() => {
+  if (pollTimer) clearInterval(pollTimer)
+  if (socket) {
+    socket.off('menu_updated', fetchMenus)
+    socket.off('new_order', fetchMenus)
+    socket.off('order_status_updated', fetchMenus)
+  }
 })
 
 const filtered = computed(() => {
   return menuItems.value.filter(item => {
-    const matchCat = activeCategory.value === 'all' || item.category === activeCategory.value
-    const matchSearch = item.name.toLowerCase().includes(search.value.toLowerCase())
+    const matchCat = activeCategory.value === 'all' || 
+                     item.categoryId === activeCategory.value || 
+                     item.categoryName === activeCategory.value
+    const matchSearch = item.name.toLowerCase().includes(search.value.toLowerCase()) ||
+                        (item.categoryName && item.categoryName.toLowerCase().includes(search.value.toLowerCase()))
     return matchCat && matchSearch
   })
 })
@@ -56,6 +178,9 @@ const toggleAvailable = async (item) => {
     await axios.patch(`${API_BASE}/menus/${item.id}`, {
       is_available: newStatus
     })
+    if (socket && socket.connected) {
+      socket.emit('menu_updated', { menu_id: item.id, is_available: newStatus })
+    }
   } catch (err) {
     console.error('อัปเดตสถานะเมนูไม่สำเร็จ:', err)
     item.available = !newStatus // คืนค่าเดิมหากเชื่อมต่อล้มเหลว
@@ -98,15 +223,22 @@ const toggleAvailable = async (item) => {
           </div>
 
           <!-- Category Filter Capsule -->
-          <div style="background-color: #EFECE3; padding: 6px; border-radius: 16px; display: flex; align-items: center; gap: 6px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);">
+          <div style="background-color: #EFECE3; padding: 5px; border-radius: 16px; display: flex; align-items: center; gap: 6px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.03); overflow-x: auto; max-width: 100%;">
             <button
               v-for="cat in categories"
               :key="cat.id"
               @click="activeCategory = cat.id"
-              style="padding: 10px 24px; border-radius: 12px; font-size: 14px; border: none; cursor: pointer; transition: all 0.2s;"
-              :style="activeCategory === cat.id ? 'background-color: #FAF9F5; color: #111827; font-weight: 700; box-shadow: 0 1px 2px rgba(0,0,0,0.05);' : 'background: transparent; color: #4B5563; font-weight: 500;'"
+              style="padding: 8px 16px; border-radius: 12px; font-size: 13px; border: none; cursor: pointer; transition: all 0.2s; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;"
+              :style="activeCategory === cat.id ? 'background-color: #FAF9F5; color: #111827; font-weight: 700; box-shadow: 0 2px 6px rgba(0,0,0,0.08);' : 'background: transparent; color: #4B5563; font-weight: 500;'"
             >
-              {{ cat.label }}
+              <span style="font-size: 14px;">{{ cat.icon }}</span>
+              <span>{{ cat.label }}</span>
+              <span 
+                style="font-size: 11px; padding: 1px 6px; border-radius: 9999px; transition: all 0.2s;"
+                :style="activeCategory === cat.id ? 'background: rgba(0,0,0,0.08); color: #111827; font-weight: 700;' : 'background: rgba(0,0,0,0.04); color: #6B7280;'"
+              >
+                {{ cat.count }}
+              </span>
             </button>
           </div>
         </div>
@@ -114,7 +246,7 @@ const toggleAvailable = async (item) => {
         <!-- Inventory List Card Table -->
         <div style="background-color: #EFECE3; border-radius: 24px; padding: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.04); border: 1px solid rgba(227,222,195,0.6); margin-bottom: 40px;">
           <!-- Table Header -->
-          <div style="display: grid; grid-template-columns: 80px 1fr 120px 140px 140px; color: #4B5563; font-weight: 700; font-size: 14px; padding-bottom: 16px; padding-left: 16px; padding-right: 16px; border-bottom: 1px solid rgba(209,213,219,0.6); align-items: center;">
+          <div style="display: grid; grid-template-columns: 76px 1fr 110px 190px 140px; color: #4B5563; font-weight: 700; font-size: 14px; padding-bottom: 16px; padding-left: 16px; padding-right: 16px; border-bottom: 1px solid rgba(209,213,219,0.6); align-items: center;">
             <div>รูปภาพ</div>
             <div>ชื่อรายการ</div>
             <div>ราคา</div>
@@ -127,7 +259,7 @@ const toggleAvailable = async (item) => {
             <div
               v-for="item in filtered"
               :key="item.id"
-              style="display: grid; grid-template-columns: 80px 1fr 120px 140px 140px; align-items: center; padding: 16px; font-size: 14px; border-bottom: 1px solid rgba(209,213,219,0.3);"
+              style="display: grid; grid-template-columns: 76px 1fr 110px 190px 140px; align-items: center; padding: 16px; font-size: 14px; border-bottom: 1px solid rgba(209,213,219,0.3);"
               :style="!item.available ? 'opacity: 0.6;' : ''"
             >
               <!-- Image Icon -->
@@ -155,8 +287,12 @@ const toggleAvailable = async (item) => {
 
               <!-- Category Badge -->
               <div>
-                <span style="background-color: #FAF9F5; border: 1px solid rgba(209,213,219,0.8); padding: 6px 14px; border-radius: 9999px; font-size: 12px; font-weight: 500; color: #374151;">
-                  {{ item.category === 'food' ? 'อาหาร' : 'เครื่องดื่ม' }}
+                <span 
+                  :style="getCategoryBadgeStyle(item.categoryId, item.categoryName)"
+                  style="padding: 6px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;"
+                >
+                  <span style="font-size: 13px;">{{ item.categoryIcon }}</span>
+                  <span>{{ item.categoryName }}</span>
                 </span>
               </div>
 
