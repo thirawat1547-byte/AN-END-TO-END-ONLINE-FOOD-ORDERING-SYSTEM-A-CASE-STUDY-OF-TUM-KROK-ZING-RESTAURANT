@@ -46,6 +46,19 @@ let TablesService = class TablesService {
             data: { status: updateDto.status },
         });
     }
+    async remove(table_id) {
+        const table = await this.findOne(table_id);
+        if (table.status === 'OCCUPIED' || table.status === 'BILLING') {
+            throw new common_1.BadRequestException('ไม่สามารถลบโต๊ะที่กำลังมีลูกค้าใช้งานอยู่ได้ กรุณาปิดโต๊ะหรือเคลียร์บิลก่อนดำเนินการ');
+        }
+        await this.prisma.order.updateMany({
+            where: { table_id },
+            data: { table_id: null },
+        });
+        return this.prisma.table.delete({
+            where: { table_id },
+        });
+    }
 };
 exports.TablesService = TablesService;
 exports.TablesService = TablesService = __decorate([

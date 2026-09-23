@@ -34,6 +34,9 @@ let TablesController = class TablesController {
     updateStatus(id, updateDto) {
         return this.tablesService.updateStatus(id, updateDto);
     }
+    remove(id) {
+        return this.tablesService.remove(id);
+    }
 };
 exports.TablesController = TablesController;
 __decorate([
@@ -68,6 +71,14 @@ __decorate([
     __metadata("design:paramtypes", [Number, update_table_status_dto_1.UpdateTableStatusDto]),
     __metadata("design:returntype", void 0)
 ], TablesController.prototype, "updateStatus", null);
+__decorate([
+    (0, common_1.Delete)(':id'),
+    (0, swagger_1.ApiOperation)({ summary: 'ลบโต๊ะอาหารออกจากระบบ' }),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], TablesController.prototype, "remove", null);
 exports.TablesController = TablesController = __decorate([
     (0, swagger_1.ApiTags)('Tables'),
     (0, common_1.Controller)('tables'),

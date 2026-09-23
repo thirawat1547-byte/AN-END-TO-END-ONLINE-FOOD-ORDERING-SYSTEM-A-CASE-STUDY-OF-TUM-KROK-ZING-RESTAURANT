@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, ParseIntPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { TablesService } from './tables.service';
 import { CreateTableDto } from './dto/create-table.dto';
@@ -8,7 +8,6 @@ import { UpdateTableStatusDto } from './dto/update-table-status.dto';
 @ApiTags('Tables') 
 @Controller('tables')
 export class TablesController {
-  // ... โค้ดเดิม
   constructor(private readonly tablesService: TablesService) {}
 
   @Get()
@@ -36,5 +35,11 @@ export class TablesController {
     @Body() updateDto: UpdateTableStatusDto,
   ) {
     return this.tablesService.updateStatus(id, updateDto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'ลบโต๊ะอาหารออกจากระบบ' })
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.tablesService.remove(id);
   }
 }

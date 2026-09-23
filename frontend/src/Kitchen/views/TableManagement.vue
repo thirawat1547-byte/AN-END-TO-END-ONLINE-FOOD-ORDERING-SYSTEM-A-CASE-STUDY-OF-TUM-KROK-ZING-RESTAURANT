@@ -496,6 +496,32 @@ const handleAddTable = async () => {
   newTable.value = { id: '', capacity: 4 }
   isAddModalOpen.value = false
 }
+
+// ฟังก์ชั่นลบโต๊ะอาหารออกจากระบบ
+const confirmDeleteTable = async (table) => {
+  if (table.status === 'occupied' || table.status === 'billing' || table.total > 0) {
+    alert(`ไม่สามารถลบโต๊ะ ${table.id} ได้ เนื่องจากโต๊ะกำลังมีลูกค้าใช้งานหรือมียอดค้างชำระ กรุณาปิดโต๊ะหรือเคลียร์บิลก่อนครับ`)
+    return
+  }
+
+  const tableLabel = table.id || `โต๊ะ #${table.table_id}`
+  if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบ "${tableLabel}" ออกจากระบบ?`)) {
+    return
+  }
+
+  try {
+    if (table.table_id) {
+      await axios.delete(`${API_BASE}/tables/${table.table_id}`)
+    }
+    localStorage.removeItem(`table_guests_${table.table_id || table.id}`)
+    tables.value = tables.value.filter(t => (t.table_id ? t.table_id !== table.table_id : t.id !== table.id))
+    alert(`ลบ ${tableLabel} สำเร็จเรียบร้อยแล้ว`)
+    await fetchTablesData()
+  } catch (err) {
+    console.error('ไม่สามารถลบโต๊ะได้:', err)
+    alert(err?.response?.data?.message || 'เกิดข้อผิดพลาดในการลบโต๊ะ')
+  }
+}
 </script>
 
 <template>
@@ -587,18 +613,31 @@ const handleAddTable = async () => {
             style="background-color: #EFECE3; border-radius: 20px; padding: 18px; border: 1px solid rgba(227,222,195,0.8); box-shadow: 0 4px 12px rgba(0,0,0,0.02); cursor: pointer; display: flex; flex-direction: column; justify-content: space-between; min-height: 165px; position: relative; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s;"
             :style="table.status === 'occupied' ? 'border-left: 5px solid #3D664C;' : table.status === 'billing' ? 'border-left: 5px solid #4F46E5;' : 'border-left: 5px solid #D1D5DB;'"
           >
-            <!-- Card Top Row (Table Name & Status Badge) -->
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <!-- Card Top Row (Table Name, Status Badge & Delete Button) -->
+            <div style="display: flex; justify-content: space-between; align-items: center;">
               <h3 style="font-size: 22px; font-weight: 700; color: #1F2937; margin: 0; letter-spacing: -0.5px;">
                 {{ table.id }}
               </h3>
-              <span
-                style="font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 8px; display: flex; align-items: center; gap: 6px;"
-                :style="table.status === 'occupied' ? 'background-color: #48785A; color: white;' : table.status === 'billing' ? 'background-color: #819BF8; color: white;' : 'background-color: #E3DFD5; color: #4B5563;'"
-              >
-                <span v-if="table.status === 'occupied' || table.status === 'billing'" style="width: 6px; height: 6px; border-radius: 9999px; background-color: white; display: inline-block;"></span>
-                {{ statusMap[table.status].label }}
-              </span>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span
+                  style="font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 8px; display: flex; align-items: center; gap: 6px;"
+                  :style="table.status === 'occupied' ? 'background-color: #48785A; color: white;' : table.status === 'billing' ? 'background-color: #819BF8; color: white;' : 'background-color: #E3DFD5; color: #4B5563;'"
+                >
+                  <span v-if="table.status === 'occupied' || table.status === 'billing'" style="width: 6px; height: 6px; border-radius: 9999px; background-color: white; display: inline-block;"></span>
+                  {{ statusMap[table.status].label }}
+                </span>
+
+                <!-- ปุ่มลบโต๊ะ -->
+                <button
+                  @click.stop="confirmDeleteTable(table)"
+                  style="width: 28px; height: 28px; border-radius: 8px; background-color: #FEE2E2; border: 1px solid #FECACA; color: #DC2626; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; padding: 0;"
+                  onmouseover="this.style.backgroundColor='#FCA5A5'; this.style.color='#991B1B'"
+                  onmouseout="this.style.backgroundColor='#FEE2E2'; this.style.color='#DC2626'"
+                  title="ลบโต๊ะนี้ออกจากระบบ"
+                >
+                  🗑️
+                </button>
+              </div>
             </div>
 
             <!-- Card Middle Row (Customer Count / Guests Controls) -->

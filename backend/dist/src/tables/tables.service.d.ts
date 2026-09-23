@@ -28,4 +28,10 @@ export declare class TablesService {
         capacity: number;
         status: string;
     }>;
+    remove(table_id: number): Promise<{
+        table_id: number;
+        table_number: string;
+        capacity: number;
+        status: string;
+    }>;
 }

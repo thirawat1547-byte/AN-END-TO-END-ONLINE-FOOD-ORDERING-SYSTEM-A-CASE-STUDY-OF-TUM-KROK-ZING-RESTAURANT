@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { CreateTableDto } from './dto/create-table.dto';
 import { UpdateTableStatusDto } from './dto/update-table-status.dto';
@@ -43,6 +43,26 @@ export class TablesService {
     return this.prisma.table.update({
       where: { table_id },
       data: { status: updateDto.status },
+    });
+  }
+
+  // 5. ลบโต๊ะอาหารออกจากระบบ
+  async remove(table_id: number) {
+    const table = await this.findOne(table_id);
+
+    // ตรวจสอบว่าโต๊ะมีลูกค้ากำลังใช้งานหรือรอเช็คบิลอยู่หรือไม่
+    if (table.status === 'OCCUPIED' || table.status === 'BILLING') {
+      throw new BadRequestException('ไม่สามารถลบโต๊ะที่กำลังมีลูกค้าใช้งานอยู่ได้ กรุณาปิดโต๊ะหรือเคลียร์บิลก่อนดำเนินการ');
+    }
+
+    // เคลียร์ table_id ในออเดอร์เก่าเพื่อไม่ให้ติด Foreign Key Constraint
+    await this.prisma.order.updateMany({
+      where: { table_id },
+      data: { table_id: null },
+    });
+
+    return this.prisma.table.delete({
+      where: { table_id },
     });
   }
 }
