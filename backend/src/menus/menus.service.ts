@@ -100,9 +100,20 @@ export class MenusService {
     await this.prisma.menuIngredient.deleteMany({
       where: { menu_id: id },
     });
-    return this.prisma.menu.delete({
+    await this.prisma.menuAllergen.deleteMany({
       where: { menu_id: id },
     });
+    try {
+      return await this.prisma.menu.delete({
+        where: { menu_id: id },
+      });
+    } catch (err) {
+      // หากเมนูนี้เคยมีประวัติการสั่งซื้อใน ORDER_ITEMS แล้ว ให้ปิดสถานะการขายแทนเพื่อรักษาความถูกต้องของข้อมูลใบเสร็จ
+      return await this.prisma.menu.update({
+        where: { menu_id: id },
+        data: { is_available: false },
+      });
+    }
   }
 
   // 6. ผูกสูตร / แก้ไขสูตรอาหารและสัดส่วนวัตถุดิบ (Recipe Formulation)
