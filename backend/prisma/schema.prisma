@@ -236,3 +236,22 @@ view LiveTableStatus {
 
   @@map("LIVE_TABLE_STATUS_VIEW")
 }
+
+// 6. การตั้งค่าร้านค้า (Store Settings)
+model StoreSetting {
+  id               Int      @id @default(1)
+  store_name       String   @default("ร้านตำครกซิ่ง (Tum Krok Zing)") @db.VarChar(150)
+  tagline          String?  @default("แซ่บนัว ถึงใจ อาหารอีสานแท้รสเด็ด") @db.VarChar(255)
+  promptpay_number String?  @default("081-234-5678") @db.VarChar(50)
+  promptpay_name   String?  @default("นายธีรวัฒน์ แสนคำเฮียง (ตำครกซิ่ง)") @db.VarChar(150)
+  tax_id           String?  @default("0105566099881") @db.VarChar(50)
+  address          String?  @default("123/45 ถนนแจ้งวัฒนะ แขวงทุ่งสองห้อง เขตหลักสี่ กรุงเทพมหานคร 10210") @db.VarChar(255)
+  phone            String?  @default("02-987-6543, 081-234-5678") @db.VarChar(100)
+  open_time        String?  @default("10:30") @db.VarChar(20)
+  close_time       String?  @default("22:00") @db.VarChar(20)
+  is_open          Boolean  @default(true)
+  vat_rate         Decimal? @default(7.00) @db.Decimal(5, 2)
+  updated_at       DateTime @default(now()) @updatedAt
+
+  @@map("STORE_SETTINGS")
+}

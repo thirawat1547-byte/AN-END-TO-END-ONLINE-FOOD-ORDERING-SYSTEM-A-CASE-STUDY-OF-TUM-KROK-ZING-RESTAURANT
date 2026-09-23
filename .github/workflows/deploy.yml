@@ -32,5 +32,7 @@ jobs:
           sudo docker-compose exec -T backend npx prisma db push --accept-data-loss
           sudo docker-compose exec -T backend npx prisma db seed
 
-          # รีสตาร์ท Backend เพื่อโหลดสูตรและคลังวัตถุดิบใหม่เข้าสู่ระบบ
-          sudo docker-compose restart backend
+          # รีสตาร์ท Backend เพื่อโหลดสูตรและคลังวัตถุดิบใหม่เข้าสู่ระบบ (พร้อม fallback ถ้าคอนเทนเนอร์หยุดทำงาน)
+          sudo docker-compose restart backend || sudo docker-compose up -d backend
+          sudo docker-compose up -d
+

@@ -302,6 +302,15 @@ async function main() {
       calories: 320,
       is_available: true,
     },
+    {
+      category_id: 3,
+      menu_name: 'น้ำตกหมู',
+      description: 'หมูนุ่ม หอมมะนาว ข้าวคั่ว รสจัดจ้าน',
+      price: 70.00,
+      image_url: '/images/namtokmoo.jpg',
+      calories: 200,
+      is_available: true,
+    },
 
     // หมวดที่ 4: ของทอด
     {
@@ -617,11 +626,9 @@ async function main() {
     { menuName: 'ไก่ทอด (สะโพก)', ingName: 'เนื้อสะโพกไก่', qty: 0.25 },
     { menuName: 'ไก่ทอด (สะโพก)', ingName: 'แป้งทอดกรอบ', qty: 0.03 },
 
-    // 18. ไก่ทอด (ปีก) / ปีกไก่ทอด
+    // 18. ไก่ทอด (ปีก)
     { menuName: 'ไก่ทอด (ปีก)', ingName: 'ปีกไก่สด', qty: 0.2 },
     { menuName: 'ไก่ทอด (ปีก)', ingName: 'แป้งทอดกรอบ', qty: 0.02 },
-    { menuName: 'ปีกไก่ทอด', ingName: 'ปีกไก่สด', qty: 0.2 },
-    { menuName: 'ปีกไก่ทอด', ingName: 'แป้งทอดกรอบ', qty: 0.02 },
 
     // 19. น้ำเก๊กฮวย
     { menuName: 'น้ำเก๊กฮวย', ingName: 'ดอกเก๊กฮวยอบแห้ง', qty: 1.0 },
@@ -640,6 +647,12 @@ async function main() {
 
     // 24. ข้าวเหนียว
     { menuName: 'ข้าวเหนียว', ingName: 'ข้าวเหนียว', qty: 0.15 },
+
+    // 25. น้ำตกหมู
+    { menuName: 'น้ำตกหมู', ingName: 'หมูสด / หมูสับ', qty: 0.15 },
+    { menuName: 'น้ำตกหมู', ingName: 'ข้าวคั่ว', qty: 0.01 },
+    { menuName: 'น้ำตกหมู', ingName: 'พริกป่น', qty: 0.01 },
+    { menuName: 'น้ำตกหมู', ingName: 'มะนาวสด', qty: 1.0 },
   ];
 
   // ล้างข้อมูลสูตรเดิมทั้งหมดใน MENU_INGREDIENTS เพื่อเคลียร์ข้อมูลทดสอบที่ผิดพลาดตกค้างออกให้หมด 100%
