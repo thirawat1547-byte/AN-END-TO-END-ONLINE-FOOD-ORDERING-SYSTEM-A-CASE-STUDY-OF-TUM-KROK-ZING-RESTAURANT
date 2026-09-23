@@ -108,6 +108,14 @@ async function main() {
       await prisma.table.create({
         data: table,
       });
+    } else {
+      await prisma.table.update({
+        where: { table_id: existingTable.table_id },
+        data: {
+          capacity: table.capacity,
+          status: table.status,
+        },
+      });
     }
   }
   console.log(`✅ เตรียมข้อมูลโต๊ะทดสอบเรียบร้อยแล้ว (${tables.length} โต๊ะ)`);
