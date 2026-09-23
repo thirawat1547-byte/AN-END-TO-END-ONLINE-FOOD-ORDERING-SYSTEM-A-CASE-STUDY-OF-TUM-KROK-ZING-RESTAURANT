@@ -127,10 +127,40 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
         { category_id: 2, menu_name: 'ข้าวเหนียว', description: 'ข้าวเหนียวนุ่ม ร้อนๆ หอมอร่อย', price: 10, calories: 150, image_url: '/images/kaon.jpg' },
       ];
 
+      // 1. ตรวจสอบและทำความสะอาดเมนูซ้ำซ้อนในฐานข้อมูล MySQL (ถ้ามีหลงเหลืออยู่)
+      try {
+        const dupes = await this.menu.findMany({
+          where: {
+            menu_name: {
+              in: ['ปีกไก่ทอด', 'ไข่เจียวหมูสับ', 'ไข่เจียวกุ้ง']
+            }
+          }
+        });
+        for (const dupe of dupes) {
+          await this.menuIngredient.deleteMany({
+            where: { menu_id: dupe.menu_id }
+          });
+          await this.menu.delete({
+            where: { menu_id: dupe.menu_id }
+          });
+          this.logger.log(`🧹 ทำความสะอาดเมนูซ้ำซ้อนสำเร็จ: ${dupe.menu_name} (ID: ${dupe.menu_id})`);
+        }
+      } catch (e) {
+        // ignore
+      }
+
       for (const dm of defaultMenus) {
         try {
           const exists = await this.menu.findFirst({
-            where: { menu_name: dm.menu_name }
+            where: {
+              OR: [
+                { menu_name: dm.menu_name },
+                { menu_name: dm.menu_name.replace('ข้าวไข่เจียว', 'ไข่เจียว') },
+                { menu_name: dm.menu_name.replace('ไก่ทอด (ปีก)', 'ปีกไก่ทอด') },
+                { menu_name: dm.menu_name.replace('กะเพรา', 'กระเพรา') },
+                { menu_name: dm.menu_name.replace('กระเพรา', 'กะเพรา') }
+              ]
+            }
           });
           if (!exists) {
             await this.menu.create({

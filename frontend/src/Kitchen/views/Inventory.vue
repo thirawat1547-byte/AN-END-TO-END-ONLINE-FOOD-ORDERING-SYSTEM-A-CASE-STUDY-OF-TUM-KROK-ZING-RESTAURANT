@@ -120,7 +120,21 @@ const fetchMenus = async () => {
     isLoading.value = true
     const res = await axios.get(`${API_BASE}/menus`)
     const data = res.data || []
-    menuItems.value = data.map(m => {
+    const seen = new Set()
+    const uniqueData = []
+    for (const m of data) {
+      let canonical = (m.menu_name || '').trim()
+      if (canonical === 'ไข่เจียวหมูสับ') canonical = 'ข้าวไข่เจียวหมูสับ'
+      if (canonical === 'ไข่เจียวกุ้ง') canonical = 'ข้าวไข่เจียวกุ้ง'
+      if (canonical === 'ปีกไก่ทอด') canonical = 'ไก่ทอด (ปีก)'
+
+      if (!seen.has(canonical)) {
+        seen.add(canonical)
+        uniqueData.push({ ...m, menu_name: canonical })
+      }
+    }
+
+    menuItems.value = uniqueData.map(m => {
       const cat = resolveCategory(m)
       return {
         id: m.menu_id,

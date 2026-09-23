@@ -695,7 +695,22 @@ export const adminStore = reactive({
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       if (Array.isArray(data) && data.length > 0) {
-        this.menus = data.map(m => ({
+        // กรองเมนูที่ซ้ำซ้อนโดยแปลงชื่อให้อยู่ในรูปแบบทางการ
+        const seen = new Set()
+        const uniqueData = []
+        for (const m of data) {
+          let canonical = (m.menu_name || '').trim()
+          if (canonical === 'ไข่เจียวหมูสับ') canonical = 'ข้าวไข่เจียวหมูสับ'
+          if (canonical === 'ไข่เจียวกุ้ง') canonical = 'ข้าวไข่เจียวกุ้ง'
+          if (canonical === 'ปีกไก่ทอด') canonical = 'ไก่ทอด (ปีก)'
+
+          if (!seen.has(canonical)) {
+            seen.add(canonical)
+            uniqueData.push({ ...m, menu_name: canonical })
+          }
+        }
+
+        this.menus = uniqueData.map(m => ({
           menu_id: m.menu_id,
           category_id: m.category_id,
           menu_name: m.menu_name,

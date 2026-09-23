@@ -104,8 +104,10 @@ const imageMap = {
 const categories = [
   { id: 'all', name: 'ทั้งหมด' },
   { id: 'ขายดีที่สุด', name: 'เมนูแนะนำ' },
-  { id: 'เมนูอาหาร', name: 'เมนูอาหาร' },
-  { id: 'เมนูอาหารอีสาน', name: 'อาหารอีสาน' },
+  { id: 'อาหารจานเดียว / ผัด', name: 'อาหารจานเดียว / ผัด' },
+  { id: 'ส้มตำแซ่บซิ่ง', name: 'ส้มตำแซ่บซิ่ง' },
+  { id: 'ลาบ / ยำ', name: 'ลาบ / ยำ' },
+  { id: 'ของทอด', name: 'ของทอด' },
   { id: 'เครื่องดื่ม', name: 'เครื่องดื่ม' }
 ]
 
@@ -119,19 +121,34 @@ const fetchMenus = async () => {
   try {
     const res = await axios.get(`${API_BASE}/menus`)
     if (res.data && Array.isArray(res.data) && res.data.length > 0) {
-      menuItems.value = res.data.map(m => {
+      // กรองเมนูซ้ำซ้อนโดยใช้ชื่อมาตรฐาน
+      const seen = new Set()
+      const uniqueData = []
+      for (const m of res.data) {
+        const canonical = m.menu_name === 'ไข่เจียวหมูสับ' ? 'ข้าวไข่เจียวหมูสับ' :
+                          m.menu_name === 'ไข่เจียวกุ้ง' ? 'ข้าวไข่เจียวกุ้ง' :
+                          m.menu_name === 'ปีกไก่ทอด' ? 'ไก่ทอด (ปีก)' : m.menu_name
+        if (!seen.has(canonical)) {
+          seen.add(canonical)
+          uniqueData.push({ ...m, menu_name: canonical })
+        }
+      }
+
+      menuItems.value = uniqueData.map(m => {
         const catName = m.category?.category_name || ''
         const cats = []
         if (catName.includes('เครื่องดื่ม') || m.category_id === 5) {
           cats.push('เครื่องดื่ม')
-        } else if (catName.includes('อีสาน') || catName.includes('ส้มตำ') || catName.includes('ลาบ') || catName.includes('ของทอด') || [2, 3, 4].includes(m.category_id)) {
-          cats.push('เมนูอาหารอีสาน')
+        } else if (catName.includes('ส้มตำ') || m.category_id === 2) {
+          cats.push('ส้มตำแซ่บซิ่ง')
+        } else if (catName.includes('ลาบ') || catName.includes('ยำ') || m.category_id === 3) {
+          cats.push('ลาบ / ยำ')
+        } else if (catName.includes('ของทอด') || m.category_id === 4) {
+          cats.push('ของทอด')
         } else {
-          cats.push('เมนูอาหาร')
+          cats.push('อาหารจานเดียว / ผัด')
         }
-        if (m.menu_name === 'ข้าวเหนียว') {
-          cats.push('เมนูอาหาร')
-        }
+
         if (['กะเพราหมู', 'กระเพราหมู', 'ส้มตำปูปลาร้า', 'ยำวุ้นเส้นทะเล', 'ไก่ทอด (สะโพก)', 'น้ำเก๊กฮวย'].includes(m.menu_name)) {
           cats.push('ขายดีที่สุด')
         }

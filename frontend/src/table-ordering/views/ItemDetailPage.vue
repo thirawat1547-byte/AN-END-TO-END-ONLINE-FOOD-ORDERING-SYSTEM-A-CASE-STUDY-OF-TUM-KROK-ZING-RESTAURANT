@@ -197,12 +197,17 @@ onMounted(async () => {
     if (res.data) {
       const m = res.data
       const catName = m.category?.category_name || ''
-      const cats = ['เมนูอาหาร']
-      if (catName.includes('อีสาน') || catName.includes('ส้มตำ') || catName.includes('ลาบ') || catName.includes('ของทอด') || [2, 3, 4].includes(m.category_id)) {
-        cats.push('เมนูอาหารอีสาน')
-      }
+      const cats = ['ทั้งหมด']
       if (catName.includes('เครื่องดื่ม') || m.category_id === 5) {
         cats.push('เครื่องดื่ม')
+      } else if (catName.includes('ส้มตำ') || m.category_id === 2) {
+        cats.push('ส้มตำแซ่บซิ่ง')
+      } else if (catName.includes('ลาบ') || catName.includes('ยำ') || m.category_id === 3) {
+        cats.push('ลาบ / ยำ')
+      } else if (catName.includes('ของทอด') || m.category_id === 4) {
+        cats.push('ของทอด')
+      } else {
+        cats.push('อาหารจานเดียว / ผัด')
       }
 
       const isSpicy = m.menu_name.includes('กะเพรา') || m.menu_name.includes('กระเพรา') || m.menu_name.includes('พริกแกง') || m.menu_name.includes('ส้มตำ') || m.menu_name.includes('ลาบ') || m.menu_name.includes('ยำ')

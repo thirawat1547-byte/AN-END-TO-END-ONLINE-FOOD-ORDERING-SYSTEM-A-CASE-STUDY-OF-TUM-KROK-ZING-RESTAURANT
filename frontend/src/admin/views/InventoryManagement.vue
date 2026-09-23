@@ -224,6 +224,24 @@ function deleteIng(id) {
   }
 }
 
+// รายการเมนูกรองไม่ให้มีชื่อซ้ำซ้อนใน Tab 2 (Recipe Formulation)
+const recipeMenus = computed(() => {
+  const seen = new Set()
+  const list = []
+  for (const m of adminStore.menus) {
+    let canonical = (m.menu_name || '').trim()
+    if (canonical === 'ไข่เจียวหมูสับ') canonical = 'ข้าวไข่เจียวหมูสับ'
+    if (canonical === 'ไข่เจียวกุ้ง') canonical = 'ข้าวไข่เจียวกุ้ง'
+    if (canonical === 'ปีกไก่ทอด') canonical = 'ไก่ทอด (ปีก)'
+
+    if (!seen.has(canonical)) {
+      seen.add(canonical)
+      list.push({ ...m, menu_name: canonical })
+    }
+  }
+  return list
+})
+
 // Recipes formulation helpers (ดึงสูตรจากฐานข้อมูลของเพื่อนก่อนเป็นอันดับแรก)
 function getMenuIngredients(menuId) {
   const targetMenu = adminStore.menus.find(m => m.menu_id === menuId)
@@ -557,7 +575,7 @@ async function saveRecipeFormula() {
       <!-- Recipes Grid -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div 
-          v-for="menu in adminStore.menus" 
+          v-for="menu in recipeMenus" 
           :key="menu.menu_id"
           class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between"
         >

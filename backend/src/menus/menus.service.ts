@@ -34,7 +34,24 @@ export class MenusService {
       orderBy: { menu_id: 'asc' },
     });
 
-    return menus.map((m) => ({
+    const seen = new Set<string>();
+    const uniqueMenus: typeof menus = [];
+    for (const m of menus) {
+      let canonical = (m.menu_name || '').trim();
+      if (canonical === 'ไข่เจียวหมูสับ') canonical = 'ข้าวไข่เจียวหมูสับ';
+      if (canonical === 'ไข่เจียวกุ้ง') canonical = 'ข้าวไข่เจียวกุ้ง';
+      if (canonical === 'ปีกไก่ทอด') canonical = 'ไก่ทอด (ปีก)';
+
+      if (!seen.has(canonical)) {
+        seen.add(canonical);
+        uniqueMenus.push({
+          ...m,
+          menu_name: canonical,
+        });
+      }
+    }
+
+    return uniqueMenus.map((m) => ({
       ...m,
       allergens: (m.allergens || []).filter((a) => a.allergen != null),
       ingredients: (m.ingredients || []).filter((i) => i.ingredient != null),
@@ -80,6 +97,9 @@ export class MenusService {
   // 5. ลบเมนูอาหาร
   async remove(id: number) {
     await this.findOne(id);
+    await this.prisma.menuIngredient.deleteMany({
+      where: { menu_id: id },
+    });
     return this.prisma.menu.delete({
       where: { menu_id: id },
     });

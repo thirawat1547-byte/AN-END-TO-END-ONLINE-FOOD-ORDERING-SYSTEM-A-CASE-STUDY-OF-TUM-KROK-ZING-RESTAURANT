@@ -30,7 +30,16 @@ const form = ref({
 
 const filteredMenus = computed(() => {
   const query = (searchQuery.value || '').trim().toLowerCase()
+  const seen = new Set()
   return adminStore.menus.filter(m => {
+    let canonical = (m.menu_name || '').trim()
+    if (canonical === 'ไข่เจียวหมูสับ') canonical = 'ข้าวไข่เจียวหมูสับ'
+    if (canonical === 'ไข่เจียวกุ้ง') canonical = 'ข้าวไข่เจียวกุ้ง'
+    if (canonical === 'ปีกไก่ทอด') canonical = 'ไก่ทอด (ปีก)'
+
+    if (seen.has(canonical)) return false
+    seen.add(canonical)
+
     const matchCategory = selectedCategory.value === 0 || m.category_id === selectedCategory.value
     const matchSearch = !query || 
                         (m.menu_name || '').toLowerCase().includes(query) || 
