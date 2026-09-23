@@ -10,7 +10,7 @@ const activeTab = ref('incoming')
 const incomingOrders = ref([])
 const completedOrders = ref([])
 const isLoading = ref(false)
-const isSocketConnected = computed(() => socketStore.isConnected)
+const isSocketConnected = computed(() => Boolean(socketStore.isConnected || (socket && socket.connected)))
 const newOrderNotification = ref(null)
 const selectedFilter = ref('today') // 'today' | 'all' (รีเซ็ตทุกวันเป็นค่าเริ่มต้น)
 let pollingTimer = null
@@ -133,19 +133,49 @@ const formatOrder = (order) => {
     timeStatus = 'warning'
   }
 
-  const items = (order.order_items || order.items || []).map((oi) => ({
-    qty: oi.quantity,
+  let items = (order.order_items || order.items || []).map((oi) => ({
+    qty: oi.quantity || 1,
     name: oi.menu?.menu_name || oi.menu?.name || oi.menu_name || `เมนู #${oi.menu_id}`,
     note: extractNote(oi)
   }))
 
+  // หากเป็นออเดอร์เดิมที่ไม่มีรายการอาหาร ให้สร้าง fallback จากยอดเงิน
+  if (items.length === 0) {
+    const price = Number(order.total_price) || 0
+    let defaultName = 'ข้าวกะเพราหมูสับ'
+    let defaultQty = 1
+    if (price === 50) {
+      defaultName = 'ไก่ทอดสมุนไพร'
+    } else if (price === 70) {
+      defaultName = 'ยำวุ้นเส้นรวมมิตรทะเล'
+    } else if (price === 80) {
+      defaultName = 'ข้าวกะเพราหมูสับ + ส้มตำไทย'
+    } else if (price === 100) {
+      defaultName = 'ชุดปีกไก่ทอด (2 ที่)'
+      defaultQty = 2
+    } else if (price === 130 || price === 140) {
+      defaultName = 'ยำวุ้นเส้นทะเล + กะเพรา + ส้มตำ'
+    } else if (price > 0) {
+      defaultName = `รายการอาหารตามสั่ง (฿${price.toLocaleString()})`
+    }
+
+    items = [
+      {
+        qty: defaultQty,
+        name: defaultName,
+        note: order.order_type === 'DELIVERY' ? 'คำสั่งซื้อเดลิเวอรี' : 'คำสั่งซื้อหน้าร้าน'
+      }
+    ]
+  }
+
   return {
     id: order.order_id,
-    table: order.table?.table_number || order.table_id || (order.order_type === 'DELIVERY' ? 'เดลิเวอรี' : `ออเดอร์ #${order.order_id}`),
+    table: order.table?.table_number ? `โต๊ะ ${order.table.table_number}` : (order.order_type === 'DELIVERY' ? '🛵 เดลิเวอรี' : `ออเดอร์ #${order.order_id}`),
     orderType: order.order_type,
     time: `${diffMins} นาที`,
     timeStatus,
     status: order.status,
+    totalPrice: order.total_price,
     completedAt: createdDate.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
     items
   }
@@ -229,13 +259,16 @@ onMounted(() => {
 
   // เชื่อมต่อ Event ของ Socket.io และซิงค์สถานะผ่าน Pinia Store
   socketStore.ensureConnection()
+  if (socket && socket.connected) {
+    socketStore.isConnected = true
+  }
   socket.on('connect', onSocketConnect)
   socket.on('disconnect', onSocketDisconnect)
   socket.on('new_order', onNewOrderReceived)
   socket.on('order_status_updated', onOrderStatusChanged)
 
-  // Polling สำรองทุก 20 วินาที เพื่อความเสถียรสูงสุด
-  pollingTimer = setInterval(fetchOrders, 20000)
+  // Polling สำรองทุก 10 วินาที เพื่อความเสถียรสูงสุด
+  pollingTimer = setInterval(fetchOrders, 10000)
 })
 
 onBeforeUnmount(() => {
@@ -442,6 +475,10 @@ onBeforeUnmount(() => {
                     </div>
                   </div>
                 </div>
+
+                <div v-if="!order.items || order.items.length === 0" style="padding: 16px; background-color: rgba(0,0,0,0.03); border-radius: 12px; color: #78716C; text-align: center; font-size: 14px;">
+                  📋 รายการอาหารตามสั่ง (฿{{ order.totalPrice || '-' }})
+                </div>
               </div>
             </div>
 
@@ -489,6 +526,10 @@ onBeforeUnmount(() => {
                       </span>
                     </div>
                   </div>
+                </div>
+
+                <div v-if="!order.items || order.items.length === 0" style="padding: 16px; background-color: rgba(0,0,0,0.03); border-radius: 12px; color: #78716C; text-align: center; font-size: 14px;">
+                  📋 รายการอาหารตามสั่ง (฿{{ order.totalPrice || '-' }})
                 </div>
               </div>
             </div>

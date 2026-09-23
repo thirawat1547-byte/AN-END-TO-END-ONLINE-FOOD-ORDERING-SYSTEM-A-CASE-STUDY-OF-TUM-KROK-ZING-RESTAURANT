@@ -15,6 +15,13 @@ export const useSocketStore = defineStore('socket', () => {
     lastError.value = null
   })
 
+  socket.on('reconnect', (attemptNumber) => {
+    console.log('⚡ [SocketStore] socket.on("reconnect") - เชื่อมต่อใหม่สำเร็จ ครั้งที่:', attemptNumber)
+    isConnected.value = true
+    socketId.value = socket.id || ''
+    lastError.value = null
+  })
+
   socket.on('disconnect', (reason) => {
     console.warn('⚠️ [SocketStore] socket.on("disconnect") - ตัดการเชื่อมต่อ:', reason)
     isConnected.value = false
@@ -22,7 +29,7 @@ export const useSocketStore = defineStore('socket', () => {
 
   socket.on('connect_error', (err) => {
     console.warn('⚠️ [SocketStore] socket.on("connect_error"):', err.message)
-    isConnected.value = false
+    isConnected.value = Boolean(socket && socket.connected)
     lastError.value = err.message
   })
 
@@ -32,6 +39,18 @@ export const useSocketStore = defineStore('socket', () => {
     if (socket && !socket.connected) {
       socket.connect()
     }
+  }
+
+  // ซิงค์สถานะการเชื่อมต่อจริงแบบอัตโนมัติ
+  if (typeof window !== 'undefined') {
+    setInterval(() => {
+      if (socket) {
+        const actual = Boolean(socket.connected)
+        if (isConnected.value !== actual) {
+          isConnected.value = actual
+        }
+      }
+    }, 2000)
   }
 
   return {

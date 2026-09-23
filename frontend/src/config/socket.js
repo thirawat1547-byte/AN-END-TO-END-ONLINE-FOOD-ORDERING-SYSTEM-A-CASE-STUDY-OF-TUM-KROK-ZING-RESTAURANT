@@ -20,10 +20,13 @@ export const SOCKET_URL = getSocketUrl();
 
 export const socket = io(SOCKET_URL, {
   autoConnect: true,
-  transports: ['websocket', 'polling'],
+  transports: ['polling', 'websocket'],
+  upgrade: true,
   reconnection: true,
-  reconnectionAttempts: 20,
-  reconnectionDelay: 2000,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
+  timeout: 10000,
 });
 
 // Event listeners สำหรับการตรวจสอบสถานะการเชื่อมต่อ
