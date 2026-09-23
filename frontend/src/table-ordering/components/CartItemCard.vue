@@ -65,16 +65,10 @@ const emit = defineEmits(['update-qty', 'remove'])
 
 const allergens = computed(() => {
   if (!props.item) return []
-  let ids = props.item.allergen_ids
-  if (!ids || ids.length === 0) {
-    const name = props.item.menu_name || props.item.name || ''
-    if (name.includes('ทะเล') || name.includes('กุ้ง')) ids = [1, 6]
-    else if (name.includes('ไข่เจียว')) ids = [5]
-    else if (name.includes('ส้มตำปู') || name.includes('ปลาร้า')) ids = [7, 9]
-    else if (name.includes('ส้มตำไทย')) ids = [1, 2]
-    else if (name.includes('ไก่ทอด')) ids = [4]
-  }
-  return resolveAllergenBadges(ids || [], DEFAULT_ALLERGENS)
+  const ids = Array.isArray(props.item.allergen_ids)
+    ? props.item.allergen_ids
+    : (props.item.allergens ? props.item.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean) : [])
+  return resolveAllergenBadges(ids, DEFAULT_ALLERGENS)
 })
 
 const hasDetails = computed(() => {

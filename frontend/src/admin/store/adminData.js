@@ -716,9 +716,9 @@ export const adminStore = reactive({
           calories: m.calories || 0,
           is_available: m.is_available ?? true,
           image_url: MENU_IMAGE_MAP[m.menu_name] || m.image_url || 'https://images.unsplash.com/photo-1569562211093-4ed0d0758f12?w=500&auto=format&fit=crop&q=80',
-          allergen_ids: (m.allergens && m.allergens.length > 0)
-            ? m.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean)
-            : (this.menus.find(x => x.menu_id === m.menu_id)?.allergen_ids || []),
+          allergen_ids: Array.isArray(m.allergen_ids)
+            ? m.allergen_ids
+            : (m.allergens ? m.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean) : []),
           total_sold: m.total_sold || 0,
           ingredients: m.ingredients ? m.ingredients.map(mi => ({
             menu_id: mi.menu_id,

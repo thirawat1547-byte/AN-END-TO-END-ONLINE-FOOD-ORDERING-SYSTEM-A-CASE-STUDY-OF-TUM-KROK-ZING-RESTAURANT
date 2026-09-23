@@ -510,6 +510,18 @@ export default {
         }
       }
 
+      // ซิงค์ allergen_ids ในตะกร้าสินค้าแบบ Real-time
+      if (this.cartItems && this.cartItems.length > 0) {
+        for (const cartItem of this.cartItems) {
+          if ((targetId && cartItem.id === targetId) || (targetName && cartItem.name === targetName)) {
+            if (updatedMenu.allergen_ids !== undefined) {
+              cartItem.allergen_ids = [...updatedMenu.allergen_ids];
+            }
+          }
+        }
+        this.cartItems = [...this.cartItems];
+      }
+
       // ถ้าเปิด Modal เมนูนี้อยู่ ให้อัปเดตข้อมูลสารก่อภูมิแพ้ทันทีแบบ Real-time
       if (this.selectedItem && ((targetId && this.selectedItem.id === targetId) || (targetName && this.selectedItem.name === targetName))) {
         if (updatedMenu.allergen_ids !== undefined) {
@@ -531,8 +543,13 @@ export default {
     getItemAllergens(item) {
       if (!item) return [];
       let ids = item.allergen_ids;
-      if ((!ids || ids.length === 0) && item.allergens && Array.isArray(item.allergens)) {
-        ids = item.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean);
+      if (ids === undefined) {
+        const found = this.menuItems.find(m => m.name === item.name || (m.id && item.id && m.id === item.id));
+        if (found && Array.isArray(found.allergen_ids)) {
+          ids = found.allergen_ids;
+        } else if (item.allergens && Array.isArray(item.allergens)) {
+          ids = item.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean);
+        }
       }
       return resolveAllergenBadges(ids || [], DEFAULT_ALLERGENS);
     },
@@ -618,9 +635,9 @@ export default {
 
             if (dbItem) {
               matchedIds.add(dbItem.menu_id || dbItem.id);
-              const dbAllergens = (dbItem.allergens && dbItem.allergens.length > 0)
-                ? dbItem.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean)
-                : (dbItem.allergen_ids !== undefined ? dbItem.allergen_ids : localItem.allergen_ids || []);
+              const dbAllergens = Array.isArray(dbItem.allergen_ids)
+                ? dbItem.allergen_ids
+                : (dbItem.allergens ? dbItem.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean) : []);
 
               return {
                 ...localItem,
@@ -655,9 +672,9 @@ export default {
               else if (catName.includes('ของทอด') || dbItem.category_id === 4) cats.push('ของทอด');
               else cats.push('อาหารจานเดียว / ผัด');
 
-              const newAllergenIds = (dbItem.allergens && dbItem.allergens.length > 0)
-                ? dbItem.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean)
-                : (dbItem.allergen_ids || []);
+              const newAllergenIds = Array.isArray(dbItem.allergen_ids)
+                ? dbItem.allergen_ids
+                : (dbItem.allergens ? dbItem.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean) : []);
 
               this.menuItems.push({
                 id: id,
@@ -815,6 +832,7 @@ export default {
       }
 
       this.cartItems.push({
+        id: this.selectedItem.id,
         name: this.selectedItem.name, 
         price: this.unitModalPrice,
         qty: this.modalOptions.qty,
@@ -822,7 +840,8 @@ export default {
         spiceLevel: this.modalOptions.spiceLevel, 
         seafoodChoice: this.modalOptions.seafoodChoice, 
         addons: [...this.modalOptions.addons], 
-        note: this.modalOptions.note
+        note: this.modalOptions.note,
+        allergen_ids: Array.isArray(this.selectedItem.allergen_ids) ? [...this.selectedItem.allergen_ids] : []
       });
       this.closeItemModal();
     },
@@ -833,7 +852,21 @@ export default {
       }
       if (item.is_available === false) return;
       let found = this.cartItems.find(i => i.name === item.name && !i.dishType && !i.spiceLevel && !i.seafoodChoice && (!i.addons || i.addons.length === 0));
-      if (found) { found.qty++; } else { this.cartItems.push({ name: item.name, price: item.price, qty: 1, dishType: null, spiceLevel: null, seafoodChoice: null, addons: [] }); }
+      if (found) { 
+        found.qty++; 
+      } else { 
+        this.cartItems.push({ 
+          id: item.id,
+          name: item.name, 
+          price: item.price, 
+          qty: 1, 
+          dishType: null, 
+          spiceLevel: null, 
+          seafoodChoice: null, 
+          addons: [],
+          allergen_ids: Array.isArray(item.allergen_ids) ? [...item.allergen_ids] : []
+        }); 
+      }
     },
     updateQty(index, change) {
       if (change === -1 && this.cartItems[index].qty <= 1) return;

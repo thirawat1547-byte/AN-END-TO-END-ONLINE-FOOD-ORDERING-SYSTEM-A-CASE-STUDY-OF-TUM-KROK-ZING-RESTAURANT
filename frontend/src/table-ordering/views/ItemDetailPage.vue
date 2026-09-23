@@ -240,9 +240,9 @@ onMounted(async () => {
 
       const isSpicy = m.menu_name.includes('กะเพรา') || m.menu_name.includes('กระเพรา') || m.menu_name.includes('พริกแกง') || m.menu_name.includes('ส้มตำ') || m.menu_name.includes('ลาบ') || m.menu_name.includes('ยำ')
 
-      const allergenIds = (m.allergens && m.allergens.length > 0)
-        ? m.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean)
-        : (m.allergen_ids || [])
+      const allergenIds = Array.isArray(m.allergen_ids)
+        ? m.allergen_ids
+        : (m.allergens ? m.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean) : [])
 
       item.value = {
         id: m.menu_id,
@@ -288,19 +288,13 @@ onBeforeUnmount(() => {
   if (cleanupMenuSync) cleanupMenuSync()
 })
 
-// สารก่อภูมิแพ้ของเมนูนี้ (พร้อม fallback อัตโนมัติตามชื่อเมนู)
+// สารก่อภูมิแพ้ของเมนูนี้
 const itemAllergens = computed(() => {
   if (!item.value) return []
-  let ids = item.value.allergen_ids
-  if (!ids || ids.length === 0) {
-    const name = item.value.menu_name || ''
-    if (name.includes('ทะเล') || name.includes('กุ้ง')) ids = [1, 6]
-    else if (name.includes('ไข่เจียว')) ids = [5]
-    else if (name.includes('ส้มตำปู') || name.includes('ปลาร้า')) ids = [7, 9]
-    else if (name.includes('ส้มตำไทย')) ids = [1, 2]
-    else if (name.includes('ไก่ทอด')) ids = [4]
-  }
-  return resolveAllergenBadges(ids || [], DEFAULT_ALLERGENS)
+  const ids = Array.isArray(item.value.allergen_ids)
+    ? item.value.allergen_ids
+    : (item.value.allergens ? item.value.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean) : [])
+  return resolveAllergenBadges(ids, DEFAULT_ALLERGENS)
 })
 
 // เช็คว่าเป็นเมนูทะเลหรือไม่ (อิงจากชื่อเมนูมีคำว่า "ทะเล")

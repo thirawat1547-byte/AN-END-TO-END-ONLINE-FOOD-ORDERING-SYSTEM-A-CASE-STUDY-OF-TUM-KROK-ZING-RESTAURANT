@@ -145,16 +145,10 @@ let cleanupMenuSync = null
 // คำนวณสารก่อภูมิแพ้ของแต่ละเมนู
 const getItemAllergens = (item) => {
   if (!item) return []
-  let ids = item.allergen_ids
-  if (!ids || ids.length === 0) {
-    const name = item.menu_name || item.name || ''
-    if (name.includes('ทะเล') || name.includes('กุ้ง')) ids = [1, 6]
-    else if (name.includes('ไข่เจียว')) ids = [5]
-    else if (name.includes('ส้มตำปู') || name.includes('ปลาร้า')) ids = [7, 9]
-    else if (name.includes('ส้มตำไทย')) ids = [1, 2]
-    else if (name.includes('ไก่ทอด')) ids = [4]
-  }
-  return resolveAllergenBadges(ids || [], DEFAULT_ALLERGENS)
+  const ids = Array.isArray(item.allergen_ids)
+    ? item.allergen_ids
+    : (item.allergens ? item.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean) : [])
+  return resolveAllergenBadges(ids, DEFAULT_ALLERGENS)
 }
 
 // โหลดเมนูจริงจากฐานข้อมูล Backend
@@ -196,9 +190,9 @@ const fetchMenus = async () => {
 
         const isSpicy = m.menu_name.includes('กะเพรา') || m.menu_name.includes('กระเพรา') || m.menu_name.includes('พริกแกง') || m.menu_name.includes('ส้มตำ') || m.menu_name.includes('ลาบ') || m.menu_name.includes('ยำ')
 
-        const allergenIds = (m.allergens && m.allergens.length > 0)
-          ? m.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean)
-          : (m.allergen_ids || [])
+        const allergenIds = Array.isArray(m.allergen_ids)
+          ? m.allergen_ids
+          : (m.allergens ? m.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean) : [])
 
         return {
           id: m.menu_id,
@@ -256,6 +250,7 @@ onMounted(async () => {
         }
       }
     }
+    menuItems.value = [...menuItems.value]
 
     if (previewItem.value && 
         ((targetId && Number(previewItem.value.id) === Number(targetId)) ||

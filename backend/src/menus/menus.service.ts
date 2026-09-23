@@ -75,8 +75,47 @@ export class MenusService {
     return allergens;
   }
 
+  private static hasCheckedDefaults = false;
+
+  // ดึงรายการสารก่อภูมิแพ้เริ่มต้นและบันทึกลง MENU_ALLERGENS หากยังไม่เคยมีการตั้งค่า
+  private async ensureDefaultMenuAllergens() {
+    if (MenusService.hasCheckedDefaults) return;
+    MenusService.hasCheckedDefaults = true;
+    try {
+      const count = await this.prisma.menuAllergen.count();
+      if (count === 0) {
+        const allMenus = await this.prisma.menu.findMany();
+        const initialLinks: { menu_id: number; allergen_id: number }[] = [];
+        for (const m of allMenus) {
+          const name = m.menu_name || '';
+          const ids: number[] = [];
+          if (name.includes('ทะเล') || name.includes('กุ้ง')) ids.push(1, 6);
+          if (name.includes('ส้มตำปู') || name.includes('ปลาร้า')) ids.push(7, 9);
+          if (name.includes('ส้มตำไทย')) ids.push(1, 2);
+          if (name.includes('ไข่เจียว') || name.includes('ข้าวผัด')) ids.push(5);
+          if (name.includes('ไก่ทอด')) ids.push(4);
+
+          const uniqueIds = Array.from(new Set(ids));
+          for (const aId of uniqueIds) {
+            initialLinks.push({ menu_id: m.menu_id, allergen_id: aId });
+          }
+        }
+        if (initialLinks.length > 0) {
+          await this.prisma.menuAllergen.createMany({
+            data: initialLinks,
+            skipDuplicates: true,
+          });
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
   // 2. ดึงรายการอาหารทั้งหมด (กรองตามหมวดหมู่ / สถานะขาย) พร้อมสูตรวัตถุดิบ
   async findAll(categoryId?: number, isAvailable?: boolean) {
+    await this.ensureDefaultMenuAllergens();
+
     const menus = await this.prisma.menu.findMany({
       where: {
         ...(categoryId && { category_id: categoryId }),
@@ -111,11 +150,15 @@ export class MenusService {
       }
     }
 
-    return uniqueMenus.map((m) => ({
-      ...m,
-      allergens: (m.allergens || []).filter((a) => a.allergen != null),
-      ingredients: (m.ingredients || []).filter((i) => i.ingredient != null),
-    }));
+    return uniqueMenus.map((m) => {
+      const filteredAllergens = (m.allergens || []).filter((a) => a.allergen != null);
+      return {
+        ...m,
+        allergens: filteredAllergens,
+        allergen_ids: filteredAllergens.map((a) => a.allergen_id),
+        ingredients: (m.ingredients || []).filter((i) => i.ingredient != null),
+      };
+    });
   }
 
   // 3. ดูรายละเอียดเมนูรายตัว
@@ -137,9 +180,11 @@ export class MenusService {
       throw new NotFoundException(`ไม่พบเมนูอาหารรหัส ${id}`);
     }
 
+    const filteredAllergens = (menu.allergens || []).filter((a) => a.allergen != null);
     return {
       ...menu,
-      allergens: (menu.allergens || []).filter((a) => a.allergen != null),
+      allergens: filteredAllergens,
+      allergen_ids: filteredAllergens.map((a) => a.allergen_id),
       ingredients: (menu.ingredients || []).filter((i) => i.ingredient != null),
     };
   }
