@@ -28,11 +28,8 @@ services:
       PORT: 5000
     depends_on:
       - mysql-db
-<<<<<<< HEAD
     volumes:
       - uploads_data:/app/uploads
-=======
->>>>>>> ab04806e7aafd3cbf8a0e860486ae0899bc10133
 
   # 3. บริการส่วนของ Frontend (Vue.js)
   frontend:
@@ -46,13 +43,7 @@ services:
     depends_on:
       - backend
 
-<<<<<<< HEAD
 # ประกาศสร้าง Volume สำหรับเก็บข้อมูล MySQL และรูปภาพที่อัปโหลดแบบถาวร
 volumes:
   mysql_data:
   uploads_data:
-=======
-# ประกาศสร้าง Volume สำหรับเก็บข้อมูล MySQL แบบถาวร
-volumes:
-  mysql_data:
->>>>>>> ab04806e7aafd3cbf8a0e860486ae0899bc10133
