@@ -686,6 +686,53 @@ async function main() {
   }
   console.log(`✅ บันทึกสูตรอาหารและการใช้วัตถุดิบเรียบร้อยแล้ว (${addedRecipes} รายการที่ผูก)`);
 
+  // 7. Seed ข้อมูลโปรโมชัน (PROMOTIONS)
+  const defaultPromotions = [
+    {
+      code: 'WELCOME20',
+      discount_type: 'Percentage',
+      discount_value: 20,
+      min_order_price: 300,
+      expiry_date: new Date('2026-12-31T23:59:59.000Z'),
+    },
+    {
+      code: 'ZING50',
+      discount_type: 'Fixed',
+      discount_value: 50,
+      min_order_price: 300,
+      expiry_date: new Date('2026-10-31T23:59:59.000Z'),
+    },
+    {
+      code: 'SEP10',
+      discount_type: 'Percentage',
+      discount_value: 10,
+      min_order_price: 200,
+      expiry_date: new Date('2026-09-30T23:59:59.000Z'),
+    },
+    {
+      code: 'WELCOME100',
+      discount_type: 'Fixed',
+      discount_value: 100,
+      min_order_price: 500,
+      expiry_date: new Date('2026-12-31T23:59:59.000Z'),
+    },
+    {
+      code: 'FREESHIP',
+      discount_type: 'Fixed',
+      discount_value: 30,
+      min_order_price: 250,
+      expiry_date: new Date('2026-08-31T23:59:59.000Z'),
+    },
+  ];
+
+  for (const promo of defaultPromotions) {
+    const existing = await prisma.promotion.findUnique({ where: { code: promo.code } });
+    if (!existing) {
+      await prisma.promotion.create({ data: promo });
+    }
+  }
+  console.log('✅ บันทึกโปรโมชันตั้งต้นเรียบร้อยแล้ว (5 โค้ดส่วนลด)');
+
   console.log('🎉 Seeding ข้อมูลพื้นฐานเสร็จสิ้นสมบูรณ์!');
 }
 
