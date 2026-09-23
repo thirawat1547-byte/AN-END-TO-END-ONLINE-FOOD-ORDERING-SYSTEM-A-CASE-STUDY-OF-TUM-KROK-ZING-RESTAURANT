@@ -3,7 +3,7 @@
     class="menu-item-card" 
     :class="{ 
       'is-out-of-stock': item.is_available === false,
-      'is-drink-card': isDrink(item)
+      'is-drink-card': isPlusOnly(item)
     }"
     @click="onCardClick"
   >
@@ -14,7 +14,12 @@
       </div>
     </div>
     <div class="item-details">
-      <h3 class="item-name">{{ item.menu_name }}</h3>
+      <h3 class="item-name">
+        {{ item.menu_name }}
+        <span v-if="cardAllergens.length > 0" class="card-allergen-badge" :title="'มีสารก่อภูมิแพ้: ' + cardAllergens.map(a => a.allergen_name).join(', ')">
+          ⚠️ มีสารก่อภูมิแพ้
+        </span>
+      </h3>
       <div class="price-action">
         <span class="item-price">฿{{ item.price.toFixed(2) }}</span>
       </div>
@@ -23,7 +28,7 @@
         :disabled="item.is_available === false"
         :class="{ 'btn-disabled': item.is_available === false }"
         @click.stop="item.is_available !== false && $emit('add', item)"
-        :title="isDrink(item) ? 'กด + Add เพื่อเพิ่มลงตะกร้า' : 'เลือกรายละเอียด'"
+        :title="isPlusOnly(item) ? 'กด + Add เพื่อเพิ่มลงตะกร้า' : 'เลือกรายละเอียด'"
       >
         {{ item.is_available === false ? 'สินค้าหมด' : '+ Add' }}
       </button>
@@ -32,6 +37,9 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
+import { DEFAULT_ALLERGENS, resolveAllergenBadges } from '../../utils/menuSync'
+
 const props = defineProps({
   item: {
     type: Object,
@@ -39,6 +47,14 @@ const props = defineProps({
   }
 })
 const emit = defineEmits(['select', 'add'])
+
+const cardAllergens = computed(() => {
+  if (!props.item) return []
+  const ids = Array.isArray(props.item.allergen_ids)
+    ? props.item.allergen_ids
+    : (props.item.allergens ? props.item.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean) : [])
+  return resolveAllergenBadges(ids, DEFAULT_ALLERGENS)
+})
 
 const isDrink = (item) => {
   if (!item) return false;
@@ -54,10 +70,21 @@ const isDrink = (item) => {
          name.includes('เก๊กฮวย');
 }
 
+const isPlusOnly = (item) => {
+  if (!item) return false;
+  if (isDrink(item)) return true;
+  const name = (item.menu_name || item.name || '').toString().trim();
+  return name.includes('ไก่ทอด') ||
+         name.includes('ปีกไก่ทอด') ||
+         name.includes('ข้าวเปล่า') ||
+         name.includes('ข้าวสวย') ||
+         name.includes('ข้าวเหนียว');
+}
+
 const onCardClick = () => {
   if (props.item.is_available === false) return;
-  // เมนูน้ำจะไม่สามารถกดตรงรูปภาพหรือการ์ดเพื่อเพิ่มรายการเข้าตะกร้าได้
-  if (isDrink(props.item)) {
+  // เมนูน้ำ, ไก่ทอด, ปีกไก่ทอด, ข้าวสวย, ข้าวเหนียว จะไม่สามารถกดตรงรูปภาพหรือการ์ดเพื่อเพิ่มรายการเข้าตะกร้าได้
+  if (isPlusOnly(props.item)) {
     return;
   }
   emit('select', props.item);
@@ -186,5 +213,18 @@ const onCardClick = () => {
 
 .add-button:active {
   background-color: #2c543b;
+}
+
+.card-allergen-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  color: #c2410c;
+  background: #ffedd5;
+  border: 1px solid #fed7aa;
+  padding: 1px 6px;
+  border-radius: 6px;
+  margin-left: 4px;
+  vertical-align: middle;
 }
 </style>

@@ -120,6 +120,13 @@ export class MenusController {
     return this.menusService.findAll(parsedCatId, parsedAvailable);
   }
 
+  @Get('allergens')
+  @ApiOperation({ summary: 'ดึงรายการสารก่อภูมิแพ้ทั้งหมด (Master Data)' })
+  @ApiResponse({ status: 200, description: 'รายการสารก่อภูมิแพ้' })
+  getAllergens() {
+    return this.menusService.getAllergens();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'ดูรายละเอียดเมนูอาหารตามรหัส (ID)' })
   @ApiParam({ name: 'id', description: 'รหัสเมนูอาหาร (menu_id)' })

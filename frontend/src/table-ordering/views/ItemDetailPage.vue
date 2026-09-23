@@ -13,7 +13,31 @@
       </div>
       
       <div class="item-header">
-        <h1 class="item-title">{{ item.menu_name }}</h1>
+        <h1 class="item-title">
+          {{ item.menu_name }}
+          <!-- ⚠️ มีเขียนเตือน อยุ่ตรงหลังชื่อเมนูหลังกดเลือกเมนูนั้นไป ว่ามีสารก่อภูมิแพ้ -->
+          <span v-if="itemAllergens.length > 0" class="allergen-warning-inline">
+            ⚠️ มีสารก่อภูมิแพ้: {{ itemAllergens.map(a => a.allergen_name).join(', ') }}
+          </span>
+        </h1>
+
+        <!-- แถบแจ้งเตือนสารก่อภูมิแพ้เด่นชัด (Allergens Warning Banner) -->
+        <div v-if="itemAllergens.length > 0" class="allergen-warning-banner">
+          <div class="allergen-banner-header">
+            <span class="allergen-alert-icon">⚠️</span>
+            <strong class="allergen-alert-title">คำเตือนสำหรับผู้แพ้อาหาร (Allergens Warning):</strong>
+          </div>
+          <div class="allergen-badge-list">
+            <span 
+              v-for="al in itemAllergens" 
+              :key="al.allergen_id"
+              class="allergen-chip"
+            >
+              {{ al.icon }} {{ al.allergen_name }}
+            </span>
+          </div>
+        </div>
+
         <p class="item-desc">{{ item.desc }}</p>
         <div class="item-price">฿{{ item.price.toFixed(2) }}</div>
         <!-- แสดงแคลอรีโดยประมาณใต้ราคา -->
@@ -108,12 +132,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import OrderHeader from '../components/OrderHeader.vue'
 import { useCart } from '../composables/useCart'
 import { API_BASE } from '../../config/api'
+import { onMenuUpdated, DEFAULT_ALLERGENS, resolveAllergenBadges } from '../../utils/menuSync'
 
 const route = useRoute()
 const router = useRouter()
@@ -192,6 +217,8 @@ const imageMap = {
   'ข้าวเหนียว': '/images/kaon.jpg'
 }
 
+let cleanupMenuSync = null
+
 onMounted(async () => {
   try {
     const res = await axios.get(`${API_BASE}/menus/${itemId}`)
@@ -213,6 +240,10 @@ onMounted(async () => {
 
       const isSpicy = m.menu_name.includes('กะเพรา') || m.menu_name.includes('กระเพรา') || m.menu_name.includes('พริกแกง') || m.menu_name.includes('ส้มตำ') || m.menu_name.includes('ลาบ') || m.menu_name.includes('ยำ')
 
+      const allergenIds = Array.isArray(m.allergen_ids)
+        ? m.allergen_ids
+        : (m.allergens ? m.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean) : [])
+
       item.value = {
         id: m.menu_id,
         menu_id: m.menu_id,
@@ -223,13 +254,47 @@ onMounted(async () => {
         image_url: m.image_url || imageMap[m.menu_name] || '/images/kapaomu.jpg',
         calories: m.calories || 350,
         isSpicy,
-        is_available: m.is_available !== false
+        is_available: m.is_available !== false,
+        allergen_ids: allergenIds
       }
-      return
     }
   } catch (err) {
     console.warn('โหลดรายละเอียดเมนูจาก API ไม่สำเร็จ ใช้สำรอง:', err)
   }
+
+  // ⚡ ซิงก์ข้อมูลสารก่อภูมิแพ้แบบ Real-time
+  cleanupMenuSync = onMenuUpdated((updatedMenu) => {
+    if (!updatedMenu || !item.value) return
+    const targetId = updatedMenu.menu_id || updatedMenu.id
+    const targetName = (updatedMenu.menu_name || updatedMenu.name || '').trim()
+
+    if ((targetId && (Number(item.value.id) === Number(targetId) || Number(item.value.menu_id) === Number(targetId))) ||
+        (targetName && item.value.menu_name === targetName)) {
+      if (updatedMenu.allergen_ids !== undefined) {
+        item.value.allergen_ids = [...updatedMenu.allergen_ids]
+      }
+      if (updatedMenu.price !== undefined) {
+        item.value.price = Number(updatedMenu.price)
+      }
+      if (updatedMenu.is_available !== undefined) {
+        item.value.is_available = updatedMenu.is_available
+      }
+      item.value = { ...item.value }
+    }
+  })
+})
+
+onBeforeUnmount(() => {
+  if (cleanupMenuSync) cleanupMenuSync()
+})
+
+// สารก่อภูมิแพ้ของเมนูนี้
+const itemAllergens = computed(() => {
+  if (!item.value) return []
+  const ids = Array.isArray(item.value.allergen_ids)
+    ? item.value.allergen_ids
+    : (item.value.allergens ? item.value.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean) : [])
+  return resolveAllergenBadges(ids, DEFAULT_ALLERGENS)
 })
 
 // เช็คว่าเป็นเมนูทะเลหรือไม่ (อิงจากชื่อเมนูมีคำว่า "ทะเล")
@@ -486,5 +551,67 @@ input[type="radio"] {
   width: 100%;
   cursor: pointer;
   margin-top: 16px;
+}
+
+/* ===== สไตล์สารก่อภูมิแพ้ (Allergens Warning Styles) ===== */
+.allergen-warning-inline {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #b91c1c;
+  background-color: #fee2e2;
+  border: 1px solid #fca5a5;
+  padding: 3px 8px;
+  border-radius: 6px;
+  vertical-align: middle;
+}
+
+.allergen-warning-banner {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-left: 4px solid #f59e0b;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: 12px 0;
+  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.08);
+}
+
+.allergen-banner-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.allergen-alert-icon {
+  font-size: 16px;
+}
+
+.allergen-alert-title {
+  font-size: 13px;
+  color: #92400e;
+  font-weight: 700;
+}
+
+.allergen-badge-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.allergen-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: white;
+  border: 1px solid #fde68a;
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 </style>

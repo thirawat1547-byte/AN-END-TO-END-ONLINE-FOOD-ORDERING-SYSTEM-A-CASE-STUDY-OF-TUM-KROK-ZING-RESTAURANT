@@ -1,7 +1,12 @@
 <template>
   <div class="cart-item-card">
     <div class="item-info">
-      <h4 class="item-name">{{ item.menu_name }}</h4>
+      <h4 class="item-name">
+        {{ item.menu_name }}
+        <span v-if="allergens.length > 0" class="cart-allergen-tag">
+          ⚠️ มีสารก่อภูมิแพ้: {{ allergens.map(a => a.allergen_name).join(', ') }}
+        </span>
+      </h4>
       
       <div class="item-details" v-if="hasDetails">
         <div v-if="item.spicyLevel" class="detail-line">
@@ -47,6 +52,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { DEFAULT_ALLERGENS, resolveAllergenBadges } from '../../utils/menuSync'
 
 const props = defineProps({
   item: {
@@ -56,6 +62,14 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update-qty', 'remove'])
+
+const allergens = computed(() => {
+  if (!props.item) return []
+  const ids = Array.isArray(props.item.allergen_ids)
+    ? props.item.allergen_ids
+    : (props.item.allergens ? props.item.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean) : [])
+  return resolveAllergenBadges(ids, DEFAULT_ALLERGENS)
+})
 
 const hasDetails = computed(() => {
   return props.item.spicyLevel || 
@@ -101,6 +115,15 @@ const increaseQty = () => {
   font-weight: 600;
   color: #333;
   margin: 0 0 4px 0;
+}
+
+.cart-allergen-tag {
+  display: block;
+  font-size: 11px;
+  color: #dc2626;
+  font-weight: 600;
+  margin-top: 3px;
+  line-height: 1.3;
 }
 
 .item-details {

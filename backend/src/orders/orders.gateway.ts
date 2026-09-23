@@ -84,6 +84,38 @@ export class OrdersGateway
   }
 
   /**
+   * ฟังก์ชันส่งสัญญาณเมื่อข้อมูลเมนูหรือสารก่อภูมิแพ้มีการเปลี่ยนแปลง
+   * @param menu ข้อมูลเมนูที่อัปเดตแล้ว
+   */
+  sendMenuUpdated(menu: any) {
+    this.logger.log(`📢 กระจายสัญญาณ menu_updated: #${menu?.menu_id || menu?.id}`);
+    try {
+      this.server?.emit('menu_updated', menu);
+    } catch (e) {
+      this.logger.warn('ไม่สามารถกระจายสัญญาณ menu_updated:', e.message);
+    }
+  }
+
+  /**
+   * รองรับการรับสัญญาณ menu_updated จากฝั่ง Frontend แล้วบรอดแคสต์ต่อไปยังทุกหน้าจอ
+   */
+  @SubscribeMessage('menu_updated')
+  handleMenuUpdated(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: any,
+  ) {
+    this.logger.log(`📥 ได้รับสัญญาณ menu_updated จาก Client: ${client.id}`);
+    if (payload) {
+      try {
+        this.server?.emit('menu_updated', payload);
+      } catch (e) {
+        this.logger.warn('ไม่สามารถกระจายสัญญาณ menu_updated:', e.message);
+      }
+    }
+    return { status: 'acknowledged', receivedAt: new Date().toISOString() };
+  }
+
+  /**
    * ตรวจสอบสถานะการเชื่อมต่อ (Ping-Pong)
    */
   @SubscribeMessage('ping')

@@ -32,7 +32,30 @@
         </button>
         <img :src="previewItem.image_url" :alt="previewItem.menu_name" class="preview-image" />
         <div class="preview-info">
-          <h3 class="preview-title">{{ previewItem.menu_name }}</h3>
+          <h3 class="preview-title">
+            {{ previewItem.menu_name }}
+            <!-- ⚠️ เขียนเตือนอยู่ตรงหลังชื่อเมนูหลังกดเลือกเมนูนั้นไป -->
+            <span v-if="getItemAllergens(previewItem).length > 0" class="allergen-warning-inline">
+              ⚠️ มีสารก่อภูมิแพ้: {{ getItemAllergens(previewItem).map(a => a.allergen_name).join(', ') }}
+            </span>
+          </h3>
+
+          <div v-if="getItemAllergens(previewItem).length > 0" class="allergen-warning-banner">
+            <div class="allergen-banner-header">
+              <span class="allergen-alert-icon">⚠️</span>
+              <strong class="allergen-alert-title">คำเตือนสำหรับผู้แพ้อาหาร:</strong>
+            </div>
+            <div class="allergen-badge-list">
+              <span 
+                v-for="al in getItemAllergens(previewItem)" 
+                :key="al.allergen_id"
+                class="allergen-chip"
+              >
+                {{ al.icon }} {{ al.allergen_name }}
+              </span>
+            </div>
+          </div>
+
           <p class="preview-desc" v-if="previewItem.desc">{{ previewItem.desc }}</p>
           <div class="preview-price">฿{{ previewItem.price.toFixed(2) }}</div>
         </div>
@@ -60,6 +83,7 @@ import MenuItemCard from '../components/MenuItemCard.vue'
 import FloatingCartBar from '../components/FloatingCartBar.vue'
 import { useCart } from '../composables/useCart'
 import { API_BASE } from '../../config/api'
+import { onMenuUpdated, DEFAULT_ALLERGENS, resolveAllergenBadges } from '../../utils/menuSync'
 
 const route = useRoute()
 const router = useRouter()
@@ -116,6 +140,16 @@ const activeCategory = ref('all')
 const previewItem = ref(null)
 const menuItems = ref([])
 let menuPollTimer = null
+let cleanupMenuSync = null
+
+// คำนวณสารก่อภูมิแพ้ของแต่ละเมนู
+const getItemAllergens = (item) => {
+  if (!item) return []
+  const ids = Array.isArray(item.allergen_ids)
+    ? item.allergen_ids
+    : (item.allergens ? item.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean) : [])
+  return resolveAllergenBadges(ids, DEFAULT_ALLERGENS)
+}
 
 // โหลดเมนูจริงจากฐานข้อมูล Backend
 const fetchMenus = async () => {
@@ -156,6 +190,10 @@ const fetchMenus = async () => {
 
         const isSpicy = m.menu_name.includes('กะเพรา') || m.menu_name.includes('กระเพรา') || m.menu_name.includes('พริกแกง') || m.menu_name.includes('ส้มตำ') || m.menu_name.includes('ลาบ') || m.menu_name.includes('ยำ')
 
+        const allergenIds = Array.isArray(m.allergen_ids)
+          ? m.allergen_ids
+          : (m.allergens ? m.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean) : [])
+
         return {
           id: m.menu_id,
           menu_id: m.menu_id,
@@ -167,7 +205,8 @@ const fetchMenus = async () => {
           calories: m.calories || 350,
           isPopular: cats.includes('ขายดีที่สุด'),
           isSpicy,
-          is_available: m.is_available !== false
+          is_available: m.is_available !== false,
+          allergen_ids: allergenIds
         }
       })
     }
@@ -190,10 +229,46 @@ onMounted(async () => {
   await fetchMenus()
   // ซิงค์สถานะเปิด-ปิดเมนูอัตโนมัติทุกๆ 6 วินาที
   menuPollTimer = setInterval(fetchMenus, 6000)
+
+  // ⚡ ดักฟังสัญญาณอัปเดตสารก่อภูมิแพ้และเมนูแบบ Real-time
+  cleanupMenuSync = onMenuUpdated((updatedMenu) => {
+    if (!updatedMenu) return
+    const targetId = updatedMenu.menu_id || updatedMenu.id
+    const targetName = (updatedMenu.menu_name || updatedMenu.name || '').trim()
+
+    for (const item of menuItems.value) {
+      if ((targetId && Number(item.id) === Number(targetId)) ||
+          (targetName && item.menu_name === targetName)) {
+        if (updatedMenu.allergen_ids !== undefined) {
+          item.allergen_ids = [...updatedMenu.allergen_ids]
+        }
+        if (updatedMenu.is_available !== undefined) {
+          item.is_available = updatedMenu.is_available
+        }
+        if (updatedMenu.price !== undefined) {
+          item.price = Number(updatedMenu.price)
+        }
+      }
+    }
+    menuItems.value = [...menuItems.value]
+
+    if (previewItem.value && 
+        ((targetId && Number(previewItem.value.id) === Number(targetId)) ||
+         (targetName && previewItem.value.menu_name === targetName))) {
+      if (updatedMenu.allergen_ids !== undefined) {
+        previewItem.value.allergen_ids = [...updatedMenu.allergen_ids]
+      }
+      if (updatedMenu.price !== undefined) {
+        previewItem.value.price = Number(updatedMenu.price)
+      }
+      previewItem.value = { ...previewItem.value }
+    }
+  })
 })
 
 onBeforeUnmount(() => {
   if (menuPollTimer) clearInterval(menuPollTimer)
+  if (cleanupMenuSync) cleanupMenuSync()
 })
 
 const filteredMenu = computed(() => {
@@ -231,6 +306,18 @@ const isDrink = (item) => {
          name.includes('เก๊กฮวย');
 }
 
+// เมนูที่ต้องกดปุ่ม + เท่านั้น จึงจะเพิ่มเข้าตะกร้า
+const isPlusOnly = (item) => {
+  if (!item) return false;
+  if (isDrink(item)) return true;
+  const name = (item.menu_name || item.name || '').toString().trim();
+  return name.includes('ไก่ทอด') ||
+         name.includes('ปีกไก่ทอด') ||
+         name.includes('ข้าวเปล่า') ||
+         name.includes('ข้าวสวย') ||
+         name.includes('ข้าวเหนียว');
+}
+
 // จัดการคลิกเลือกเมนู
 const handleAction = (item, isQuickAdd = false) => {
   if (!isStoreOpen.value) {
@@ -242,8 +329,8 @@ const handleAction = (item, isQuickAdd = false) => {
     return
   }
 
-  // 🛑 เมนูน้ำจะไม่สามารถกดตรงรูปภาพหรือการ์ดเพื่อเพิ่มรายการเข้าตะกร้าได้ จะต้องกดที่ + ตรงการ์ดเท่านั้น
-  if (isDrink(item) && !isQuickAdd) {
+  // 🛑 เมนูน้ำ, ไก่ทอด, ปีกไก่ทอด, ข้าวสวย, ข้าวเหนียว จะไม่สามารถกดตรงรูปภาพหรือการ์ดเพื่อเพิ่มรายการเข้าตะกร้าได้ จะต้องกดที่ + ตรงการ์ดเท่านั้น
+  if (isPlusOnly(item) && !isQuickAdd) {
     return;
   }
 
@@ -442,5 +529,68 @@ const goToCart = () => {
   .menu-grid {
     grid-template-columns: repeat(4, 1fr);
   }
+}
+
+/* ===== สไตล์สารก่อภูมิแพ้ (Allergens Warning) ===== */
+.allergen-warning-inline {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #b91c1c;
+  background-color: #fee2e2;
+  border: 1px solid #fca5a5;
+  padding: 3px 8px;
+  border-radius: 6px;
+  vertical-align: middle;
+}
+
+.allergen-warning-banner {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-left: 4px solid #f59e0b;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: 10px 0;
+  text-align: left;
+  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.08);
+}
+
+.allergen-banner-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.allergen-alert-icon {
+  font-size: 16px;
+}
+
+.allergen-alert-title {
+  font-size: 13px;
+  color: #92400e;
+  font-weight: 700;
+}
+
+.allergen-badge-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.allergen-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: white;
+  border: 1px solid #fde68a;
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 </style>

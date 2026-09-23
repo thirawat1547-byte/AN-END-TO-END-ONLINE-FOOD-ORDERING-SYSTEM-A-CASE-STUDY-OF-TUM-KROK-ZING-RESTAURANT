@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsArray,
   IsBoolean,
   IsInt,
   IsNumber,
@@ -51,4 +52,14 @@ export class CreateMenuDto {
   @IsOptional()
   @IsBoolean()
   is_available?: boolean;
+
+  @ApiPropertyOptional({
+    example: [1, 2],
+    description: 'รายการรหัสสารก่อภูมิแพ้ (Allergen IDs)',
+    type: [Number],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  allergen_ids?: number[];
 }

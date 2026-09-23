@@ -2,6 +2,7 @@ import { reactive } from 'vue'
 
 // ===== Backend API Configuration =====
 import { API_BASE } from '../../config/api'
+import { broadcastMenuUpdated, DEFAULT_ALLERGENS } from '../../utils/menuSync'
 import imgChick from '../../assets/chick.jpg'
 import imgCoke from '../../assets/coke.jpg'
 import imgGek from '../../assets/gek.jpg'
@@ -94,13 +95,7 @@ export const adminStore = reactive({
     { category_id: 5, category_name: 'เครื่องดื่ม', icon: '🥤' }
   ],
 
-  allergens: [
-    { allergen_id: 1, allergen_name: 'กุ้ง / อาหารทะเล', icon: '🦐' },
-    { allergen_id: 2, allergen_name: 'ถั่วลิสง', icon: '🥜' },
-    { allergen_id: 3, allergen_name: 'นม / ผลิตภัณฑ์นม', icon: '🥛' },
-    { allergen_id: 4, allergen_name: 'กลูเตน / แป้งสาลี', icon: '🌾' },
-    { allergen_id: 5, allergen_name: 'ไข่', icon: '🥚' }
-  ],
+  allergens: [...DEFAULT_ALLERGENS],
 
   ingredients: [
     { ingredient_id: 1, ingredient_name: 'มะละกอดิบขูด', quantity_in_stock: 18.5, unit: 'กิโลกรัม', reorder_level: 5.0, cost_per_unit: 35, last_updated: '2026-09-03 14:30' },
@@ -721,7 +716,9 @@ export const adminStore = reactive({
           calories: m.calories || 0,
           is_available: m.is_available ?? true,
           image_url: MENU_IMAGE_MAP[m.menu_name] || m.image_url || 'https://images.unsplash.com/photo-1569562211093-4ed0d0758f12?w=500&auto=format&fit=crop&q=80',
-          allergen_ids: m.allergens ? m.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean) : [],
+          allergen_ids: Array.isArray(m.allergen_ids)
+            ? m.allergen_ids
+            : (m.allergens ? m.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean) : []),
           total_sold: m.total_sold || 0,
           ingredients: m.ingredients ? m.ingredients.map(mi => ({
             menu_id: mi.menu_id,
@@ -791,6 +788,7 @@ export const adminStore = reactive({
     if (!item) return
     const newStatus = !item.is_available
     item.is_available = newStatus
+    broadcastMenuUpdated({ ...item })
     try {
       const res = await fetch(`${API_BASE}/menus/${menuId}`, {
         method: 'PATCH',
@@ -801,11 +799,13 @@ export const adminStore = reactive({
       console.log(`✅ เปลี่ยนสถานะเมนู #${menuId} เป็น ${newStatus ? 'พร้อมขาย' : 'ปิดการขาย'}`)
     } catch (err) {
       item.is_available = !newStatus
+      broadcastMenuUpdated({ ...item })
       console.error('❌ เปลี่ยนสถานะเมนูไม่สำเร็จ:', err.message)
     }
   },
 
   async addMenuItem(newMenu) {
+    const allergen_ids = newMenu.allergen_ids ? newMenu.allergen_ids.map(Number) : []
     try {
       const res = await fetch(`${API_BASE}/menus`, {
         method: 'POST',
@@ -817,12 +817,13 @@ export const adminStore = reactive({
           price: Number(newMenu.price),
           image_url: newMenu.image_url || '',
           calories: Number(newMenu.calories) || 0,
-          is_available: newMenu.is_available !== false
+          is_available: newMenu.is_available !== false,
+          allergen_ids: allergen_ids
         })
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const created = await res.json()
-      this.menus.push({
+      const itemToPush = {
         menu_id: created.menu_id,
         category_id: created.category_id,
         menu_name: created.menu_name,
@@ -831,18 +832,42 @@ export const adminStore = reactive({
         calories: created.calories || 0,
         is_available: created.is_available,
         image_url: created.image_url || newMenu.image_url,
-        allergen_ids: newMenu.allergen_ids || [],
+        allergen_ids: allergen_ids,
         total_sold: 0
-      })
+      }
+      this.menus.push(itemToPush)
+      broadcastMenuUpdated(itemToPush)
       console.log(`✅ เพิ่มเมนูใหม่สำเร็จ: ${created.menu_name} (ID: ${created.menu_id})`)
     } catch (err) {
       console.warn('⚠️ เพิ่มเมนู API ไม่สำเร็จ:', err.message)
+      const nextId = this.menus.length > 0 ? Math.max(...this.menus.map(m => m.menu_id)) + 1 : 1
+      const itemToPush = {
+        menu_id: nextId,
+        category_id: Number(newMenu.category_id) || 1,
+        menu_name: newMenu.menu_name,
+        description: newMenu.description || '',
+        price: Number(newMenu.price),
+        calories: Number(newMenu.calories) || 0,
+        is_available: newMenu.is_available !== false,
+        image_url: newMenu.image_url || '',
+        allergen_ids: allergen_ids,
+        total_sold: 0
+      }
+      this.menus.push(itemToPush)
+      broadcastMenuUpdated(itemToPush)
     }
   },
 
   async updateMenuItem(updatedMenu) {
     const index = this.menus.findIndex(m => m.menu_id === updatedMenu.menu_id)
     if (index === -1) return
+    const allergen_ids = updatedMenu.allergen_ids ? updatedMenu.allergen_ids.map(Number) : []
+    const merged = { ...this.menus[index], ...updatedMenu, allergen_ids }
+    this.menus[index] = merged
+
+    // ⚡ กระจายสัญญาณ Real-time ไปยังทุกหน้าจอทันที (Online & Dine-in)
+    broadcastMenuUpdated(merged)
+
     try {
       const res = await fetch(`${API_BASE}/menus/${updatedMenu.menu_id}`, {
         method: 'PATCH',
@@ -854,15 +879,14 @@ export const adminStore = reactive({
           price: Number(updatedMenu.price),
           image_url: updatedMenu.image_url || '',
           calories: Number(updatedMenu.calories) || 0,
-          is_available: updatedMenu.is_available
+          is_available: updatedMenu.is_available,
+          allergen_ids: allergen_ids
         })
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      this.menus[index] = { ...this.menus[index], ...updatedMenu }
-      console.log(`✅ แก้ไขเมนู #${updatedMenu.menu_id} สำเร็จ`)
+      console.log(`✅ แก้ไขเมนู #${updatedMenu.menu_id} สำเร็จพร้อมข้อมูลสารก่อภูมิแพ้`)
     } catch (err) {
-      this.menus[index] = { ...this.menus[index], ...updatedMenu }
-      console.warn('⚠️ แก้ไขเมนู API ไม่สำเร็จ:', err.message)
+      console.warn('⚠️ แก้ไขเมนู API ไม่สำเร็จ บันทึกลง Local Store เรียบร้อย:', err.message)
     }
   },
 

@@ -50,7 +50,7 @@
             :key="item.id + '-' + item.name" 
             :class="{ 
               'out-of-stock-card': item.is_available === false,
-              'drink-card': isDrink(item)
+              'drink-card': isPlusOnly(item)
             }"
             @click="onCardClick(item)"
           >
@@ -64,7 +64,12 @@
               </div>
             </div>
             
-            <h3 class="food-title">{{ item.name }}</h3>
+            <h3 class="food-title">
+              {{ item.name }}
+              <span v-if="getItemAllergens(item).length > 0" class="card-allergen-tag" :title="'มีสารก่อภูมิแพ้: ' + getItemAllergens(item).map(a => a.allergen_name).join(', ')">
+                ⚠️ มีสารก่อภูมิแพ้
+              </span>
+            </h3>
             <p class="food-desc">{{ item.desc }}</p>
             <div class="food-footer">
               <span class="price">B{{ item.price }}</span>
@@ -73,7 +78,7 @@
                 :disabled="item.is_available === false"
                 :class="{ 'disabled-btn': item.is_available === false }"
                 @click.stop="onPlusClick(item)"
-                :title="isDrink(item) ? 'กด + เพื่อเพิ่มลงตะกร้า' : 'เลือกรายละเอียด'"
+                :title="isPlusOnly(item) ? 'กด + เพื่อเพิ่มลงตะกร้า' : 'เลือกรายละเอียด'"
               >
                 {{ item.is_available === false ? 'หมด' : '+' }}
               </button>
@@ -90,7 +95,12 @@
         <div class="cart-list">
           <div class="cart-row" v-for="(item, index) in cartItems" :key="index">
             <div class="cart-item-info">
-              <div class="cart-item-name">{{ item.name }}</div>
+              <div class="cart-item-name">
+                {{ item.name }}
+                <span v-if="getItemAllergens(item).length > 0" class="cart-allergen-pill">
+                  ⚠️ มีสารก่อภูมิแพ้: {{ getItemAllergens(item).map(a => a.allergen_name).join(', ') }}
+                </span>
+              </div>
               
               <div class="cart-item-options">
                 <span v-if="item.dishType" class="opt-badge dish-badge">🍽️ {{ item.dishType }}</span>
@@ -150,12 +160,38 @@
           <button class="close-modal-btn" @click="closeItemModal">✕</button>
           
           <div class="modal-header">
-            <h2>{{ selectedItem.name }}</h2>
+            <div class="modal-title-wrap">
+              <h2>
+                {{ selectedItem.name }}
+                <!-- ⚠️ เขียนเตือนอยู่ตรงหลังชื่อเมนูหลังกดเลือกเมนูนั้นไป -->
+                <span v-if="getItemAllergens(selectedItem).length > 0" class="allergen-warning-inline">
+                  ⚠️ มีสารก่อภูมิแพ้: {{ getItemAllergens(selectedItem).map(a => a.allergen_name).join(', ') }}
+                </span>
+              </h2>
+            </div>
             <div class="price-cal-box">
               <span class="modal-base-price">B{{ unitModalPrice }}</span>
               <span class="modal-cal-text" v-if="selectedItem.calories !== undefined">🔥 ~{{ unitModalCalories }} kcal</span>
             </div>
           </div>
+
+          <!-- แถบเตือนสารก่อภูมิแพ้แบบกล่องเตือนเด่นชัด (Allergens Warning Banner) -->
+          <div v-if="getItemAllergens(selectedItem).length > 0" class="allergen-warning-banner">
+            <div class="allergen-banner-header">
+              <span class="allergen-alert-icon">⚠️</span>
+              <strong class="allergen-alert-title">คำเตือนสำหรับผู้แพ้อาหาร (Allergens Warning):</strong>
+            </div>
+            <div class="allergen-badge-list">
+              <span 
+                v-for="al in getItemAllergens(selectedItem)" 
+                :key="al.allergen_id"
+                class="allergen-chip"
+              >
+                {{ al.icon }} {{ al.allergen_name }}
+              </span>
+            </div>
+          </div>
+
           <p class="modal-desc">{{ selectedItem.desc }}</p>
 
           <div class="modal-scroll-area">
@@ -295,6 +331,7 @@ import axios from 'axios';
 import { API_BASE } from './config/api';
 import CustomerNavbar from './components/CustomerNavbar.vue';
 import { authStore } from './store/authStore';
+import { onMenuUpdated, DEFAULT_ALLERGENS, resolveAllergenBadges } from './utils/menuSync';
 
 export default {
   components: {
@@ -322,33 +359,33 @@ export default {
 
       // รายการเมนูพร้อม Path รูปที่ Vite โหลดได้สมบูรณ์
       menuItems: [
-        { id: 1, name: 'กระเพราหมู', price: 40, category: ['อาหารจานเดียว / ผัด', 'ขายดีที่สุด'], desc: 'หอมฟุ้ง อร่อยเด็ดสะใจ!', img: new URL('./assets/kapaomu.jpg', import.meta.url).href, isPopular: true, isSpicy: true, calories: 550, is_available: true },
-        { id: 2, name: 'กระเพราทะเล/หมึก/กุ้ง', price: 60, category: ['อาหารจานเดียว / ผัด'], desc: 'เผ็ดร้อน ถึงเครื่อง', img: new URL('./assets/kapaotaley.jpg', import.meta.url).href, isSpicy: true, isSeafood: true, calories: 450, is_available: true },
-        { id: 3, name: 'ข้าวผัดหมู', price: 40, category: ['อาหารจานเดียว / ผัด'], desc: 'ข้าวผัดหอมกรุ่น', img: new URL('./assets/khaopadmu.jpg', import.meta.url).href, isSpicy: false, calories: 550, is_available: true },
-        { id: 4, name: 'ข้าวผัดกุ้ง', price: 50, category: ['อาหารจานเดียว / ผัด'], desc: 'ข้าวผัดกุ้งสดเด้ง รสชาติกลมกล่อม', img: new URL('./assets/khaopadkung.jpg', import.meta.url).href, isSpicy: false, calories: 510, is_available: true },
-        { id: 5, name: 'ข้าวผัดทะเล/หมึก/กุ้ง', price: 60, category: ['อาหารจานเดียว / ผัด'], desc: 'รวมมิตรทะเลผัด', img: new URL('./assets/khaopadtalay.jpg', import.meta.url).href, isSpicy: false, isSeafood: true, calories: 520, is_available: true },
-        { id: 6, name: 'ผัดพริกแกงหมู', price: 40, category: ['อาหารจานเดียว / ผัด'], desc: 'พริกแกงเข้มข้น', img: new URL('./assets/pikkangmu.jpg', import.meta.url).href, isSpicy: true, calories: 550, is_available: true },
-        { id: 7, name: 'ผัดพริกแกงทะเล/หมึก/กุ้ง', price: 60, category: ['อาหารจานเดียว / ผัด'], desc: 'จัดจ้านถึงใจ', img: new URL('./assets/prikkangtalay.jpg', import.meta.url).href, isSpicy: true, isSeafood: true, calories: 480, is_available: true },
-        { id: 8, name: 'ผัดคะน้าหมูกรอบ', price: 40, category: ['อาหารจานเดียว / ผัด'], desc: 'ผักกรอบ หมูกรอบชิ้นโต', img: new URL('./assets/kanamokrop.jpg', import.meta.url).href, isSpicy: false, calories: 450, is_available: true },
-        { id: 9, name: 'ผัดคะน้าทะเล/หมึก/กุ้ง', price: 60, category: ['อาหารจานเดียว / ผัด'], desc: 'คะน้ากรอบกับซีฟู้ด', img: new URL('./assets/kanatalay.jpg', import.meta.url).href, isSpicy: false, isSeafood: true, calories: 400, is_available: true },
-        { id: 10, name: 'ข้าวหมูกระเทียม', price: 40, category: ['อาหารจานเดียว / ผัด'], desc: 'หอมกระเทียมพริกไทย', img: new URL('./assets/mookratiem.jpg', import.meta.url).href, isSpicy: false, calories: 500, is_available: true },
-        { id: 11, name: 'ข้าวไข่เจียวหมูสับ', price: 40, category: ['อาหารจานเดียว / ผัด'], desc: 'ไข่เจียวฟูๆ หมูสับแน่นๆ', img: new URL('./assets/kaijeawmoosub.jpg', import.meta.url).href, isSpicy: false, calories: 600, is_available: true },
-        { id: 12, name: 'ข้าวไข่เจียวกุ้ง', price: 50, category: ['อาหารจานเดียว / ผัด'], desc: 'ไข่เจียวฟูกับกุ้ง', img: new URL('./assets/kaikung.jpg', import.meta.url).href, isSpicy: false, calories: 550, is_available: true },
-        { id: 13, name: 'ยำวุ้นเส้นทะเล', price: 70, category: ['ลาบ / ยำ', 'ขายดีที่สุด'], desc: 'เปรี้ยวเผ็ดแซ่บ กุ้ง หมึก หมูสับ', img: new URL('./assets/yumtalay.jpg', import.meta.url).href, isSpicy: true, isSeafood: true, calories: 250, is_available: true },
+        { id: 1, name: 'กระเพราหมู', price: 40, category: ['อาหารจานเดียว / ผัด', 'ขายดีที่สุด'], desc: 'หอมฟุ้ง อร่อยเด็ดสะใจ!', img: new URL('./assets/kapaomu.jpg', import.meta.url).href, isPopular: true, isSpicy: true, calories: 550, is_available: true, allergen_ids: [] },
+        { id: 2, name: 'กระเพราทะเล/หมึก/กุ้ง', price: 60, category: ['อาหารจานเดียว / ผัด'], desc: 'เผ็ดร้อน ถึงเครื่อง', img: new URL('./assets/kapaotaley.jpg', import.meta.url).href, isSpicy: true, isSeafood: true, calories: 450, is_available: true, allergen_ids: [1, 6] },
+        { id: 3, name: 'ข้าวผัดหมู', price: 40, category: ['อาหารจานเดียว / ผัด'], desc: 'ข้าวผัดหอมกรุ่น', img: new URL('./assets/khaopadmu.jpg', import.meta.url).href, isSpicy: false, calories: 550, is_available: true, allergen_ids: [5] },
+        { id: 4, name: 'ข้าวผัดกุ้ง', price: 50, category: ['อาหารจานเดียว / ผัด'], desc: 'ข้าวผัดกุ้งสดเด้ง รสชาติกลมกล่อม', img: new URL('./assets/khaopadkung.jpg', import.meta.url).href, isSpicy: false, calories: 510, is_available: true, allergen_ids: [1, 5] },
+        { id: 5, name: 'ข้าวผัดทะเล/หมึก/กุ้ง', price: 60, category: ['อาหารจานเดียว / ผัด'], desc: 'รวมมิตรทะเลผัด', img: new URL('./assets/khaopadtalay.jpg', import.meta.url).href, isSpicy: false, isSeafood: true, calories: 520, is_available: true, allergen_ids: [1, 5, 6] },
+        { id: 6, name: 'ผัดพริกแกงหมู', price: 40, category: ['อาหารจานเดียว / ผัด'], desc: 'พริกแกงเข้มข้น', img: new URL('./assets/pikkangmu.jpg', import.meta.url).href, isSpicy: true, calories: 550, is_available: true, allergen_ids: [] },
+        { id: 7, name: 'ผัดพริกแกงทะเล/หมึก/กุ้ง', price: 60, category: ['อาหารจานเดียว / ผัด'], desc: 'จัดจ้านถึงใจ', img: new URL('./assets/prikkangtalay.jpg', import.meta.url).href, isSpicy: true, isSeafood: true, calories: 480, is_available: true, allergen_ids: [1, 6] },
+        { id: 8, name: 'ผัดคะน้าหมูกรอบ', price: 40, category: ['อาหารจานเดียว / ผัด'], desc: 'ผักกรอบ หมูกรอบชิ้นโต', img: new URL('./assets/kanamokrop.jpg', import.meta.url).href, isSpicy: false, calories: 450, is_available: true, allergen_ids: [] },
+        { id: 9, name: 'ผัดคะน้าทะเล/หมึก/กุ้ง', price: 60, category: ['อาหารจานเดียว / ผัด'], desc: 'คะน้ากรอบกับซีฟู้ด', img: new URL('./assets/kanatalay.jpg', import.meta.url).href, isSpicy: false, isSeafood: true, calories: 400, is_available: true, allergen_ids: [1, 6] },
+        { id: 10, name: 'ข้าวหมูกระเทียม', price: 40, category: ['อาหารจานเดียว / ผัด'], desc: 'หอมกระเทียมพริกไทย', img: new URL('./assets/mookratiem.jpg', import.meta.url).href, isSpicy: false, calories: 500, is_available: true, allergen_ids: [] },
+        { id: 11, name: 'ข้าวไข่เจียวหมูสับ', price: 40, category: ['อาหารจานเดียว / ผัด'], desc: 'ไข่เจียวฟูๆ หมูสับแน่นๆ', img: new URL('./assets/kaijeawmoosub.jpg', import.meta.url).href, isSpicy: false, calories: 600, is_available: true, allergen_ids: [5] },
+        { id: 12, name: 'ข้าวไข่เจียวกุ้ง', price: 50, category: ['อาหารจานเดียว / ผัด'], desc: 'ไข่เจียวฟูกับกุ้ง', img: new URL('./assets/kaikung.jpg', import.meta.url).href, isSpicy: false, calories: 550, is_available: true, allergen_ids: [1, 5] },
+        { id: 13, name: 'ยำวุ้นเส้นทะเล', price: 70, category: ['ลาบ / ยำ', 'ขายดีที่สุด'], desc: 'เปรี้ยวเผ็ดแซ่บ กุ้ง หมึก หมูสับ', img: new URL('./assets/yumtalay.jpg', import.meta.url).href, isSpicy: true, isSeafood: true, calories: 250, is_available: true, allergen_ids: [1, 6] },
         
-        { id: 14, name: 'ส้มตำปูปลาร้า', price: 40, category: ['ส้มตำแซ่บซิ่ง', 'ขายดีที่สุด'], desc: 'เส้นมะละกอดิบ มะเขือเทศ และพริก', img: new URL('./assets/tumprara.jpg', import.meta.url).href, isPopular: true, isSpicy: true, calories: 120, is_available: true },
-        { id: 15, name: 'ส้มตำไทย', price: 40, category: ['ส้มตำแซ่บซิ่ง'], desc: 'เปรี้ยวหวาน สามรส', img: new URL('./assets/tumtai.jpg', import.meta.url).href, isSpicy: true, calories: 150, is_available: true },
-        { id: 16, name: 'ลาบหมู', price: 60, category: ['ลาบ / ยำ'], desc: 'หอมข้าวคั่ว แซ่บถึงใจ', img: new URL('./assets/larbmoo.jpg', import.meta.url).href, isSpicy: true, calories: 200, is_available: true },
-        { id: 17, name: 'ไก่ทอด (ปีก)', price: 20, category: ['ของทอด'], desc: 'กรอบนอกนุ่มใน', img: new URL('./assets/wingchick.jpg', import.meta.url).href, isSpicy: false, calories: 150, is_available: true },
-        { id: 18, name: 'ไก่ทอด (สะโพก)', price: 50, category: ['ของทอด', 'ขายดีที่สุด'], desc: 'เนื้อฉ่ำๆ ชิ้นใหญ่', img: new URL('./assets/chick.jpg', import.meta.url).href, isSpicy: false, calories: 250, is_available: true },
+        { id: 14, name: 'ส้มตำปูปลาร้า', price: 40, category: ['ส้มตำแซ่บซิ่ง', 'ขายดีที่สุด'], desc: 'เส้นมะละกอดิบ มะเขือเทศ และพริก', img: new URL('./assets/tumprara.jpg', import.meta.url).href, isPopular: true, isSpicy: true, calories: 120, is_available: true, allergen_ids: [7, 9] },
+        { id: 15, name: 'ส้มตำไทย', price: 40, category: ['ส้มตำแซ่บซิ่ง'], desc: 'เปรี้ยวหวาน สามรส', img: new URL('./assets/tumtai.jpg', import.meta.url).href, isSpicy: true, calories: 150, is_available: true, allergen_ids: [1, 2] },
+        { id: 16, name: 'ลาบหมู', price: 60, category: ['ลาบ / ยำ'], desc: 'หอมข้าวคั่ว แซ่บถึงใจ', img: new URL('./assets/larbmoo.jpg', import.meta.url).href, isSpicy: true, calories: 200, is_available: true, allergen_ids: [] },
+        { id: 17, name: 'ไก่ทอด (ปีก)', price: 20, category: ['ของทอด'], desc: 'กรอบนอกนุ่มใน', img: new URL('./assets/wingchick.jpg', import.meta.url).href, isSpicy: false, calories: 150, is_available: true, allergen_ids: [4] },
+        { id: 18, name: 'ไก่ทอด (สะโพก)', price: 50, category: ['ของทอด', 'ขายดีที่สุด'], desc: 'เนื้อฉ่ำๆ ชิ้นใหญ่', img: new URL('./assets/chick.jpg', import.meta.url).href, isSpicy: false, calories: 250, is_available: true, allergen_ids: [4] },
 
-        { id: 19, name: 'น้ำเก๊กฮวย', price: 20, category: ['เครื่องดื่ม', 'ขายดีที่สุด'], desc: 'หวานเย็น ชื่นใจ', img: new URL('./assets/gek.jpg', import.meta.url).href, calories: 120, is_available: true },
-        { id: 20, name: 'โค้ก (Coke)', price: 20, category: ['เครื่องดื่ม'], desc: 'น้ำอัดลมซ่าสดชื่น', img: new URL('./assets/coke.jpg', import.meta.url).href, calories: 140, is_available: true },
-        { id: 21, name: 'สไปรท์ (Sprite)', price: 20, category: ['เครื่องดื่ม'], desc: 'ซ่า สดชื่น กลิ่นเลมอน', img: new URL('./assets/sprite.jpg', import.meta.url).href, calories: 140, is_available: true },
-        { id: 22, name: 'น้ำเปล่า', price: 10, category: ['เครื่องดื่ม'], desc: 'น้ำดื่มบริสุทธิ์', img: new URL('./assets/water.jpg', import.meta.url).href, calories: 0, is_available: true },
-        { id: 23, name: 'ข้าวเปล่า', price: 10, category: ['อาหารจานเดียว / ผัด'], desc: 'ข้าวสวยหอมมะลิ ร้อนๆ นุ่มอร่อย', img: new URL('./assets/kao.jpg', import.meta.url).href, isSpicy: false, calories: 150, is_available: true },
-        { id: 24, name: 'ข้าวเหนียว', price: 10, category: ['ส้มตำแซ่บซิ่ง', 'อาหารจานเดียว / ผัด'], desc: 'ข้าวเหนียวนุ่ม ร้อนๆ หอมอร่อย', img: new URL('./assets/kaon.jpg', import.meta.url).href, isSpicy: false, calories: 150, is_available: true },
-        { id: 25, name: 'น้ำตกหมู', price: 70, category: ['ลาบ / ยำ'], desc: 'หมูนุ่ม หอมมะนาว ข้าวคั่ว รสจัดจ้าน', img: new URL('./assets/namtokmoo.jpg', import.meta.url).href, isSpicy: true, calories: 200, is_available: true }
+        { id: 19, name: 'น้ำเก๊กฮวย', price: 20, category: ['เครื่องดื่ม', 'ขายดีที่สุด'], desc: 'หวานเย็น ชื่นใจ', img: new URL('./assets/gek.jpg', import.meta.url).href, calories: 120, is_available: true, allergen_ids: [] },
+        { id: 20, name: 'โค้ก (Coke)', price: 20, category: ['เครื่องดื่ม'], desc: 'น้ำอัดลมซ่าสดชื่น', img: new URL('./assets/coke.jpg', import.meta.url).href, calories: 140, is_available: true, allergen_ids: [] },
+        { id: 21, name: 'สไปรท์ (Sprite)', price: 20, category: ['เครื่องดื่ม'], desc: 'ซ่า สดชื่น กลิ่นเลมอน', img: new URL('./assets/sprite.jpg', import.meta.url).href, calories: 140, is_available: true, allergen_ids: [] },
+        { id: 22, name: 'น้ำเปล่า', price: 10, category: ['เครื่องดื่ม'], desc: 'น้ำดื่มบริสุทธิ์', img: new URL('./assets/water.jpg', import.meta.url).href, calories: 0, is_available: true, allergen_ids: [] },
+        { id: 23, name: 'ข้าวเปล่า', price: 10, category: ['อาหารจานเดียว / ผัด'], desc: 'ข้าวสวยหอมมะลิ ร้อนๆ นุ่มอร่อย', img: new URL('./assets/kao.jpg', import.meta.url).href, isSpicy: false, calories: 150, is_available: true, allergen_ids: [] },
+        { id: 24, name: 'ข้าวเหนียว', price: 10, category: ['ส้มตำแซ่บซิ่ง', 'อาหารจานเดียว / ผัด'], desc: 'ข้าวเหนียวนุ่ม ร้อนๆ หอมอร่อย', img: new URL('./assets/kaon.jpg', import.meta.url).href, isSpicy: false, calories: 150, is_available: true, allergen_ids: [] },
+        { id: 25, name: 'น้ำตกหมู', price: 70, category: ['ลาบ / ยำ'], desc: 'หมูนุ่ม หอมมะนาว ข้าวคั่ว รสจัดจ้าน', img: new URL('./assets/namtokmoo.jpg', import.meta.url).href, isSpicy: true, calories: 200, is_available: true, allergen_ids: [] }
       ]
     }
   },
@@ -452,8 +489,70 @@ export default {
     // ซิงก์ราคาและข้อมูลสดจาก Database Backend
     await this.fetchMenus();
     await this.fetchStoreSettings();
+
+    // ⚡ ดักฟังสัญญาณอัปเดตเมนูและสารก่อภูมิแพ้แบบ Real-time (Socket.io + BroadcastChannel + Storage)
+    this.cleanupMenuSync = onMenuUpdated((updatedMenu) => {
+      if (!updatedMenu) return;
+      const targetId = updatedMenu.menu_id || updatedMenu.id;
+      const targetName = (updatedMenu.menu_name || updatedMenu.name || '').trim();
+
+      for (const item of this.menuItems) {
+        if ((targetId && item.id === targetId) || (targetName && item.name === targetName)) {
+          if (updatedMenu.allergen_ids !== undefined) {
+            item.allergen_ids = [...updatedMenu.allergen_ids];
+          }
+          if (updatedMenu.is_available !== undefined) {
+            item.is_available = updatedMenu.is_available;
+          }
+          if (updatedMenu.price !== undefined) {
+            item.price = Number(updatedMenu.price);
+          }
+        }
+      }
+
+      // ซิงค์ allergen_ids ในตะกร้าสินค้าแบบ Real-time
+      if (this.cartItems && this.cartItems.length > 0) {
+        for (const cartItem of this.cartItems) {
+          if ((targetId && cartItem.id === targetId) || (targetName && cartItem.name === targetName)) {
+            if (updatedMenu.allergen_ids !== undefined) {
+              cartItem.allergen_ids = [...updatedMenu.allergen_ids];
+            }
+          }
+        }
+        this.cartItems = [...this.cartItems];
+      }
+
+      // ถ้าเปิด Modal เมนูนี้อยู่ ให้อัปเดตข้อมูลสารก่อภูมิแพ้ทันทีแบบ Real-time
+      if (this.selectedItem && ((targetId && this.selectedItem.id === targetId) || (targetName && this.selectedItem.name === targetName))) {
+        if (updatedMenu.allergen_ids !== undefined) {
+          this.selectedItem.allergen_ids = [...updatedMenu.allergen_ids];
+        }
+        if (updatedMenu.price !== undefined) {
+          this.selectedItem.price = Number(updatedMenu.price);
+        }
+        this.selectedItem = { ...this.selectedItem };
+      }
+    });
+  },
+  beforeUnmount() {
+    if (this.cleanupMenuSync) {
+      this.cleanupMenuSync();
+    }
   },
   methods: {
+    getItemAllergens(item) {
+      if (!item) return [];
+      let ids = item.allergen_ids;
+      if (ids === undefined) {
+        const found = this.menuItems.find(m => m.name === item.name || (m.id && item.id && m.id === item.id));
+        if (found && Array.isArray(found.allergen_ids)) {
+          ids = found.allergen_ids;
+        } else if (item.allergens && Array.isArray(item.allergens)) {
+          ids = item.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean);
+        }
+      }
+      return resolveAllergenBadges(ids || [], DEFAULT_ALLERGENS);
+    },
     async fetchStoreSettings() {
       try {
         const res = await axios.get(`${API_BASE}/settings`);
@@ -536,6 +635,10 @@ export default {
 
             if (dbItem) {
               matchedIds.add(dbItem.menu_id || dbItem.id);
+              const dbAllergens = Array.isArray(dbItem.allergen_ids)
+                ? dbItem.allergen_ids
+                : (dbItem.allergens ? dbItem.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean) : []);
+
               return {
                 ...localItem,
                 id: dbItem.menu_id || dbItem.id || localItem.id,
@@ -543,7 +646,8 @@ export default {
                 // คงคำอธิบายของเมนูให้ตรงกับเมนูและการ์ดอาหารเสมอ ไม่นำคำอธิบายผิดเมนูมาทับ
                 desc: localItem.desc || dbItem.description,
                 // 🛑 บรรทัดนี้สำคัญมาก: ดึงสถานะเปิด-ปิดจริงจาก Backend มาทับ
-                is_available: dbItem.is_available !== undefined ? dbItem.is_available : true
+                is_available: dbItem.is_available !== undefined ? dbItem.is_available : true,
+                allergen_ids: dbAllergens
               };
             }
             return localItem;
@@ -568,6 +672,10 @@ export default {
               else if (catName.includes('ของทอด') || dbItem.category_id === 4) cats.push('ของทอด');
               else cats.push('อาหารจานเดียว / ผัด');
 
+              const newAllergenIds = Array.isArray(dbItem.allergen_ids)
+                ? dbItem.allergen_ids
+                : (dbItem.allergens ? dbItem.allergens.map(a => a.allergen_id || a.allergen?.allergen_id).filter(Boolean) : []);
+
               this.menuItems.push({
                 id: id,
                 name: canonical,
@@ -577,7 +685,8 @@ export default {
                 img: dbItem.image_url || '/images/kapaomu.jpg',
                 isSpicy: canonical.includes('ตำ') || canonical.includes('ลาบ') || canonical.includes('เพรา') || canonical.includes('ตก'),
                 calories: dbItem.calories || 200,
-                is_available: dbItem.is_available !== false
+                is_available: dbItem.is_available !== false,
+                allergen_ids: newAllergenIds
               });
               matchedIds.add(id);
             }
@@ -646,11 +755,23 @@ export default {
              name.includes('เก๊กฮวย');
     },
 
+    // เมนูที่ต้องกดปุ่ม + เท่านั้น จึงจะเพิ่มเข้าตะกร้า (คลิกการ์ดจะไม่เพิ่มเข้าตะกร้า)
+    isPlusOnly(item) {
+      if (!item) return false;
+      if (this.isDrink(item)) return true;
+      const name = (item.name || item.menu_name || '').toString().trim();
+      return name.includes('ไก่ทอด') ||
+             name.includes('ปีกไก่ทอด') ||
+             name.includes('ข้าวเปล่า') ||
+             name.includes('ข้าวสวย') ||
+             name.includes('ข้าวเหนียว');
+    },
+
     onCardClick(item) {
       if (!item || item.is_available === false) return;
-      // 🛑 เมนูน้ำจะไม่สามารถกดตรงรูปภาพหรือการ์ดเพื่อเพิ่มรายการเข้าตะกร้าได้
+      // 🛑 เมนูน้ำ, ไก่ทอด, ปีกไก่ทอด, ข้าวสวย, ข้าวเหนียว จะไม่สามารถกดตรงรูปภาพหรือการ์ดเพื่อเพิ่มรายการเข้าตะกร้าได้
       // จะต้องกดที่ + ตรงการ์ดเท่านั้นจึงจะเพิ่มเข้าตะกร้า
-      if (this.isDrink(item)) {
+      if (this.isPlusOnly(item)) {
         return;
       }
       this.openModalOrAdd(item);
@@ -668,8 +789,8 @@ export default {
         return;
       }
 
-      if (this.isDrink(item)) {
-        // กดปุ่ม + ตรงการ์ดเท่านั้น จึงจะเพิ่มเมนูน้ำเข้าตะกร้า
+      if (this.isPlusOnly(item)) {
+        // กดปุ่ม + ตรงการ์ดเท่านั้น จึงจะเพิ่มเมนูน้ำ, ไก่ทอด, ปีกไก่ทอด, ข้าวสวย, ข้าวเหนียว เข้าตะกร้า
         this.addDirectToCart(item);
       } else {
         this.openModalOrAdd(item);
@@ -687,25 +808,21 @@ export default {
         return; 
       }
       
-      // เมนูน้ำห้าม add จากการคลิกการ์ด
-      if (this.isDrink(item)) {
+      // เมนูที่ต้องกดปุ่ม + เท่านั้น ห้ามเพิ่มจากการคลิกการ์ด
+      if (this.isPlusOnly(item)) {
         return;
       }
 
-      if (item.name.includes('ไก่ทอด') || item.name === 'ข้าวเปล่า' || item.name === 'ข้าวเหนียว') {
-        this.addDirectToCart(item);
-      } else {
-        this.selectedItem = item;
-        this.modalOptions = { 
-          dishType: null,
-          spiceLevel: item.isSpicy ? 'เผ็ดกลาง' : null, 
-          seafoodChoice: item.isSeafood ? 'รวม (หมึก+กุ้ง)' : null, 
-          addons: [], 
-          note: '', 
-          qty: 1 
-        };
-        this.showItemModal = true;
-      }
+      this.selectedItem = item;
+      this.modalOptions = { 
+        dishType: null,
+        spiceLevel: item.isSpicy ? 'เผ็ดกลาง' : null, 
+        seafoodChoice: item.isSeafood ? 'รวม (หมึก+กุ้ง)' : null, 
+        addons: [], 
+        note: '', 
+        qty: 1 
+      };
+      this.showItemModal = true;
     },
     closeItemModal() { this.showItemModal = false; this.selectedItem = null; },
     confirmAddToCart() {
@@ -715,6 +832,7 @@ export default {
       }
 
       this.cartItems.push({
+        id: this.selectedItem.id,
         name: this.selectedItem.name, 
         price: this.unitModalPrice,
         qty: this.modalOptions.qty,
@@ -722,7 +840,8 @@ export default {
         spiceLevel: this.modalOptions.spiceLevel, 
         seafoodChoice: this.modalOptions.seafoodChoice, 
         addons: [...this.modalOptions.addons], 
-        note: this.modalOptions.note
+        note: this.modalOptions.note,
+        allergen_ids: Array.isArray(this.selectedItem.allergen_ids) ? [...this.selectedItem.allergen_ids] : []
       });
       this.closeItemModal();
     },
@@ -733,7 +852,21 @@ export default {
       }
       if (item.is_available === false) return;
       let found = this.cartItems.find(i => i.name === item.name && !i.dishType && !i.spiceLevel && !i.seafoodChoice && (!i.addons || i.addons.length === 0));
-      if (found) { found.qty++; } else { this.cartItems.push({ name: item.name, price: item.price, qty: 1, dishType: null, spiceLevel: null, seafoodChoice: null, addons: [] }); }
+      if (found) { 
+        found.qty++; 
+      } else { 
+        this.cartItems.push({ 
+          id: item.id,
+          name: item.name, 
+          price: item.price, 
+          qty: 1, 
+          dishType: null, 
+          spiceLevel: null, 
+          seafoodChoice: null, 
+          addons: [],
+          allergen_ids: Array.isArray(item.allergen_ids) ? [...item.allergen_ids] : []
+        }); 
+      }
     },
     updateQty(index, change) {
       if (change === -1 && this.cartItems[index].qty <= 1) return;
@@ -976,4 +1109,95 @@ export default {
   opacity: 0.85;
   box-shadow: none !important;
 }
+
+/* ===== สไตล์สารก่อภูมิแพ้ (Allergens Warning Styles) ===== */
+.modal-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.allergen-warning-inline {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #b91c1c;
+  background-color: #fee2e2;
+  border: 1px solid #fca5a5;
+  padding: 3px 8px;
+  border-radius: 6px;
+  vertical-align: middle;
+}
+
+.allergen-warning-banner {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-left: 4px solid #f59e0b;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.08);
+}
+
+.allergen-banner-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.allergen-alert-icon {
+  font-size: 15px;
+}
+
+.allergen-alert-title {
+  font-size: 12px;
+  color: #92400e;
+  font-weight: 700;
+}
+
+.allergen-badge-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.allergen-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: white;
+  border: 1px solid #fde68a;
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.card-allergen-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  color: #c2410c;
+  background: #ffedd5;
+  border: 1px solid #fed7aa;
+  padding: 1px 6px;
+  border-radius: 6px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.cart-allergen-pill {
+  display: block;
+  font-size: 10px;
+  color: #dc2626;
+  font-weight: 600;
+  margin-top: 3px;
+  line-height: 1.3;
+}
+
 </style>
