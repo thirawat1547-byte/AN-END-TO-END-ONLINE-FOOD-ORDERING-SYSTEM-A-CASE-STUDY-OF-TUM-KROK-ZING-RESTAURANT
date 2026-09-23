@@ -133,6 +133,30 @@ async function main() {
   }
   console.log(`✅ เตรียมหมวดหมู่อาหารเรียบร้อยแล้ว (${categories.length} หมวดหมู่)`);
 
+  // 3.1 Seed ข้อมูลสารก่อภูมิแพ้ (ALLERGENS)
+  const defaultAllergens = [
+    { allergen_id: 1, allergen_name: 'กุ้ง / อาหารทะเล', icon_url: '/icons/shrimp.png' },
+    { allergen_id: 2, allergen_name: 'ถั่วลิสง', icon_url: '/icons/peanut.png' },
+    { allergen_id: 3, allergen_name: 'นม / ผลิตภัณฑ์นม', icon_url: '/icons/milk.png' },
+    { allergen_id: 4, allergen_name: 'กลูเตน / แป้งสาลี', icon_url: '/icons/gluten.png' },
+    { allergen_id: 5, allergen_name: 'ไข่', icon_url: '/icons/egg.png' },
+  ];
+
+  for (const alg of defaultAllergens) {
+    const existingAlg = await prisma.allergen.findUnique({
+      where: { allergen_id: alg.allergen_id },
+    });
+    if (!existingAlg) {
+      await prisma.allergen.create({ data: alg });
+    } else {
+      await prisma.allergen.update({
+        where: { allergen_id: alg.allergen_id },
+        data: { allergen_name: alg.allergen_name, icon_url: alg.icon_url },
+      });
+    }
+  }
+  console.log(`✅ เตรียมสารก่อภูมิแพ้เรียบร้อยแล้ว (${defaultAllergens.length} รายการ)`);
+
   // 4. Seed รายการอาหาร (Menus)
   const menus = [
     // หมวดที่ 1: อาหารจานเดียว / ผัด

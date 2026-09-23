@@ -35,7 +35,7 @@ CREATE TABLE `ALLERGENS` (
   `allergen_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
   `icon_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`allergen_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -44,7 +44,7 @@ CREATE TABLE `ALLERGENS` (
 
 LOCK TABLES `ALLERGENS` WRITE;
 /*!40000 ALTER TABLE `ALLERGENS` DISABLE KEYS */;
-INSERT INTO `ALLERGENS` VALUES (1,'เธเธธเนเธ / เธญเธฒเธซเธฒเธฃเธ—เธฐเน€เธฅ','/icons/shrimp.png'),(2,'เธ–เธฑเนเธงเธฅเธดเธชเธ','/icons/peanut.png');
+INSERT INTO `ALLERGENS` VALUES (1,'เธเธธเนเธ / เธญเธฒเธซเธฒเธฃเธ—เธฐเน€เธฅ','/icons/shrimp.png'),(2,'เธ–เธฑเนเธงเธฅเธดเธชเธ','/icons/peanut.png'),(3,'เธเธก / เธเธฅเธดเธ•เธ เธฑเธ“เธ‘เนเธเธก','/icons/milk.png'),(4,'เธเธฅเธนเน€เธ•เธ / เนเธเนเธเธชเธฒเธฅเธต','/icons/gluten.png'),(5,'เนเธเน','/icons/egg.png');
 /*!40000 ALTER TABLE `ALLERGENS` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -189,7 +189,7 @@ CREATE TABLE `MENU_ALLERGENS` (
 
 LOCK TABLES `MENU_ALLERGENS` WRITE;
 /*!40000 ALTER TABLE `MENU_ALLERGENS` DISABLE KEYS */;
-INSERT INTO `MENU_ALLERGENS` VALUES (2,1),(14,1),(14,2);
+INSERT INTO `MENU_ALLERGENS` VALUES (2,1),(4,1),(5,1),(7,1),(9,1),(12,1),(13,1),(14,1),(15,1),(26,1),(13,2),(14,2),(15,2),(17,4),(18,4),(4,5),(5,5),(11,5),(12,5);
 /*!40000 ALTER TABLE `MENU_ALLERGENS` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -686,4 +686,4 @@ USE `tum_krok_zing`;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-23 10:01:11
+-- Dump completed on 2026-09-23 10:10:04
