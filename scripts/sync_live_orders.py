@@ -55,14 +55,32 @@ def sync():
             amount = tr.get('amount', price)
             pmethod = tr.get('payment_method', 'PROMPTPAY')
             pstatus = tr.get('payment_status', 'COMPLETED')
-            slip = tr.get('payment_slip_url')
-            slip_val = f"'{slip}'" if slip else 'NULL'
 
             sql_statements.append(
-                f"INSERT INTO tum_krok_zing.TRANSACTIONS (transaction_id, order_id, amount, payment_method, payment_status, payment_slip_url) "
-                f"VALUES ({tr_id}, {oid}, {amount}, '{pmethod}', '{pstatus}', {slip_val}) "
+                f"INSERT INTO tum_krok_zing.TRANSACTIONS (transaction_id, order_id, amount, payment_method, payment_status) "
+                f"VALUES ({tr_id}, {oid}, {amount}, '{pmethod}', '{pstatus}') "
                 f"ON DUPLICATE KEY UPDATE payment_status = '{pstatus}';"
             )
+
+    # Sync ingredients
+    try:
+        ing_url = 'http://161.33.43.187/api/v1/ingredients'
+        print(f'Fetching live ingredients from {ing_url}...')
+        req_ing = urllib.request.Request(ing_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req_ing) as res_ing:
+            ingredients = json.loads(res_ing.read().decode('utf-8'))
+        print(f'Retrieved {len(ingredients)} ingredients.')
+        for ing in ingredients:
+            name = ing['name'].replace("'", "''")
+            qty = ing['quantity']
+            min_qty = ing['min_quantity']
+            unit = ing['unit']
+            sql_statements.append(
+                f"UPDATE tum_krok_zing.INGREDIENTS SET quantity_in_stock = {qty}, reorder_level = {min_qty}, unit = '{unit}' "
+                f"WHERE ingredient_name = '{name}';"
+            )
+    except Exception as e:
+        print(f'Warning: ingredients sync: {e}')
 
     sql_statements.append('SET FOREIGN_KEY_CHECKS = 1;')
 
@@ -77,9 +95,9 @@ def sync():
         capture_output=True
     )
     if proc.returncode == 0:
-        print('✅ Sync completed successfully!')
+        print('SUCCESS: Sync completed successfully!')
     else:
-        print('❌ Error:', proc.stderr.decode('utf-8'))
+        print('ERROR:', proc.stderr.decode('utf-8'))
 
 if __name__ == '__main__':
     sync()

@@ -611,13 +611,20 @@ export default {
 }
 
 .logo-box { 
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center; 
   margin-bottom: 18px; 
 }
 
 .shop-logo { 
-  height: 50px; 
-  margin-bottom: 8px; 
+  display: block;
+  height: 60px; 
+  width: auto;
+  object-fit: contain;
+  margin: 0 auto 10px auto; 
 }
 
 .logo-box h2 { 

@@ -18,7 +18,7 @@ export class TransactionsService {
 
   // บันทึกการชำระเงินปกติ (เงินสด / สแกนโอน) และเปลี่ยนสถานะ Order เป็น COMPLETED
   async create(createTransactionDto: CreateTransactionDto) {
-    const { order_id, amount, payment_method, payment_slip_url } = createTransactionDto;
+    const { order_id, amount, payment_method } = createTransactionDto;
 
     const order = await this.prisma.order.findUnique({
       where: { order_id },
@@ -40,7 +40,6 @@ export class TransactionsService {
           amount,
           payment_method,
           payment_status: 'COMPLETED',
-          payment_slip_url: payment_slip_url || null,
         },
       });
 

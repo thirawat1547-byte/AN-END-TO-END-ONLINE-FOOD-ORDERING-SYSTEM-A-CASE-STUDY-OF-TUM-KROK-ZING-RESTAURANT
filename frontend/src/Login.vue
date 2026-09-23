@@ -133,8 +133,8 @@ export default {
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Prompt', sans-serif; }
 .auth-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; background-color: #f7f6f0; }
 .auth-card { background: white; padding: 40px; border-radius: 24px; width: 420px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
-.logo-box { text-align: center; margin-bottom: 25px; }
-.shop-logo { height: 50px; margin-bottom: 10px; }
+.logo-box { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; margin-bottom: 25px; }
+.shop-logo { display: block; height: 60px; width: auto; object-fit: contain; margin: 0 auto 12px auto; }
 .logo-box h2 { font-size: 22px; font-weight: 600; color: #333; margin-bottom: 5px; }
 .logo-box p { font-size: 13px; color: #777; }
 

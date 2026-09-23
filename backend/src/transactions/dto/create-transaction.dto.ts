@@ -17,9 +17,4 @@ export class CreateTransactionDto {
   @IsString()
   @IsNotEmpty()
   payment_method: string;
-
-  @ApiPropertyOptional({ example: 'https://example.com/slip.jpg', description: 'ลิงก์รูปสลิปโอนเงิน' })
-  @IsString()
-  @IsOptional()
-  payment_slip_url?: string;
 }

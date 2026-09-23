@@ -39,7 +39,25 @@ let MenusService = class MenusService {
             },
             orderBy: { menu_id: 'asc' },
         });
-        return menus.map((m) => ({
+        const seen = new Set();
+        const uniqueMenus = [];
+        for (const m of menus) {
+            let canonical = (m.menu_name || '').trim();
+            if (canonical === 'ไข่เจียวหมูสับ')
+                canonical = 'ข้าวไข่เจียวหมูสับ';
+            if (canonical === 'ไข่เจียวกุ้ง')
+                canonical = 'ข้าวไข่เจียวกุ้ง';
+            if (canonical === 'ปีกไก่ทอด')
+                canonical = 'ไก่ทอด (ปีก)';
+            if (!seen.has(canonical)) {
+                seen.add(canonical);
+                uniqueMenus.push({
+                    ...m,
+                    menu_name: canonical,
+                });
+            }
+        }
+        return uniqueMenus.map((m) => ({
             ...m,
             allergens: (m.allergens || []).filter((a) => a.allergen != null),
             ingredients: (m.ingredients || []).filter((i) => i.ingredient != null),
@@ -77,9 +95,23 @@ let MenusService = class MenusService {
     }
     async remove(id) {
         await this.findOne(id);
-        return this.prisma.menu.delete({
+        await this.prisma.menuIngredient.deleteMany({
             where: { menu_id: id },
         });
+        await this.prisma.menuAllergen.deleteMany({
+            where: { menu_id: id },
+        });
+        try {
+            return await this.prisma.menu.delete({
+                where: { menu_id: id },
+            });
+        }
+        catch (err) {
+            return await this.prisma.menu.update({
+                where: { menu_id: id },
+                data: { is_available: false },
+            });
+        }
     }
     async updateIngredients(menuId, ingredients) {
         await this.findOne(menuId);

@@ -275,6 +275,15 @@ async function main() {
             is_available: true,
         },
         {
+            category_id: 3,
+            menu_name: 'น้ำตกหมู',
+            description: 'หมูนุ่ม หอมมะนาว ข้าวคั่ว รสจัดจ้าน',
+            price: 70.00,
+            image_url: '/images/namtokmoo.jpg',
+            calories: 200,
+            is_available: true,
+        },
+        {
             category_id: 4,
             menu_name: 'ไก่ทอด (สะโพก)',
             description: 'เนื้อฉ่ำๆ ชิ้นใหญ่ กรอบนอกนุ่มใน ไม่อมน้ำมัน',
@@ -535,14 +544,16 @@ async function main() {
         { menuName: 'ไก่ทอด (สะโพก)', ingName: 'แป้งทอดกรอบ', qty: 0.03 },
         { menuName: 'ไก่ทอด (ปีก)', ingName: 'ปีกไก่สด', qty: 0.2 },
         { menuName: 'ไก่ทอด (ปีก)', ingName: 'แป้งทอดกรอบ', qty: 0.02 },
-        { menuName: 'ปีกไก่ทอด', ingName: 'ปีกไก่สด', qty: 0.2 },
-        { menuName: 'ปีกไก่ทอด', ingName: 'แป้งทอดกรอบ', qty: 0.02 },
         { menuName: 'น้ำเก๊กฮวย', ingName: 'ดอกเก๊กฮวยอบแห้ง', qty: 1.0 },
         { menuName: 'โค้ก (กระป๋อง)', ingName: 'โค้กกระป๋อง', qty: 1.0 },
         { menuName: 'สไปรท์ (Sprite)', ingName: 'สไปรท์กระป๋อง', qty: 1.0 },
         { menuName: 'น้ำดื่ม', ingName: 'น้ำดื่มขวด', qty: 1.0 },
         { menuName: 'ข้าวเปล่า', ingName: 'ข้าวสารหอมมะลิ', qty: 0.15 },
         { menuName: 'ข้าวเหนียว', ingName: 'ข้าวเหนียว', qty: 0.15 },
+        { menuName: 'น้ำตกหมู', ingName: 'หมูสด / หมูสับ', qty: 0.15 },
+        { menuName: 'น้ำตกหมู', ingName: 'ข้าวคั่ว', qty: 0.01 },
+        { menuName: 'น้ำตกหมู', ingName: 'พริกป่น', qty: 0.01 },
+        { menuName: 'น้ำตกหมู', ingName: 'มะนาวสด', qty: 1.0 },
     ];
     try {
         await prisma.menuIngredient.deleteMany({});

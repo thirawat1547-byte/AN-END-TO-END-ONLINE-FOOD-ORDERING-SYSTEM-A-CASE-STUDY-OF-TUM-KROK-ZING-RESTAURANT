@@ -138,12 +138,11 @@ model OrderItem {
 }
 
 model Transaction {
-  transaction_id   Int     @id @default(autoincrement())
-  order_id         Int
-  amount           Decimal @db.Decimal(10, 2)
-  payment_method   String  @db.VarChar(50)
-  payment_status   String  @db.VarChar(20)
-  payment_slip_url String? @db.VarChar(255)
+  transaction_id Int     @id @default(autoincrement())
+  order_id       Int
+  amount         Decimal @db.Decimal(10, 2)
+  payment_method String  @db.VarChar(50)
+  payment_status String  @db.VarChar(20)
 
   order Order @relation(fields: [order_id], references: [order_id])
 
