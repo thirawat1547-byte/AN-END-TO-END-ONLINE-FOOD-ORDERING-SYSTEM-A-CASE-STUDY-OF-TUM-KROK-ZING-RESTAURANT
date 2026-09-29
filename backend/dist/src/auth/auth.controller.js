@@ -20,6 +20,9 @@ const register_dto_1 = require("./dto/register.dto");
 const login_dto_1 = require("./dto/login.dto");
 const update_profile_dto_1 = require("./dto/update-profile.dto");
 const jwt_auth_guard_1 = require("./guards/jwt-auth.guard");
+const google_auth_guard_1 = require("./guards/google-auth.guard");
+const facebook_auth_guard_1 = require("./guards/facebook-auth.guard");
+const line_auth_guard_1 = require("./guards/line-auth.guard");
 const current_user_decorator_1 = require("./decorators/current-user.decorator");
 let AuthController = class AuthController {
     constructor(authService) {
@@ -38,6 +41,36 @@ let AuthController = class AuthController {
     updateProfile(user, updateDto) {
         const userId = user.userId || user.sub || user.user_id;
         return this.authService.updateProfile(Number(userId), updateDto);
+    }
+    googleAuth() {
+    }
+    async googleAuthCallback(req, res) {
+        return this.handleOAuthSuccess(req.user, res);
+    }
+    facebookAuth() {
+    }
+    async facebookAuthCallback(req, res) {
+        return this.handleOAuthSuccess(req.user, res);
+    }
+    lineAuth() {
+    }
+    async lineAuthCallback(req, res) {
+        return this.handleOAuthSuccess(req.user, res);
+    }
+    async handleOAuthSuccess(userProfile, res) {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        try {
+            if (!userProfile) {
+                return res.redirect(`${frontendUrl}/login?error=${encodeURIComponent('ไม่สามารถดึงข้อมูลผู้ใช้งานได้')}`);
+            }
+            const result = await this.authService.validateOAuthUser(userProfile);
+            return res.redirect(`${frontendUrl}/auth/callback?token=${result.access_token}`);
+        }
+        catch (err) {
+            console.error('OAuth Callback processing error:', err);
+            const msg = encodeURIComponent(err?.message || 'การเข้าสู่ระบบผ่าน Social Account ขัดข้อง');
+            return res.redirect(`${frontendUrl}/login?error=${msg}`);
+        }
     }
 };
 exports.AuthController = AuthController;
@@ -85,6 +118,60 @@ __decorate([
     __metadata("design:paramtypes", [Object, update_profile_dto_1.UpdateProfileDto]),
     __metadata("design:returntype", void 0)
 ], AuthController.prototype, "updateProfile", null);
+__decorate([
+    (0, common_1.Get)('google'),
+    (0, common_1.UseGuards)(google_auth_guard_1.GoogleAuthGuard),
+    (0, swagger_1.ApiOperation)({ summary: 'เข้าสู่ระบบด้วย Google' }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "googleAuth", null);
+__decorate([
+    (0, common_1.Get)('google/callback'),
+    (0, common_1.UseGuards)(google_auth_guard_1.GoogleAuthGuard),
+    (0, swagger_1.ApiOperation)({ summary: 'Callback URL สำหรับ Google OAuth' }),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Res)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "googleAuthCallback", null);
+__decorate([
+    (0, common_1.Get)('facebook'),
+    (0, common_1.UseGuards)(facebook_auth_guard_1.FacebookAuthGuard),
+    (0, swagger_1.ApiOperation)({ summary: 'เข้าสู่ระบบด้วย Facebook' }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "facebookAuth", null);
+__decorate([
+    (0, common_1.Get)('facebook/callback'),
+    (0, common_1.UseGuards)(facebook_auth_guard_1.FacebookAuthGuard),
+    (0, swagger_1.ApiOperation)({ summary: 'Callback URL สำหรับ Facebook OAuth' }),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Res)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "facebookAuthCallback", null);
+__decorate([
+    (0, common_1.Get)('line'),
+    (0, common_1.UseGuards)(line_auth_guard_1.LineAuthGuard),
+    (0, swagger_1.ApiOperation)({ summary: 'เข้าสู่ระบบด้วย LINE' }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "lineAuth", null);
+__decorate([
+    (0, common_1.Get)('line/callback'),
+    (0, common_1.UseGuards)(line_auth_guard_1.LineAuthGuard),
+    (0, swagger_1.ApiOperation)({ summary: 'Callback URL สำหรับ LINE OAuth' }),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Res)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "lineAuthCallback", null);
 exports.AuthController = AuthController = __decorate([
     (0, swagger_1.ApiTags)('Auth'),
     (0, common_1.Controller)('auth'),

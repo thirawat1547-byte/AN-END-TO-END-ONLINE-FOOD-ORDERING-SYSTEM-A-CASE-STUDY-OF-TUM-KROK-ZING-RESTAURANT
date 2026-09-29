@@ -3,21 +3,36 @@ import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import * as session from 'express-session';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const logger = new Logger('Bootstrap');
 
-  // 1. ตั้งค่า CORS เพื่อรองรับ Frontend (Vue.js)
+  // 1. ตั้งค่า Session สำหรับ OAuth State Verification (Google, Facebook, LINE)
+  app.use(
+    session({
+      secret: process.env.SESSION_SECRET || 'tumkrokzing_oauth_session_secret_2026',
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        secure: false, // ตั้งเป็น true เมื่อรันบน HTTPS ในโหมด Production
+        maxAge: 24 * 60 * 60 * 1000,
+      },
+    }),
+  );
+
+  // 2. ตั้งค่า CORS เพื่อรองรับ Frontend (Vue.js)
   app.enableCors({
     origin: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
 
-  // 2. Global Prefix (เรียก API ด้วย /api/v1/...)
+  // 3. Global Prefix (เรียก API ด้วย /api/v1/...)
   app.setGlobalPrefix('api/v1');
+
 
   // 3. Validation Pipe ตรวจสอบ Request Body อัตโนมัติ
   app.useGlobalPipes(

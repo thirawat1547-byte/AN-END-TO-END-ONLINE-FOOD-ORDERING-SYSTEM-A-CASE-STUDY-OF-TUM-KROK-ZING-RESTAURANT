@@ -13,6 +13,7 @@ exports.AuthService = void 0;
 const common_1 = require("@nestjs/common");
 const jwt_1 = require("@nestjs/jwt");
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 const prisma_service_1 = require("../prisma.service");
 let AuthService = class AuthService {
     constructor(prisma, jwtService) {
@@ -58,6 +59,49 @@ let AuthService = class AuthService {
         const isPasswordValid = await bcrypt.compare(dto.password, user.password);
         if (!isPasswordValid) {
             throw new common_1.UnauthorizedException('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+        }
+        const normalizedRole = (user.role || 'CUSTOMER').toUpperCase();
+        const payload = {
+            sub: user.user_id,
+            username: user.username,
+            role: normalizedRole,
+        };
+        return {
+            access_token: this.jwtService.sign(payload),
+            user: {
+                user_id: user.user_id,
+                username: user.username,
+                email: user.email,
+                phone_number: user.phone_number,
+                role: normalizedRole,
+            },
+        };
+    }
+    async validateOAuthUser(profile) {
+        const providerLower = (profile.provider || 'oauth').toLowerCase();
+        const socialUsername = `${providerLower}_${profile.providerId}`;
+        let user = null;
+        if (profile.email) {
+            user = await this.prisma.user.findFirst({
+                where: { email: profile.email },
+            });
+        }
+        if (!user) {
+            user = await this.prisma.user.findFirst({
+                where: { username: socialUsername },
+            });
+        }
+        if (!user) {
+            const randomPassword = `OAuth_${crypto.randomUUID()}_${Date.now()}`;
+            const hashedPassword = await bcrypt.hash(randomPassword, 10);
+            user = await this.prisma.user.create({
+                data: {
+                    username: socialUsername,
+                    password: hashedPassword,
+                    email: profile.email || null,
+                    role: 'CUSTOMER',
+                },
+            });
         }
         const normalizedRole = (user.role || 'CUSTOMER').toUpperCase();
         const payload = {

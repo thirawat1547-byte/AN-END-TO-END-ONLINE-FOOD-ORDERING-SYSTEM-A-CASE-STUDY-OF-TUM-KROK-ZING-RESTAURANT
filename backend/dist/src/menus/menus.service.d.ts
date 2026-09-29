@@ -6,14 +6,14 @@ export declare class MenusService {
     constructor(prisma: PrismaService);
     create(createMenuDto: CreateMenuDto): Promise<{
         category: {
-            category_name: string;
             category_id: number;
+            category_name: string;
         };
     } & {
+        description: string | null;
+        category_id: number;
         menu_id: number;
         menu_name: string;
-        category_id: number;
-        description: string | null;
         price: import("@prisma/client/runtime/library").Decimal;
         image_url: string | null;
         calories: number | null;
@@ -21,8 +21,8 @@ export declare class MenusService {
     }>;
     findAll(categoryId?: number, isAvailable?: boolean): Promise<({
         category: {
-            category_name: string;
             category_id: number;
+            category_name: string;
         };
         allergens: ({
             allergen: {
@@ -35,10 +35,10 @@ export declare class MenusService {
             allergen_id: number;
         })[];
     } & {
+        description: string | null;
+        category_id: number;
         menu_id: number;
         menu_name: string;
-        category_id: number;
-        description: string | null;
         price: import("@prisma/client/runtime/library").Decimal;
         image_url: string | null;
         calories: number | null;
@@ -46,8 +46,8 @@ export declare class MenusService {
     })[]>;
     findOne(id: number): Promise<{
         category: {
-            category_name: string;
             category_id: number;
+            category_name: string;
         };
         allergens: ({
             allergen: {
@@ -62,11 +62,11 @@ export declare class MenusService {
         ingredients: ({
             ingredient: {
                 name: string;
-                created_at: Date;
                 ingredient_id: number;
                 quantity: number;
                 unit: string;
                 min_quantity: number;
+                created_at: Date;
                 updated_at: Date;
             };
         } & {
@@ -75,10 +75,10 @@ export declare class MenusService {
             quantity_used: import("@prisma/client/runtime/library").Decimal;
         })[];
     } & {
+        description: string | null;
+        category_id: number;
         menu_id: number;
         menu_name: string;
-        category_id: number;
-        description: string | null;
         price: import("@prisma/client/runtime/library").Decimal;
         image_url: string | null;
         calories: number | null;
@@ -86,24 +86,24 @@ export declare class MenusService {
     }>;
     update(id: number, updateMenuDto: UpdateMenuDto): Promise<{
         category: {
-            category_name: string;
             category_id: number;
+            category_name: string;
         };
     } & {
+        description: string | null;
+        category_id: number;
         menu_id: number;
         menu_name: string;
-        category_id: number;
-        description: string | null;
         price: import("@prisma/client/runtime/library").Decimal;
         image_url: string | null;
         calories: number | null;
         is_available: boolean;
     }>;
     remove(id: number): Promise<{
+        description: string | null;
+        category_id: number;
         menu_id: number;
         menu_name: string;
-        category_id: number;
-        description: string | null;
         price: import("@prisma/client/runtime/library").Decimal;
         image_url: string | null;
         calories: number | null;
