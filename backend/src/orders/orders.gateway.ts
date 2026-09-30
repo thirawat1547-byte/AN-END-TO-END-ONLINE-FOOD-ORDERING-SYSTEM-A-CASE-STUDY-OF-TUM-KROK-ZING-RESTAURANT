@@ -44,6 +44,7 @@ export class OrdersGateway
    */
   sendNewOrder(order: any) {
     this.logger.log(`📢 กระจายสัญญาณ new_order: #${order?.order_id || order?.id}`);
+<<<<<<< HEAD
     try {
       this.server?.emit('new_order', order);
     } catch (e) {
@@ -53,15 +54,26 @@ export class OrdersGateway
 
   /**
    * ฟังก์ชันส่งสัญญาณเมื่อสถานะออเดอร์มีการเปลี่ยนแปลง (เช่น จาก PENDING -> COOKING -> READY -> COMPLETED)
+=======
+    this.server.emit('new_order', order);
+  }
+
+  /**
+   * ฟังก์ชันส่งสัญญาณเมื่อสถานะออเดอร์มีการเปลี่ยนแปลง (เช่น จาก PENDING -> COOKING -> SERVED)
+>>>>>>> origin/feature/social-login
    * @param order ข้อมูลออเดอร์หลังอัปเดตสถานะ
    */
   sendOrderStatusUpdated(order: any) {
     this.logger.log(`📢 กระจายสัญญาณ order_status_updated: #${order?.order_id || order?.id} -> ${order?.status}`);
+<<<<<<< HEAD
     try {
       this.server?.emit('order_status_updated', order);
     } catch (e) {
       this.logger.warn('ไม่สามารถกระจายสัญญาณ order_status_updated:', e.message);
     }
+=======
+    this.server.emit('order_status_updated', order);
+>>>>>>> origin/feature/social-login
   }
 
   /**
@@ -73,6 +85,7 @@ export class OrdersGateway
     @MessageBody() payload: any,
   ) {
     this.logger.log(`📥 ได้รับสัญญาณ place_order จาก Client: ${client.id}`);
+<<<<<<< HEAD
     if (payload) {
       try {
         this.server?.emit('new_order', payload);
@@ -105,7 +118,6 @@ export class OrdersGateway
     @MessageBody() payload: any,
   ) {
     this.logger.log(`📥 ได้รับสัญญาณ menu_updated จาก Client: ${client.id}`);
-    if (payload) {
       try {
         this.server?.emit('menu_updated', payload);
       } catch (e) {

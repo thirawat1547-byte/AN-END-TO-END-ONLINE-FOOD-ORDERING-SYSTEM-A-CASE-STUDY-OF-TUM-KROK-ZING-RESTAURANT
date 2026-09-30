@@ -27,7 +27,6 @@ const changeFilter = (filterType) => {
   selectedFilter.value = filterType
   fetchOrders()
 }
-
 // ฟังก์ชันจำลองเสียงกระดิ่งแจ้งเตือนออเดอร์ใหม่ (Web Audio API)
 const playChime = () => {
   try {
@@ -91,8 +90,6 @@ const onSocketConnect = () => {
 const onSocketDisconnect = () => {
   socketStore.isConnected = false
 }
-
-
 // ฟังก์ชันดึงรายละเอียด/หมายเหตุที่ลูกค้าเลือก (ความเผ็ด, ไม่ใส่ผัก, โน้ตเพิ่มเติม)
 const extractNote = (oi) => {
   if (oi.notes && typeof oi.notes === 'string' && oi.notes.trim()) {
@@ -254,6 +251,34 @@ const recallOrder = async (orderId) => {
   }
 }
 
+// จัดการ Event เมื่อมีออเดอร์ใหม่ส่งมาจาก Backend ผ่าน WebSocket
+const onNewOrderReceived = (order) => {
+  console.log('⚡ [KDS Real-time] มีออเดอร์ใหม่เข้ามา:', order)
+  playChime()
+  fetchOrders()
+
+  const orderNum = order?.order_id || order?.id || ''
+  const tableLabel = order?.table?.table_number ? ` (โต๊ะ ${order.table.table_number})` : ''
+  newOrderNotification.value = `🔔 มีคำสั่งซื้อใหม่ #${orderNum}${tableLabel} เข้ามาแล้ว!`
+  
+  setTimeout(() => {
+    newOrderNotification.value = null
+  }, 5000)
+}
+
+const onOrderStatusChanged = (order) => {
+  console.log('⚡ [KDS Real-time] สถานะออเดอร์เปลี่ยนแปลง:', order)
+  fetchOrders()
+}
+
+const onSocketConnect = () => {
+  isSocketConnected.value = true
+}
+
+const onSocketDisconnect = () => {
+  isSocketConnected.value = false
+}
+
 onMounted(() => {
   fetchOrders()
 
@@ -328,7 +353,7 @@ onBeforeUnmount(() => {
       v-if="newOrderNotification" 
       style="background: linear-gradient(90deg, #F59E0B, #EAB308); color: white; padding: 12px 24px; font-weight: 600; text-align: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px;"
     >
-      <span>🔔</span>
+      <span style="animation: bounce 1s infinite;">🔔</span>
       <span>{{ newOrderNotification }}</span>
     </div>
 

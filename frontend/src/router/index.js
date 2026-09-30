@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Home from '../Home.vue'
 import Login from '../Login.vue'
 import Register from '../Register.vue'
+import AuthCallback from '../AuthCallback.vue'
 import AdminLayout from '../admin/AdminLayout.vue'
 import KitchenLayout from '../Kitchen/KitchenLayout.vue'
 import Checkout from '../Checkout.vue'
@@ -21,6 +22,8 @@ const routes = [
   { path: '/', component: Home },
   { path: '/login', component: Login },
   { path: '/register', component: Register },
+  { path: '/auth/callback', component: AuthCallback },
+
   { path: '/checkout', component: Checkout },
   { path: '/tracking', component: Tracking },
   { path: '/promotions', component: Promotions },
