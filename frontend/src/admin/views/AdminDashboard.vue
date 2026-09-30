@@ -128,7 +128,6 @@ const hourlySales = computed(() => {
   }))
 })
 
-// สรุปการวิเคราะห์ช่วงเวลาที่มีคนใช้งานมากที่สุด (Peak Hours Analysis)
 const peakHoursAnalysis = computed(() => {
   const activeHours = [...hourlySales.value].filter(h => h.count > 0)
   activeHours.sort((a, b) => b.count - a.count || b.sales - a.sales)
@@ -175,6 +174,51 @@ const peakHoursAnalysis = computed(() => {
     }
   }
 })
+
+// คำนวณ % เปลี่ยนแปลงยอดขายวันนี้ เทียบกับเมื่อวาน จากออเดอร์จริง
+const salesGrowthPercent = computed(() => {
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterdayStart = new Date(todayStart.getTime() - 86400000)
+
+  const todaySales = adminStore.orders
+    .filter(o => o.created_at && new Date(o.created_at) >= todayStart)
+    .reduce((sum, o) => sum + Number(o.total_price || 0), 0)
+
+  const yesterdaySales = adminStore.orders
+    .filter(o => {
+      const d = o.created_at && new Date(o.created_at)
+      return d && d >= yesterdayStart && d < todayStart
+    })
+    .reduce((sum, o) => sum + Number(o.total_price || 0), 0)
+
+  if (yesterdaySales === 0) return null // ยังไม่มีข้อมูลเมื่อวาน
+  const pct = ((todaySales - yesterdaySales) / yesterdaySales) * 100
+  return Math.round(pct * 10) / 10 // ทศนิยม 1 ตำแหน่ง
+})
+
+// คำนวณเวลาเฉลี่ยในการปรุงอาหารจากออเดอร์จริงที่ Completed
+const avgPrepTimeMinutes = computed(() => {
+  const completed = adminStore.orders.filter(o => {
+    const s = (o.status || '').toLowerCase()
+    return (s === 'completed' || s === 'served' || s === 'done') &&
+           o.created_at && o.updated_at
+  })
+  if (completed.length === 0) return null
+
+  const totalMs = completed.reduce((sum, o) => {
+    const diff = new Date(o.updated_at) - new Date(o.created_at)
+    return diff > 0 ? sum + diff : sum
+  }, 0)
+
+  const validCount = completed.filter(o => {
+    const diff = new Date(o.updated_at) - new Date(o.created_at)
+    return diff > 0
+  }).length
+
+  if (validCount === 0) return null
+  return Math.round((totalMs / validCount / 60000) * 10) / 10 // นาที ทศนิยม 1 ตำแหน่ง
+})
 </script>
 
 <template>
@@ -217,9 +261,15 @@ const peakHoursAnalysis = computed(() => {
         </div>
         <div class="mt-3">
           <div class="text-2xl font-black text-slate-900">฿{{ totalGrossSales.toLocaleString() }}</div>
-          <div class="flex items-center gap-1.5 mt-1 text-xs text-emerald-600 font-medium">
-            <span>↑ 18.5%</span>
-            <span class="text-slate-400 font-normal">เทียบกับเมื่อวาน</span>
+          <div class="flex items-center gap-1.5 mt-1 text-xs font-medium"
+               :class="salesGrowthPercent === null ? 'text-slate-400' : salesGrowthPercent >= 0 ? 'text-emerald-600' : 'text-red-500'">
+            <template v-if="salesGrowthPercent !== null">
+              <span>{{ salesGrowthPercent >= 0 ? '↑' : '↓' }} {{ Math.abs(salesGrowthPercent) }}%</span>
+              <span class="text-slate-400 font-normal">เทียบกับเมื่อวาน</span>
+            </template>
+            <template v-else>
+              <span class="text-slate-400 font-normal">ไม่มีข้อมูลเมื่อวาน</span>
+            </template>
           </div>
         </div>
       </div>
@@ -298,10 +348,23 @@ const peakHoursAnalysis = computed(() => {
           </div>
         </div>
         <div class="mt-3">
-          <div class="text-2xl font-black text-slate-900">8.4 <span class="text-sm font-normal text-slate-500">นาที</span></div>
-          <div class="flex items-center gap-1.5 mt-1 text-xs text-emerald-600 font-medium">
-            <span>⚡ เร็วตามมาตรฐาน</span>
-            <span class="text-slate-400 font-normal">(&lt; 12 นาที)</span>
+          <div class="text-2xl font-black text-slate-900">
+            <template v-if="avgPrepTimeMinutes !== null">
+              {{ avgPrepTimeMinutes }} <span class="text-sm font-normal text-slate-500">นาที</span>
+            </template>
+            <template v-else>
+              <span class="text-lg text-slate-400">N/A</span>
+            </template>
+          </div>
+          <div class="flex items-center gap-1.5 mt-1 text-xs font-medium"
+               :class="avgPrepTimeMinutes === null ? 'text-slate-400' : avgPrepTimeMinutes <= 12 ? 'text-emerald-600' : 'text-amber-600'">
+            <template v-if="avgPrepTimeMinutes !== null">
+              <span>{{ avgPrepTimeMinutes <= 12 ? '⚡ เร็วตามมาตรฐาน' : '⏳ ช้ากว่าเกณฑ์' }}</span>
+              <span class="text-slate-400 font-normal">(&lt; 12 นาที)</span>
+            </template>
+            <template v-else>
+              <span>ยังไม่มีออเดอร์ที่เสร็จสิ้น</span>
+            </template>
           </div>
         </div>
       </div>
