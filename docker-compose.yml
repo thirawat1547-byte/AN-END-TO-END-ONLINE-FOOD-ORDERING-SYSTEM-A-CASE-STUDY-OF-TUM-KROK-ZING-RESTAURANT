@@ -52,12 +52,9 @@ services:
     container_name: tumkrokzing_frontend
     restart: always
     ports:
-      - "80:80"
-      - "443:443"
+      - "8080:80"
     depends_on:
       - backend
-    volumes:
-      - /etc/letsencrypt:/etc/letsencrypt:ro
 
 # ประกาศสร้าง Volume สำหรับเก็บข้อมูล MySQL และรูปภาพที่อัปโหลดแบบถาวร
 volumes:
