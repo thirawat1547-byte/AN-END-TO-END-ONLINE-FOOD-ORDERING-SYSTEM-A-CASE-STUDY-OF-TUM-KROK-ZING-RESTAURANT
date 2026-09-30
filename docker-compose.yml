@@ -26,6 +26,19 @@ services:
     environment:
       DATABASE_URL: "mysql://root:rootpassword@mysql-db:3306/tum_krok_zing"
       PORT: 5000
+      FRONTEND_URL: "https://tumkrokzing.duckdns.org"
+      # --- Google OAuth ---
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET}"
+      GOOGLE_CALLBACK_URL: "https://tumkrokzing.duckdns.org/api/v1/auth/google/callback"
+      # --- Facebook OAuth ---
+      FACEBOOK_APP_ID: "${FACEBOOK_APP_ID}"
+      FACEBOOK_APP_SECRET: "${FACEBOOK_APP_SECRET}"
+      FACEBOOK_CALLBACK_URL: "https://tumkrokzing.duckdns.org/api/v1/auth/facebook/callback"
+      # --- LINE OAuth ---
+      LINE_CHANNEL_ID: "${LINE_CHANNEL_ID}"
+      LINE_CHANNEL_SECRET: "${LINE_CHANNEL_SECRET}"
+      LINE_CALLBACK_URL: "https://tumkrokzing.duckdns.org/api/v1/auth/line/callback"
     depends_on:
       - mysql-db
     volumes:
