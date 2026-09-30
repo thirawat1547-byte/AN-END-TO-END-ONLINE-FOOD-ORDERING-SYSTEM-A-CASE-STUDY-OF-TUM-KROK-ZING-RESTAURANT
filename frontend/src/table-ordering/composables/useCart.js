@@ -77,7 +77,7 @@ export function useCart() {
     if (item && item.calories !== undefined && item.calories !== null && !isNaN(Number(item.calories))) {
       return Number(item.calories)
     }
-    return 350
+    return 0
   }
 
   const cartTotalCalories = computed(() => {

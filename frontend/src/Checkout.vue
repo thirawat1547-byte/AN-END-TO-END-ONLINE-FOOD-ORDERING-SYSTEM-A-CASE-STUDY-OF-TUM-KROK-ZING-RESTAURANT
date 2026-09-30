@@ -1053,21 +1053,24 @@ export default {
       let found = menuList.find(m => clean(m.menu_name || m.name) === itemName || m.menu_id === item.id || m.id === item.id);
       let baseCal = found && found.calories ? Number(found.calories) : 0;
 
-      // 3. Fallback อ้างอิงตามฐานข้อมูลเมนูจริงของร้าน
+      // 3. Fallback อ้างอิงตามเอกสารข้อมูลแคลอรี่จริงของร้าน (ข้อมูล-เเคล.docx)
       if (!baseCal) {
-        if (itemName.includes('เพรา')) baseCal = 320;
-        else if (itemName.includes('ส้มตำ')) baseCal = 150;
-        else if (itemName.includes('ลาบ') || itemName.includes('ยำ')) baseCal = 220;
-        else if (itemName.includes('ไก่ทอด')) baseCal = 250;
-        else if (itemName.includes('ข้าวผัด')) baseCal = 350;
-        else if (itemName.includes('ไข่เจียว')) baseCal = 390;
-        else if (itemName.includes('หมูกระเทียม')) baseCal = 360;
-        else if (itemName.includes('พริกแกง')) baseCal = 310;
-        else if (itemName.includes('คะน้า')) baseCal = 320;
-        else if (itemName.includes('น้ำตก')) baseCal = 200;
-        else if (itemName.includes('น้ำ') || itemName.includes('โค้ก') || itemName.includes('เก๊กฮวย')) baseCal = 120;
-        else if (itemName.includes('ข้าวเปล่า') || itemName.includes('ข้าวเหนียว')) baseCal = 150;
-        else baseCal = 250;
+        if (itemName.includes('เพรา')) baseCal = 880;
+        else if (itemName.includes('ส้มตำ')) baseCal = 240;
+        else if (itemName.includes('ลาบ') || itemName.includes('น้ำตก')) baseCal = 360;
+        else if (itemName.includes('ยำ')) baseCal = 410;
+        else if (itemName.includes('ไก่ทอด')) baseCal = 680;
+        else if (itemName.includes('ข้าวผัด')) baseCal = 950;
+        else if (itemName.includes('ไข่เจียว')) baseCal = 890;
+        else if (itemName.includes('หมูกระเทียม')) baseCal = 790;
+        else if (itemName.includes('พริกแกง')) baseCal = 810;
+        else if (itemName.includes('คะน้า')) baseCal = 920;
+        else if (itemName.includes('เก๊กฮวย')) baseCal = 110;
+        else if (itemName.includes('โค้ก') || itemName.includes('สไปรท์') || itemName.includes('coke') || itemName.includes('sprite')) baseCal = 140;
+        else if (itemName.includes('น้ำเปล่า') || itemName.includes('น้ำดื่ม')) baseCal = 0;
+        else if (itemName.includes('ข้าวเปล่า')) baseCal = 430;
+        else if (itemName.includes('ข้าวเหนียว')) baseCal = 340;
+        else baseCal = 500;
       }
 
       // บวกแคลอรี่ของส่วนเสริม (Addons)

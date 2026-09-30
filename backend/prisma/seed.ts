@@ -174,7 +174,7 @@ async function main() {
       description: 'กะเพราหมูสับผัดพริกแห้ง หอมฟุ้ง อร่อยเด็ดสะใจ',
       price: 40.00,
       image_url: '/images/kapaomu.jpg',
-      calories: 450,
+      calories: 880,
       is_available: true,
     },
     {
@@ -183,7 +183,7 @@ async function main() {
       description: 'กะเพราซีฟู้ดสดใหม่ กุ้งปลาหมึกเด้ง เผ็ดร้อน ถึงเครื่อง',
       price: 60.00,
       image_url: '/images/kapaotaley.jpg',
-      calories: 480,
+      calories: 695,
       is_available: true,
     },
     {
@@ -192,7 +192,7 @@ async function main() {
       description: 'ข้าวผัดหอมกรุ่นกระทะ เมล็ดข้าวร่วนสวย ใส่หมูนุ่ม',
       price: 40.00,
       image_url: '/images/khaopadmu.jpg',
-      calories: 520,
+      calories: 950,
       is_available: true,
     },
     {
@@ -201,7 +201,7 @@ async function main() {
       description: 'ข้าวผัดกุ้งสดเด้ง รสชาติกลมกล่อม หอมกลิ่นกระทะ',
       price: 50.00,
       image_url: '/images/khaopadtalay.jpg',
-      calories: 510,
+      calories: 840,
       is_available: true,
     },
     {
@@ -210,7 +210,7 @@ async function main() {
       description: 'รวมมิตรทะเลผัดข้าวหอมมะลิ รสชาติกลมกล่อม',
       price: 60.00,
       image_url: '/images/khaopadtalay.jpg',
-      calories: 550,
+      calories: 860,
       is_available: true,
     },
     {
@@ -219,7 +219,7 @@ async function main() {
       description: 'พริกแกงเข้มข้นถึงเครื่องแกงใต้ ผัดถั่วฝักยาวและหมูนุ่ม',
       price: 40.00,
       image_url: '/images/pikkangmu.jpg',
-      calories: 460,
+      calories: 810,
       is_available: true,
     },
     {
@@ -228,7 +228,7 @@ async function main() {
       description: 'ผัดพริกแกงรวมมิตรทะเล รสชาติจัดจ้านถึงใจ',
       price: 60.00,
       image_url: '/images/prikkangtalay.jpg',
-      calories: 480,
+      calories: 680,
       is_available: true,
     },
     {
@@ -237,7 +237,7 @@ async function main() {
       description: 'คะน้าสดกรอบผัดหมูกรอบชิ้นโต รสชาติกลมกล่อมหอมน้ำมันหอย',
       price: 40.00,
       image_url: '/images/kanamokrop.jpg',
-      calories: 490,
+      calories: 920,
       is_available: true,
     },
     {
@@ -246,7 +246,7 @@ async function main() {
       description: 'คะน้าสดกรอบผัดซีฟู้ดเนื้อแน่น ปรุงร้อนๆ จานต่อจาน',
       price: 60.00,
       image_url: '/images/kanatalay.jpg',
-      calories: 440,
+      calories: 650,
       is_available: true,
     },
     {
@@ -255,7 +255,7 @@ async function main() {
       description: 'หมูหมักนุ่มผัดกระเทียมพริกไทยดำหอมเตะจมูก',
       price: 40.00,
       image_url: '/images/mookratiem.jpg',
-      calories: 470,
+      calories: 790,
       is_available: true,
     },
     {
@@ -264,7 +264,7 @@ async function main() {
       description: 'ไข่เจียวฟูกรอบนอกนุ่มใน หมูสับแน่นๆ ทอดร้อนๆ',
       price: 40.00,
       image_url: '/images/kaijeawmoosub.jpg',
-      calories: 520,
+      calories: 890,
       is_available: true,
     },
     {
@@ -273,7 +273,7 @@ async function main() {
       description: 'ไข่เจียวฟูใส่กุ้งสดเด้ง ทานคู่น้ำปลาพริกมะนาว',
       price: 50.00,
       image_url: '/images/kaikung.jpg',
-      calories: 500,
+      calories: 810,
       is_available: true,
     },
     {
@@ -282,7 +282,7 @@ async function main() {
       description: 'ข้าวสวยหอมมะลิหุงสุก ร้อนๆ นุ่มอร่อย',
       price: 10.00,
       image_url: '/images/kao.jpg',
-      calories: 150,
+      calories: 430,
       is_available: true,
     },
 
@@ -302,7 +302,7 @@ async function main() {
       description: 'รสเปรี้ยวหวาน ถั่วลิสงคั่วเอง กุ้งแห้งตัวโต มะนาวสดแท้',
       price: 40.00,
       image_url: '/images/tumtai.jpg',
-      calories: 150,
+      calories: 240,
       is_available: true,
     },
     {
@@ -311,7 +311,7 @@ async function main() {
       description: 'ข้าวเหนียวนุ่ม ร้อนๆ หอมอร่อย ทานคู่กับส้มตำ ลาบ ไก่ทอด',
       price: 10.00,
       image_url: '/images/kaon.jpg',
-      calories: 160,
+      calories: 340,
       is_available: true,
     },
 
@@ -322,7 +322,7 @@ async function main() {
       description: 'หมูสับนุ่ม ข้าวคั่วหอมกรุ่น พริกป่นคั่วเอง มะนาวแท้',
       price: 50.00,
       image_url: '/images/larbmoo.jpg',
-      calories: 250,
+      calories: 360,
       is_available: true,
     },
     {
@@ -331,7 +331,7 @@ async function main() {
       description: 'เปรี้ยวเผ็ดแซ่บ กุ้ง หมึก หมูสับ วุ้นเส้นเหนียวนุ่ม',
       price: 70.00,
       image_url: '/images/yumtalay.jpg',
-      calories: 320,
+      calories: 410,
       is_available: true,
     },
     {
@@ -340,7 +340,7 @@ async function main() {
       description: 'หมูนุ่ม หอมมะนาว ข้าวคั่ว รสจัดจ้าน',
       price: 70.00,
       image_url: '/images/namtokmoo.jpg',
-      calories: 200,
+      calories: 360,
       is_available: true,
     },
 
@@ -351,7 +351,7 @@ async function main() {
       description: 'เนื้อฉ่ำๆ ชิ้นใหญ่ กรอบนอกนุ่มใน ไม่อมน้ำมัน',
       price: 50.00,
       image_url: '/images/chick.jpg',
-      calories: 380,
+      calories: 680,
       is_available: true,
     },
     {
@@ -360,7 +360,7 @@ async function main() {
       description: 'ปีกไก่หมักซอสทอดกรอบ ร้อนๆ เสิร์ฟพร้อมน้ำจิ้มแจ่ว',
       price: 50.00,
       image_url: '/images/wingchick.jpg',
-      calories: 350,
+      calories: 540,
       is_available: true,
     },
 
@@ -371,7 +371,7 @@ async function main() {
       description: 'น้ำเก๊กฮวยต้มสมุนไพรแท้ หวานน้อย หอมเย็นชื่นใจ',
       price: 20.00,
       image_url: '/images/gek.jpg',
-      calories: 90,
+      calories: 110,
       is_available: true,
     },
     {
@@ -420,6 +420,18 @@ async function main() {
     if (!existingMenu) {
       await prisma.menu.create({
         data: m,
+      });
+    } else {
+      // อัปเดตค่าแคลและข้อมูลอื่นๆ ให้ตรงตามเอกสารอ้างอิง
+      await prisma.menu.update({
+        where: { menu_id: existingMenu.menu_id },
+        data: {
+          calories: m.calories,
+          description: m.description,
+          price: m.price,
+          image_url: m.image_url,
+          is_available: m.is_available,
+        },
       });
     }
   }
@@ -581,10 +593,10 @@ async function main() {
     { menuName: 'ข้าวผัดทะเล/หมึก/กุ้ง', ingName: 'ผักคะน้าสด', qty: 0.02 },
 
     // 6. ผัดพริกแกงหมู
-    { menuName: 'ผัดพริกแกงหมู', ingName: 'หมูสด / หมูสับ', qty: 0.12 },
+    { menuName: 'ผัดพริกแกงหมู', ingName: 'หมูสด / หมูสับ', qty: 0.12 }, // หมูสด 120g
     { menuName: 'ผัดพริกแกงหมู', ingName: 'พริกแกงเผ็ด', qty: 0.03 },
-    { menuName: 'ผัดพริกแกงหมู', ingName: 'ถั่วฝักยาว', qty: 0.03 },
-    { menuName: 'ผัดพริกแกงหมู', ingName: 'ข้าวสารหอมมะลิ', qty: 0.15 },
+    { menuName: 'ผัดพริกแกงหมู', ingName: 'ถั่วฝักยาว', qty: 0.03 }, // ถั่วฝักยาว 30g
+    { menuName: 'ผัดพริกแกงหมู', ingName: 'ข้าวสารหอมมะลิ', qty: 0.15 }, // ข้าวสาร 150g
 
     // 7. ผัดพริกแกงทะเล / หมึก / กุ้ง
     { menuName: 'ผัดพริกแกงทะเล/หมึก/กุ้ง', ingName: 'กุ้งสด', qty: 0.07 },
@@ -594,18 +606,18 @@ async function main() {
     { menuName: 'ผัดพริกแกงทะเล/หมึก/กุ้ง', ingName: 'ข้าวสารหอมมะลิ', qty: 0.15 },
 
     // 8. ผัดคะน้าหมูกรอบ
-    { menuName: 'ผัดคะน้าหมูกรอบ', ingName: 'หมูกรอบ', qty: 0.10 },
-    { menuName: 'ผัดคะน้าหมูกรอบ', ingName: 'ผักคะน้าสด', qty: 0.10 },
+    { menuName: 'ผัดคะน้าหมูกรอบ', ingName: 'หมูกรอบ', qty: 0.10 }, // หมูกรอบ 100g
+    { menuName: 'ผัดคะน้าหมูกรอบ', ingName: 'ผักคะน้าสด', qty: 0.10 }, // คะน้า 100g
     { menuName: 'ผัดคะน้าหมูกรอบ', ingName: 'พริกสดจินดาแดง', qty: 0.01 },
     { menuName: 'ผัดคะน้าหมูกรอบ', ingName: 'กระเทียมสด', qty: 0.01 },
-    { menuName: 'ผัดคะน้าหมูกรอบ', ingName: 'ข้าวสารหอมมะลิ', qty: 0.15 },
+    { menuName: 'ผัดคะน้าหมูกรอบ', ingName: 'ข้าวสารหอมมะลิ', qty: 0.15 }, // ข้าวสาร 150g
 
     // 9. ผัดคะน้าทะเล / หมึก / กุ้ง
-    { menuName: 'ผัดคะน้าทะเล/หมึก/กุ้ง', ingName: 'กุ้งสด', qty: 0.07 },
-    { menuName: 'ผัดคะน้าทะเล/หมึก/กุ้ง', ingName: 'หมึกสด', qty: 0.07 },
-    { menuName: 'ผัดคะน้าทะเล/หมึก/กุ้ง', ingName: 'ผักคะน้าสด', qty: 0.10 },
+    { menuName: 'ผัดคะน้าทะเล/หมึก/กุ้ง', ingName: 'กุ้งสด', qty: 0.07 }, // กุ้ง 70g
+    { menuName: 'ผัดคะน้าทะเล/หมึก/กุ้ง', ingName: 'หมึกสด', qty: 0.07 }, // หมึก 70g
+    { menuName: 'ผัดคะน้าทะเล/หมึก/กุ้ง', ingName: 'ผักคะน้าสด', qty: 0.10 }, // คะน้า 100g
     { menuName: 'ผัดคะน้าทะเล/หมึก/กุ้ง', ingName: 'กระเทียมสด', qty: 0.01 },
-    { menuName: 'ผัดคะน้าทะเล/หมึก/กุ้ง', ingName: 'ข้าวสารหอมมะลิ', qty: 0.15 },
+    { menuName: 'ผัดคะน้าทะเล/หมึก/กุ้ง', ingName: 'ข้าวสารหอมมะลิ', qty: 0.15 }, // ข้าวสาร 150g
 
     // 10. ข้าวหมูกระเทียม
     { menuName: 'ข้าวหมูกระเทียม', ingName: 'หมูสด / หมูสับ', qty: 0.14 },
@@ -640,27 +652,27 @@ async function main() {
     { menuName: 'ส้มตำไทย', ingName: 'มะเขือเทศสีดา', qty: 0.03 },
 
     // 15. ลาบหมู
-    { menuName: 'ลาบหมู', ingName: 'หมูสด / หมูสับ', qty: 0.15 },
-    { menuName: 'ลาบหมู', ingName: 'ข้าวคั่ว', qty: 0.01 },
-    { menuName: 'ลาบหมู', ingName: 'พริกป่น', qty: 0.01 },
+    { menuName: 'ลาบหมู', ingName: 'หมูสด / หมูสับ', qty: 0.15 }, // หมูสับ 150g
+    { menuName: 'ลาบหมู', ingName: 'ข้าวคั่ว', qty: 0.01 }, // ข้าวคั่ว 10g
+    { menuName: 'ลาบหมู', ingName: 'พริกป่น', qty: 0.01 }, // พริกป่น
     { menuName: 'ลาบหมู', ingName: 'มะนาวสด', qty: 1.0 },
 
     // 16. ยำวุ้นเส้นทะเล
-    { menuName: 'ยำวุ้นเส้นทะเล', ingName: 'วุ้นเส้น', qty: 1.0 },
-    { menuName: 'ยำวุ้นเส้นทะเล', ingName: 'กุ้งสด', qty: 0.06 },
-    { menuName: 'ยำวุ้นเส้นทะเล', ingName: 'หมึกสด', qty: 0.06 },
-    { menuName: 'ยำวุ้นเส้นทะเล', ingName: 'หมูสด / หมูสับ', qty: 0.04 },
+    { menuName: 'ยำวุ้นเส้นทะเล', ingName: 'วุ้นเส้น', qty: 1.0 }, // วุ้นเส้นห่อ 40g (1 ห่อ)
+    { menuName: 'ยำวุ้นเส้นทะเล', ingName: 'หมูสด / หมูสับ', qty: 0.04 }, // หมูสับ 40g
+    { menuName: 'ยำวุ้นเส้นทะเล', ingName: 'กุ้งสด', qty: 0.06 }, // กุ้ง 60g
+    { menuName: 'ยำวุ้นเส้นทะเล', ingName: 'หมึกสด', qty: 0.06 }, // หมึก 60g
     { menuName: 'ยำวุ้นเส้นทะเล', ingName: 'มะนาวสด', qty: 1.0 },
     { menuName: 'ยำวุ้นเส้นทะเล', ingName: 'มะเขือเทศสีดา', qty: 0.03 },
     { menuName: 'ยำวุ้นเส้นทะเล', ingName: 'ถั่วลิสงคั่วบด', qty: 0.02 },
 
     // 17. ไก่ทอด (สะโพก)
-    { menuName: 'ไก่ทอด (สะโพก)', ingName: 'เนื้อสะโพกไก่', qty: 0.25 },
-    { menuName: 'ไก่ทอด (สะโพก)', ingName: 'แป้งทอดกรอบ', qty: 0.03 },
+    { menuName: 'ไก่ทอด (สะโพก)', ingName: 'เนื้อสะโพกไก่', qty: 0.25 }, // สะโพกไก่ติดหนัง 250g
+    { menuName: 'ไก่ทอด (สะโพก)', ingName: 'แป้งทอดกรอบ', qty: 0.03 }, // แป้งทอด 30g
 
     // 18. ไก่ทอด (ปีก)
-    { menuName: 'ไก่ทอด (ปีก)', ingName: 'ปีกไก่สด', qty: 0.2 },
-    { menuName: 'ไก่ทอด (ปีก)', ingName: 'แป้งทอดกรอบ', qty: 0.02 },
+    { menuName: 'ไก่ทอด (ปีก)', ingName: 'ปีกไก่สด', qty: 0.20 }, // ปีกไก่สด 200g
+    { menuName: 'ไก่ทอด (ปีก)', ingName: 'แป้งทอดกรอบ', qty: 0.02 }, // แป้งทอด 20g
 
     // 19. น้ำเก๊กฮวย
     { menuName: 'น้ำเก๊กฮวย', ingName: 'ดอกเก๊กฮวยอบแห้ง', qty: 1.0 },
@@ -681,9 +693,9 @@ async function main() {
     { menuName: 'ข้าวเหนียว', ingName: 'ข้าวเหนียว', qty: 0.15 },
 
     // 25. น้ำตกหมู
-    { menuName: 'น้ำตกหมู', ingName: 'หมูสด / หมูสับ', qty: 0.15 },
-    { menuName: 'น้ำตกหมู', ingName: 'ข้าวคั่ว', qty: 0.01 },
-    { menuName: 'น้ำตกหมู', ingName: 'พริกป่น', qty: 0.01 },
+    { menuName: 'น้ำตกหมู', ingName: 'หมูสด / หมูสับ', qty: 0.15 }, // หมูสด 150g
+    { menuName: 'น้ำตกหมู', ingName: 'ข้าวคั่ว', qty: 0.01 }, // ข้าวคั่ว 10g
+    { menuName: 'น้ำตกหมู', ingName: 'พริกป่น', qty: 0.01 }, // พริกป่น
     { menuName: 'น้ำตกหมู', ingName: 'มะนาวสด', qty: 1.0 },
   ];
 

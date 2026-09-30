@@ -206,7 +206,7 @@ const fetchMenus = async () => {
           category: cats,
           desc: m.description || '',
           image_url: m.image_url || imageMap[m.menu_name] || '/images/kapaomu.jpg',
-          calories: m.calories || 350,
+          calories: m.calories || 0,
           isPopular: cats.includes('ขายดีที่สุด'),
           isSpicy,
           is_available: m.is_available !== false,
