@@ -7,9 +7,50 @@ onMounted(async () => {
   await adminStore.fetchAdminDashboardData()
 })
 
-// Metrics calculations (ใช้ข้อมูลจริงจาก adminStore ที่อัปเดตจาก API แล้ว)
+// ฟังก์ชันช่วยตรวจสอบวันที่ของออเดอร์
+function getOrderDate(dateVal) {
+  if (!dateVal) return null
+  const d = new Date(dateVal)
+  if (!isNaN(d.getTime())) return d
+  if (typeof dateVal === 'string') {
+    const isoLike = dateVal.replace(' ', 'T')
+    const d2 = new Date(isoLike)
+    if (!isNaN(d2.getTime())) return d2
+  }
+  return null
+}
+
+function isSameDay(d1, d2) {
+  if (!d1 || !d2) return false
+  return (
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate()
+  )
+}
+
+function isOrderToday(o) {
+  const orderDate = getOrderDate(o?.created_at)
+  if (!orderDate) return false
+  return isSameDay(orderDate, new Date())
+}
+
+function isOrderYesterday(o) {
+  const orderDate = getOrderDate(o?.created_at)
+  if (!orderDate) return false
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate() - 1)
+  return isSameDay(orderDate, yesterday)
+}
+
+// ออเดอร์เฉพาะวันนี้จริง ๆ
+const todayOrders = computed(() => {
+  return adminStore.orders.filter(isOrderToday)
+})
+
+// ยอดขายรวมวันนี้ (Gross Sales Today) - กรองเฉพาะออเดอร์ที่สร้างในวันปัจจุบัน
 const totalGrossSales = computed(() => {
-  return adminStore.orders.reduce((sum, o) => sum + Number(o.total_price || 0), 0)
+  return todayOrders.value.reduce((sum, o) => sum + Number(o.total_price || 0), 0)
 })
 
 const totalOrdersCount = computed(() => adminStore.orders.length)
@@ -177,19 +218,9 @@ const peakHoursAnalysis = computed(() => {
 
 // คำนวณ % เปลี่ยนแปลงยอดขายวันนี้ เทียบกับเมื่อวาน จากออเดอร์จริง
 const salesGrowthPercent = computed(() => {
-  const now = new Date()
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const yesterdayStart = new Date(todayStart.getTime() - 86400000)
-
-  const todaySales = adminStore.orders
-    .filter(o => o.created_at && new Date(o.created_at) >= todayStart)
-    .reduce((sum, o) => sum + Number(o.total_price || 0), 0)
-
+  const todaySales = totalGrossSales.value
   const yesterdaySales = adminStore.orders
-    .filter(o => {
-      const d = o.created_at && new Date(o.created_at)
-      return d && d >= yesterdayStart && d < todayStart
-    })
+    .filter(isOrderYesterday)
     .reduce((sum, o) => sum + Number(o.total_price || 0), 0)
 
   if (yesterdaySales === 0) return null // ยังไม่มีข้อมูลเมื่อวาน

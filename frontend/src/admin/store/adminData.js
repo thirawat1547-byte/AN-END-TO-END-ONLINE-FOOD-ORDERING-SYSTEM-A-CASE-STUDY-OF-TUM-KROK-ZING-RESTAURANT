@@ -647,9 +647,18 @@ export const adminStore = reactive({
   },
 
   recomputeDashboardStats() {
-    // 1. Gross Sales and Order Counts
+    // 1. Gross Sales (Today) and Order Counts
+    const now = new Date()
+    const todayOrders = this.orders.filter(o => {
+      if (!o || !o.created_at) return false
+      const d = new Date(o.created_at)
+      return !isNaN(d.getTime()) &&
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate()
+    })
     this.dashboardStats.totalOrders = this.orders.length
-    this.dashboardStats.grossSales = this.orders.reduce((sum, o) => sum + Number(o.total_price || 0), 0)
+    this.dashboardStats.grossSales = todayOrders.reduce((sum, o) => sum + Number(o.total_price || 0), 0)
 
     // 2. Table occupancy
     this.dashboardStats.totalTablesCount = this.tables.length
