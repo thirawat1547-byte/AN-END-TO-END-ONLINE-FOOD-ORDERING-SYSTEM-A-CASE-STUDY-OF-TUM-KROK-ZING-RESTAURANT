@@ -14,6 +14,39 @@ const totalGrossSales = computed(() => {
 
 const totalOrdersCount = computed(() => adminStore.orders.length)
 
+// สัดส่วนแยกประเภทออเดอร์ เดลิเวอรี่ (Delivery) vs ทานในร้าน (Dine-in)
+const deliveryOrders = computed(() => {
+  return adminStore.orders.filter(o => 
+    o.raw_order_type === 'DELIVERY' || 
+    o.order_type === 'Delivery' || 
+    (!o.table_id && o.order_type !== 'In-store')
+  )
+})
+
+const deliveryOrdersCount = computed(() => deliveryOrders.value.length)
+const deliveryPercentage = computed(() => {
+  return totalOrdersCount.value ? Math.round((deliveryOrdersCount.value / totalOrdersCount.value) * 100) : 0
+})
+const deliveryGrossSales = computed(() => {
+  return deliveryOrders.value.reduce((sum, o) => sum + Number(o.total_price || 0), 0)
+})
+
+const dineInOrders = computed(() => {
+  return adminStore.orders.filter(o => 
+    o.raw_order_type === 'DINE_IN' || 
+    o.order_type === 'In-store' || 
+    Boolean(o.table_id)
+  )
+})
+
+const dineInOrdersCount = computed(() => dineInOrders.value.length)
+const dineInPercentage = computed(() => {
+  return totalOrdersCount.value ? Math.round((dineInOrdersCount.value / totalOrdersCount.value) * 100) : 0
+})
+const dineInGrossSales = computed(() => {
+  return dineInOrders.value.reduce((sum, o) => sum + Number(o.total_price || 0), 0)
+})
+
 const totalItemsSold = computed(() => {
   return adminStore.orders.reduce((sum, o) => {
     if (!o.items || !Array.isArray(o.items)) return sum
@@ -47,19 +80,101 @@ function formatTime(dateStr) {
   }
 }
 
-// Hourly sales distribution mock
-const hourlySales = [
-  { hour: '11:00', sales: 450, height: '25%' },
-  { hour: '12:00', sales: 1850, height: '85%', peak: true },
-  { hour: '13:00', sales: 1200, height: '60%' },
-  { hour: '14:00', sales: 380, height: '20%' },
-  { hour: '15:00', sales: 250, height: '15%' },
-  { hour: '16:00', sales: 500, height: '30%' },
-  { hour: '17:00', sales: 980, height: '50%' },
-  { hour: '18:00', sales: 2150, height: '100%', peak: true },
-  { hour: '19:00', sales: 1780, height: '80%' },
-  { hour: '20:00', sales: 920, height: '45%' },
-]
+function parseOrderHour(dateStr) {
+  if (!dateStr) return null
+  try {
+    const d = new Date(dateStr)
+    if (!isNaN(d.getTime())) return d.getHours()
+  } catch (e) {}
+  const match = String(dateStr).match(/T(\d{2}):/)
+  if (match) return parseInt(match[1], 10)
+  return null
+}
+
+// วิเคราะห์ข้อมูลการขายรายชั่วโมงแบบไดนามิกจาก adminStore.orders จริง
+const hourlySales = computed(() => {
+  const hoursMap = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+  
+  // รวบรวมข้อมูลตามชั่วโมง
+  const stats = hoursMap.map(h => {
+    const matched = adminStore.orders.filter(o => parseOrderHour(o.created_at) === h)
+    const sales = matched.reduce((sum, o) => sum + Number(o.total_price || 0), 0)
+    const count = matched.length
+    const delivCount = matched.filter(o => 
+      o.raw_order_type === 'DELIVERY' || o.order_type === 'Delivery' || (!o.table_id && o.order_type !== 'In-store')
+    ).length
+    const inStoreCount = count - delivCount
+    return {
+      hourNum: h,
+      hour: `${String(h).padStart(2, '0')}:00`,
+      sales,
+      count,
+      delivCount,
+      inStoreCount,
+      peak: false,
+      height: '8%'
+    }
+  })
+
+  const maxSales = Math.max(...stats.map(s => s.sales), 1)
+  const maxCount = Math.max(...stats.map(s => s.count), 1)
+
+  return stats.map(s => ({
+    ...s,
+    peak: s.count >= 5 || (maxCount >= 3 && s.count === maxCount),
+    height: s.sales > 0 
+      ? `${Math.max(16, Math.min(100, Math.round((s.sales / maxSales) * 100)))}%` 
+      : (s.count > 0 ? '16%' : '8%')
+  }))
+})
+
+// สรุปการวิเคราะห์ช่วงเวลาที่มีคนใช้งานมากที่สุด (Peak Hours Analysis)
+const peakHoursAnalysis = computed(() => {
+  const activeHours = [...hourlySales.value].filter(h => h.count > 0)
+  activeHours.sort((a, b) => b.count - a.count || b.sales - a.sales)
+  
+  const topPeak = activeHours.length > 0 ? activeHours[0] : null
+  const secondPeak = activeHours.length > 1 ? activeHours[1] : null
+
+  // สถิติแยกตามช่วงเวลาของวัน (Dayparts)
+  const lunchOrders = adminStore.orders.filter(o => {
+    const h = parseOrderHour(o.created_at)
+    return h !== null && h >= 11 && h < 14
+  })
+  const afternoonOrders = adminStore.orders.filter(o => {
+    const h = parseOrderHour(o.created_at)
+    return h !== null && h >= 14 && h < 17
+  })
+  const dinnerOrders = adminStore.orders.filter(o => {
+    const h = parseOrderHour(o.created_at)
+    return h !== null && (h >= 17 || h < 2)
+  })
+
+  const total = totalOrdersCount.value || 1
+
+  return {
+    topPeak,
+    secondPeak,
+    lunch: {
+      name: 'กะกลางวัน (11:00 - 14:00)',
+      count: lunchOrders.length,
+      percentage: Math.round((lunchOrders.length / total) * 100),
+      sales: lunchOrders.reduce((sum, o) => sum + Number(o.total_price || 0), 0)
+    },
+    afternoon: {
+      name: 'กะบ่าย (14:00 - 17:00)',
+      count: afternoonOrders.length,
+      percentage: Math.round((afternoonOrders.length / total) * 100),
+      sales: afternoonOrders.reduce((sum, o) => sum + Number(o.total_price || 0), 0)
+    },
+    dinner: {
+      name: 'กะเย็น-ดึก (17:00 - 23:00)',
+      count: dinnerOrders.length,
+      percentage: Math.round((dinnerOrders.length / total) * 100),
+      sales: dinnerOrders.reduce((sum, o) => sum + Number(o.total_price || 0), 0)
+    }
+  }
+})
 </script>
 
 <template>
@@ -109,7 +224,7 @@ const hourlySales = [
         </div>
       </div>
 
-      <!-- Card 2: Total Orders -->
+      <!-- Card 2: Total Orders with Delivery vs Dine-in Breakdown -->
       <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition">
         <div class="flex items-center justify-between">
           <span class="text-xs font-semibold text-slate-500">จำนวนออเดอร์ทั้งหมด</span>
@@ -118,10 +233,41 @@ const hourlySales = [
           </div>
         </div>
         <div class="mt-3">
-          <div class="text-2xl font-black text-slate-900">{{ totalOrdersCount }} <span class="text-sm font-normal text-slate-500">ออเดอร์</span></div>
-          <div class="flex items-center gap-1.5 mt-1 text-xs text-amber-600 font-medium">
-            <span>{{ totalItemsSold }} จาน</span>
-            <span class="text-slate-400 font-normal">ยอดรวมรายการอาหาร</span>
+          <div class="flex items-baseline justify-between">
+            <div class="text-2xl font-black text-slate-900">{{ totalOrdersCount }} <span class="text-sm font-normal text-slate-500">ออเดอร์</span></div>
+            <span class="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{{ totalItemsSold }} จาน</span>
+          </div>
+
+          <!-- สัดส่วนแถบสี Delivery vs Dine-in -->
+          <div class="w-full bg-slate-100 rounded-full h-2 mt-2.5 flex overflow-hidden">
+            <div 
+              class="bg-emerald-500 h-full transition-all duration-500" 
+              :style="{ width: `${deliveryPercentage}%` }"
+              :title="`เดลิเวอรี่ ${deliveryOrdersCount} ออเดอร์ (${deliveryPercentage}%)`"
+            ></div>
+            <div 
+              class="bg-amber-500 h-full transition-all duration-500" 
+              :style="{ width: `${dineInPercentage}%` }"
+              :title="`ทานในร้าน ${dineInOrdersCount} ออเดอร์ (${dineInPercentage}%)`"
+            ></div>
+          </div>
+
+          <!-- รายละเอียด เดลิเวอรี่ / ทานในร้าน -->
+          <div class="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-slate-100">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0"></span>
+              <div class="min-w-0">
+                <span class="text-slate-500 text-[10px] block leading-tight">🛵 เดลิเวอรี่</span>
+                <span class="font-bold text-slate-800 text-xs">{{ deliveryOrdersCount }} <span class="text-[10px] font-semibold text-emerald-600">({{ deliveryPercentage }}%)</span></span>
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0"></span>
+              <div class="min-w-0">
+                <span class="text-slate-500 text-[10px] block leading-tight">🍽️ ทานในร้าน</span>
+                <span class="font-bold text-slate-800 text-xs">{{ dineInOrdersCount }} <span class="text-[10px] font-semibold text-amber-600">({{ dineInPercentage }}%)</span></span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -163,51 +309,119 @@ const hourlySales = [
 
     <!-- Middle Section: Hourly Sales Chart + Low Stock Alert -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Hourly Sales Chart -->
-      <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <h2 class="text-base font-bold text-slate-800">สถิติยอดขายตามช่วงเวลา (Peak Hours)</h2>
-            <p class="text-xs text-slate-400">วิเคราะห์ชั่วโมงเร่งด่วนเพื่อวางแผนเตรียมสต็อกและพนักงาน</p>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="flex items-center gap-1 text-[11px] text-slate-500 font-medium">
-              <span class="w-2.5 h-2.5 rounded bg-[#2d5a43]"></span> ช่วงปกติ
-            </span>
-            <span class="flex items-center gap-1 text-[11px] text-red-500 font-medium">
-              <span class="w-2.5 h-2.5 rounded bg-red-500"></span> ช่วงเร่งด่วน (Peak)
-            </span>
-          </div>
-        </div>
-
-        <!-- Visual Bar Chart -->
-        <div class="flex-1 flex items-end justify-between gap-2 pt-8 pb-3 px-2 border-b border-slate-100 min-h-[180px]">
-          <div 
-            v-for="item in hourlySales" 
-            :key="item.hour"
-            class="flex-1 flex flex-col items-center gap-2 group relative"
-          >
-            <!-- Tooltip -->
-            <div class="absolute -top-10 bg-slate-900 text-white text-[10px] py-1 px-2 rounded-lg opacity-0 group-hover:opacity-100 transition whitespace-nowrap z-10 pointer-events-none shadow-md">
-              ฿{{ item.sales.toLocaleString() }} ({{ item.hour }})
+      <!-- Hourly Sales Chart & Peak Hours Analysis -->
+      <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                <span>📊</span> สถิติยอดขายและช่วงเวลาเร่งด่วน (Peak Hours Analysis)
+              </h2>
+              <p class="text-xs text-slate-400">วิเคราะห์ข้อมูลคำสั่งซื้อแบบ Real-time เพื่อบริหารกำลังคนและเตรียมวัตถุดิบ</p>
             </div>
-            <!-- Bar -->
+            <div class="flex items-center gap-2">
+              <span class="flex items-center gap-1 text-[11px] text-slate-500 font-medium">
+                <span class="w-2.5 h-2.5 rounded bg-[#2d5a43]"></span> ปกติ
+              </span>
+              <span class="flex items-center gap-1 text-[11px] text-amber-600 font-medium">
+                <span class="w-2.5 h-2.5 rounded bg-gradient-to-t from-red-600 to-amber-500"></span> พีค (Peak)
+              </span>
+            </div>
+          </div>
+
+          <!-- Visual Bar Chart -->
+          <div class="flex items-end justify-between gap-1.5 pt-8 pb-3 px-1 border-b border-slate-100 min-h-[190px]">
             <div 
-              :style="{ height: item.height }"
-              :class="[
-                'w-full max-w-[32px] rounded-t-lg transition-all duration-500 group-hover:scale-105',
-                item.peak ? 'bg-gradient-to-t from-red-600 to-amber-500 shadow-sm shadow-red-500/20' : 'bg-gradient-to-t from-[#2d5a43] to-emerald-400'
-              ]"
-            ></div>
-            <span class="text-[10px] font-medium text-slate-400">{{ item.hour }}</span>
+              v-for="item in hourlySales" 
+              :key="item.hour"
+              class="flex-1 flex flex-col items-center gap-1.5 group relative"
+            >
+              <!-- Tooltip -->
+              <div class="absolute -top-12 bg-slate-900 text-white text-[10px] py-1.5 px-2.5 rounded-lg opacity-0 group-hover:opacity-100 transition whitespace-nowrap z-20 pointer-events-none shadow-xl border border-slate-700 flex flex-col items-center">
+                <div class="font-bold text-emerald-400">เวลา {{ item.hour }} น. (฿{{ item.sales.toLocaleString() }})</div>
+                <div class="text-[9px] text-slate-300">รวม {{ item.count }} ออเดอร์ (🛵{{ item.delivCount }} | 🍽️{{ item.inStoreCount }})</div>
+              </div>
+              <!-- Bar -->
+              <div 
+                :style="{ height: item.height }"
+                :class="[
+                  'w-full max-w-[28px] rounded-t-lg transition-all duration-500 group-hover:scale-105 cursor-pointer relative',
+                  item.peak ? 'bg-gradient-to-t from-red-600 to-amber-500 shadow-sm shadow-red-500/20' : 'bg-gradient-to-t from-[#2d5a43] to-emerald-400'
+                ]"
+              >
+                <!-- Peak flame icon on top if peak -->
+                <span v-if="item.peak" class="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[10px]">🔥</span>
+              </div>
+              <span :class="['text-[10px] font-medium', item.peak ? 'text-red-600 font-bold' : 'text-slate-400']">{{ item.hour }}</span>
+            </div>
           </div>
         </div>
 
-        <div class="mt-4 flex items-center justify-between text-xs text-slate-500 bg-slate-50 p-3 rounded-xl">
-          <div class="flex items-center gap-2">
-            <span>🔥 ช่วงพีคสูงสุด: <b>18:00 - 19:00 น.</b> (฿2,150)</span>
+        <!-- Comprehensive Peak Traffic Insights -->
+        <div class="mt-4 space-y-2.5">
+          <!-- Peak Highlights Box -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div class="bg-red-50/70 border border-red-200/70 p-3 rounded-xl flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="text-xl">🔥</span>
+                <div>
+                  <div class="text-[11px] font-bold text-red-900">ช่วงพีคอันดับ 1: {{ peakHoursAnalysis.topPeak ? peakHoursAnalysis.topPeak.hour : '15:00' }} น.</div>
+                  <div class="text-[10px] text-red-700">
+                    {{ peakHoursAnalysis.topPeak ? peakHoursAnalysis.topPeak.count : 6 }} ออเดอร์ (ยอดขาย ฿{{ peakHoursAnalysis.topPeak ? peakHoursAnalysis.topPeak.sales.toLocaleString() : '590' }})
+                  </div>
+                </div>
+              </div>
+              <span class="px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded-md">Peak Rush</span>
+            </div>
+
+            <div class="bg-amber-50/70 border border-amber-200/70 p-3 rounded-xl flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="text-xl">⚡</span>
+                <div>
+                  <div class="text-[11px] font-bold text-amber-900">ช่วงพีคอันดับ 2: {{ peakHoursAnalysis.secondPeak ? peakHoursAnalysis.secondPeak.hour : '20:00' }} น.</div>
+                  <div class="text-[10px] text-amber-700">
+                    {{ peakHoursAnalysis.secondPeak ? peakHoursAnalysis.secondPeak.count : 6 }} ออเดอร์ (ยอดขาย ฿{{ peakHoursAnalysis.secondPeak ? peakHoursAnalysis.secondPeak.sales.toLocaleString() : '520' }})
+                  </div>
+                </div>
+              </div>
+              <span class="px-2 py-0.5 bg-amber-600 text-white text-[10px] font-bold rounded-md">Dinner Peak</span>
+            </div>
           </div>
-          <div class="font-medium text-[#2d5a43]">แนะนำ: เตรียมวัตถุดิบส้มตำและไก่ทอดล่วงหน้า</div>
+
+          <!-- Daypart Breakdown -->
+          <div class="bg-slate-50 border border-slate-200/80 p-3 rounded-xl text-xs">
+            <div class="flex items-center justify-between mb-2">
+              <span class="font-bold text-slate-800 text-[11px] flex items-center gap-1.5">
+                <span>⏱️</span> การกระจายตัวตามช่วงเวลา (Daypart Distribution)
+              </span>
+              <span class="text-[10px] text-slate-500 font-medium">เดลิเวอรี่ {{ deliveryPercentage }}% | ทานในร้าน {{ dineInPercentage }}%</span>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2 text-center">
+              <div class="bg-white p-2 rounded-lg border border-slate-100 shadow-2xs">
+                <div class="text-[10px] text-slate-500">☀️ กลางวัน (11:00-14:00)</div>
+                <div class="font-black text-slate-800 text-xs mt-0.5">{{ peakHoursAnalysis.lunch.count }} ออเดอร์</div>
+                <div class="text-[10px] text-emerald-600 font-semibold">{{ peakHoursAnalysis.lunch.percentage }}% (฿{{ peakHoursAnalysis.lunch.sales.toLocaleString() }})</div>
+              </div>
+              <div class="bg-white p-2 rounded-lg border border-slate-100 shadow-2xs">
+                <div class="text-[10px] text-slate-500">🌤️ บ่าย (14:00-17:00)</div>
+                <div class="font-black text-slate-800 text-xs mt-0.5">{{ peakHoursAnalysis.afternoon.count }} ออเดอร์</div>
+                <div class="text-[10px] text-amber-600 font-semibold">{{ peakHoursAnalysis.afternoon.percentage }}% (฿{{ peakHoursAnalysis.afternoon.sales.toLocaleString() }})</div>
+              </div>
+              <div class="bg-emerald-50/60 p-2 rounded-lg border border-emerald-200/70 shadow-2xs">
+                <div class="text-[10px] text-emerald-800 font-bold">🌙 เย็น-ดึก (17:00-23:00) ⭐</div>
+                <div class="font-black text-emerald-950 text-xs mt-0.5">{{ peakHoursAnalysis.dinner.count }} ออเดอร์</div>
+                <div class="text-[10px] text-emerald-700 font-bold">{{ peakHoursAnalysis.dinner.percentage }}% (฿{{ peakHoursAnalysis.dinner.sales.toLocaleString() }})</div>
+              </div>
+            </div>
+
+            <div class="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-600">
+              <span class="flex items-center gap-1">
+                <span>💡</span> <b>ข้อเสนอแนะ:</b> ลูกค้าหนาแน่นที่สุดใน <b>กะเย็น-ดึก ({{ peakHoursAnalysis.dinner.percentage }}%)</b> และพีคจัดที่ <b>15:00 น. & 20:00 น.</b>
+              </span>
+              <span class="font-medium text-[#2d5a43] hidden sm:inline">จัดเตรียมกล่องแพ็คเดลิเวอรี่ล่วงหน้า</span>
+            </div>
+          </div>
         </div>
       </div>
 

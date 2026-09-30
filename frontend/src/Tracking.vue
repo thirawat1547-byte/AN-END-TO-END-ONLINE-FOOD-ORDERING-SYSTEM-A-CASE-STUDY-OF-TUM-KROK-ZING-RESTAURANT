@@ -112,14 +112,86 @@
           </div>
 
           <!-- สถานะ 4: จัดส่งสำเร็จเรียบร้อย -->
+          <!-- สถานะ 4: จัดส่งสำเร็จเรียบร้อย พร้อมระบบให้คะแนนดาวรีวิวก่อนกลับหน้าร้าน -->
           <div v-else class="completed-profile-box">
             <div class="completed-icon-large">🎉</div>
             <h4 class="rider-name">จัดส่งถึงคุณเรียบร้อยแล้ว</h4>
             <p class="rider-vehicle" style="background:#eef7f1; color:#2d5a43;">✓ พนักงานส่งมอบอาหารสำเร็จ</p>
-            <p class="prep-desc">ขอบคุณที่เลือกทานอาหารกับร้านตำครกซิ่งครับ</p>
-            <button class="dismiss-btn" @click="dismissOrder">
-              ปิดหน้านี้ / สั่งอาหารเพิ่ม ➔
-            </button>
+            
+            <!-- ส่วนรีวิวให้ดาวก่อนกลับหน้าร้าน (Rating & Review Before Return) -->
+            <div class="review-box" v-if="!isReviewed">
+              <div class="review-header">
+                <h5 class="review-title">⭐ ให้คะแนนความพึงพอใจ</h5>
+                <p class="review-sub">ก่อนกลับหน้าร้าน ช่วยให้คะแนนและติชมความประทับใจหน่อยนะครับ</p>
+              </div>
+
+              <!-- ดาว 1-5 Interactive -->
+              <div class="star-rating-row">
+                <button 
+                  v-for="star in 5" 
+                  :key="star"
+                  type="button"
+                  class="star-btn"
+                  :class="{ 'star-active': star <= (hoverRating || selectedRating) }"
+                  @mouseenter="hoverRating = star"
+                  @mouseleave="hoverRating = 0"
+                  @click="setRating(star)"
+                  :title="`${star} ดาว`"
+                >
+                  ★
+                </button>
+              </div>
+
+              <div class="rating-label-banner" v-if="selectedRating > 0">
+                {{ ratingLabel }}
+              </div>
+
+              <!-- แท็กประทับใจด่วน -->
+              <div class="tags-container" v-if="selectedRating > 0">
+                <button 
+                  v-for="tag in availableReviewTags" 
+                  :key="tag"
+                  type="button"
+                  class="tag-pill"
+                  :class="{ 'tag-active': selectedReviewTags.includes(tag) }"
+                  @click="toggleReviewTag(tag)"
+                >
+                  {{ tag }}
+                </button>
+              </div>
+
+              <!-- ช่องพิมพ์รีวิว -->
+              <div class="comment-box" v-if="selectedRating > 0">
+                <textarea 
+                  v-model="reviewComment" 
+                  placeholder="เขียนคำติชม หรือความประทับใจเพิ่มเติม (ไม่บังคับ)..." 
+                  class="comment-textarea"
+                  rows="2"
+                ></textarea>
+              </div>
+
+              <!-- ปุ่มส่งรีวิว และปุ่มข้าม -->
+              <div class="review-buttons">
+                <button class="dismiss-btn review-submit-btn" @click="handleReviewOrDismiss">
+                  <span v-if="selectedRating > 0">⭐ ส่งรีวิวและกลับสู่หน้าร้าน ➔</span>
+                  <span v-else>⭐ รีวิวให้ดาว / กลับสู่หน้าร้าน ➔</span>
+                </button>
+                <button class="skip-link-btn" @click="dismissOrder" v-if="selectedRating === 0">
+                  ข้ามการรีวิวและกลับสู่หน้าร้าน
+                </button>
+              </div>
+            </div>
+
+            <!-- เมื่อส่งรีวิวเรียบร้อย -->
+            <div class="review-done-box" v-else>
+              <div class="done-stars">
+                <span v-for="s in selectedRating" :key="s">★</span>
+              </div>
+              <p class="done-msg">ขอบคุณสำหรับคะแนน {{ selectedRating }} ดาวครับ ❤️</p>
+              <button class="dismiss-btn" @click="dismissOrder">
+                กลับสู่หน้าร้าน / สั่งอาหารเพิ่ม ➔
+              </button>
+            </div>
           </div>
         </div>
 
@@ -228,6 +300,76 @@
         </div>
       </div>
     </div>
+
+    <!-- POP-UP รีวิวให้ดาวก่อนกลับหน้าร้าน (Review & Rating Modal) -->
+    <div class="modal-overlay" v-if="showReviewModal" @click.self="showReviewModal = false">
+      <div class="review-modal-content">
+        <button class="close-modal-btn" @click="showReviewModal = false">✕</button>
+        <div class="review-modal-header">
+          <div class="review-modal-icon">⭐</div>
+          <h2 class="review-modal-title">ให้คะแนนความพึงพอใจ</h2>
+          <p class="review-modal-order" v-if="currentOrder">คำสั่งซื้อ #{{ currentOrder.orderNumber }}</p>
+          <p class="review-modal-desc">ก่อนกลับหน้าร้าน ช่วยให้คะแนนและติชมความประทับใจหน่อยนะครับ</p>
+        </div>
+
+        <div class="modal-star-row">
+          <button 
+            v-for="star in 5" 
+            :key="star"
+            type="button"
+            class="modal-star-btn"
+            :class="{ 'star-active': star <= (hoverRating || selectedRating) }"
+            @mouseenter="hoverRating = star"
+            @mouseleave="hoverRating = 0"
+            @click="setRating(star)"
+            :title="`${star} ดาว`"
+          >
+            ★
+          </button>
+        </div>
+
+        <div class="modal-rating-badge">
+          {{ ratingLabel }}
+        </div>
+
+        <div class="modal-tags-grid">
+          <button 
+            v-for="tag in availableReviewTags" 
+            :key="tag"
+            type="button"
+            class="modal-tag-chip"
+            :class="{ 'tag-active': selectedReviewTags.includes(tag) }"
+            @click="toggleReviewTag(tag)"
+          >
+            {{ tag }}
+          </button>
+        </div>
+
+        <div class="modal-comment-wrap">
+          <label class="modal-field-label">ความคิดเห็นเพิ่มเติม (ไม่บังคับ):</label>
+          <textarea 
+            v-model="reviewComment" 
+            placeholder="เช่น อาหารอร่อยมาก รสแซ่บถูกใจ ไรเดอร์ส่งไว บริการสุภาพ..."
+            class="modal-textarea"
+            rows="3"
+          ></textarea>
+        </div>
+
+        <div class="modal-action-buttons">
+          <button 
+            class="modal-submit-review-btn" 
+            @click="submitReviewAndGoHome"
+            :disabled="selectedRating === 0"
+          >
+            <span v-if="selectedRating > 0">⭐ ส่งรีวิวและกลับสู่หน้าร้าน ➔</span>
+            <span v-else>แตะดาวด้านบนเพื่อให้คะแนน</span>
+          </button>
+          <button class="modal-skip-btn" @click="skipReviewAndGoHome">
+            ข้ามการรีวิวและกลับสู่หน้าร้าน
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -253,7 +395,22 @@ export default {
       currentOrder: null, 
       showReceiptModal: false,
       rawStatus: 'PENDING',
-      pollingTimer: null
+      pollingTimer: null,
+      // ระบบรีวิวให้ดาวก่อนกลับหน้าร้าน (Review & Rating)
+      selectedRating: 0,
+      hoverRating: 0,
+      selectedReviewTags: [],
+      reviewComment: '',
+      isReviewed: false,
+      showReviewModal: false,
+      availableReviewTags: [
+        '🍲 รสชาติแซ่บนัว',
+        '⚡ จัดส่งรวดเร็ว',
+        '🛵 ไรเดอร์สุภาพ',
+        '📦 แพ็กเกจสะอาด',
+        '🔥 อาหารยังร้อน',
+        '🌶️ ปรุงได้ตรงใจ'
+      ]
     }
   },
   watch: {
@@ -314,6 +471,16 @@ export default {
       if (this.rawStatus === 'READY' || this.rawStatus === 'IN_DELIVERY') return '10-15 นาที';
       if (this.rawStatus === 'COOKING') return '20-25 นาที';
       return '25-35 นาที';
+    },
+    ratingLabel() {
+      switch (this.selectedRating) {
+        case 5: return '⭐⭐⭐⭐⭐ ยอดเยี่ยมมาก ประทับใจสุดๆ! 🤩';
+        case 4: return '⭐⭐⭐⭐ ดีมาก อร่อยถูกใจ 😊';
+        case 3: return '⭐⭐⭐ ปานกลาง พอใช้ได้ 🙂';
+        case 2: return '⭐⭐ ควรปรับปรุง 😕';
+        case 1: return '⭐ ไม่พึงพอใจ 😞';
+        default: return 'แตะดาวเพื่อให้คะแนน';
+      }
     }
   },
   async mounted() {
@@ -450,6 +617,61 @@ export default {
     },
     chatRider() {
       alert('กำลังเปิดหน้าต่างแชทกับคนขับ...');
+    },
+    // เมธอดสำหรับระบบรีวิวและให้ดาวก่อนกลับหน้าร้าน
+    setRating(star) {
+      this.selectedRating = star;
+    },
+    toggleReviewTag(tag) {
+      const idx = this.selectedReviewTags.indexOf(tag);
+      if (idx > -1) {
+        this.selectedReviewTags.splice(idx, 1);
+      } else {
+        this.selectedReviewTags.push(tag);
+      }
+    },
+    handleReviewOrDismiss() {
+      if (this.selectedRating === 0) {
+        this.showReviewModal = true;
+        return;
+      }
+      this.submitReviewAndGoHome();
+    },
+    submitReviewAndGoHome() {
+      if (this.selectedRating === 0) {
+        this.showReviewModal = true;
+        return;
+      }
+
+      try {
+        const reviewData = {
+          orderId: this.currentOrder?.orderNumber || 'unknown',
+          rating: this.selectedRating,
+          tags: [...this.selectedReviewTags],
+          comment: this.reviewComment.trim(),
+          createdAt: new Date().toISOString(),
+          userName: this.userProfile.name,
+          total: this.currentOrder?.total || 0
+        };
+
+        const existingReviews = JSON.parse(localStorage.getItem('user_order_reviews') || '[]');
+        existingReviews.unshift(reviewData);
+        localStorage.setItem('user_order_reviews', JSON.stringify(existingReviews));
+        localStorage.setItem(`review_order_${reviewData.orderId}`, JSON.stringify(reviewData));
+      } catch (e) {
+        console.warn('บันทึกรีวิวไม่สำเร็จ:', e);
+      }
+
+      this.isReviewed = true;
+      this.showReviewModal = false;
+
+      alert(`ขอบคุณสำหรับคะแนนรีวิว ${this.selectedRating} ดาวครับ!\nคำติชมของคุณช่วยให้ร้านตำครกซิ่งพัฒนาบริการให้ดียิ่งขึ้น ❤️`);
+
+      this.dismissOrder();
+    },
+    skipReviewAndGoHome() {
+      this.showReviewModal = false;
+      this.dismissOrder();
     }
   }
 }
@@ -675,5 +897,380 @@ export default {
     transform: scale(0.95);
     box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
   }
+}
+
+/* ===================================================
+   REVIEW & STAR RATING SYSTEM STYLES (BEFORE RETURN)
+   =================================================== */
+.review-box {
+  background: #fdfbf7;
+  border: 1px solid #e8e3d5;
+  border-radius: 16px;
+  padding: 16px 14px;
+  width: 100%;
+  margin-top: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.review-header {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.review-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 2px;
+}
+
+.review-sub {
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.star-rating-row {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.star-btn {
+  background: none;
+  border: none;
+  font-size: 32px;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: transform 0.15s ease, color 0.15s ease;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.star-btn:hover {
+  transform: scale(1.22);
+}
+
+.star-btn.star-active {
+  color: #f59e0b;
+  text-shadow: 0 0 10px rgba(245, 158, 11, 0.45);
+}
+
+.rating-label-banner {
+  font-size: 12px;
+  font-weight: 600;
+  color: #b45309;
+  background: #fef3c7;
+  padding: 4px 12px;
+  border-radius: 999px;
+  display: inline-block;
+  margin: 4px auto 10px;
+}
+
+.tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.tag-pill {
+  font-size: 11px;
+  font-weight: 500;
+  color: #475569;
+  background: white;
+  border: 1px solid #cbd5e1;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tag-pill:hover {
+  border-color: #557c61;
+  color: #557c61;
+}
+
+.tag-pill.tag-active {
+  background: #eef7f1;
+  border-color: #557c61;
+  color: #2d5a43;
+  font-weight: 600;
+}
+
+.comment-box {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.comment-textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  resize: none;
+  background: white;
+  transition: border-color 0.2s;
+}
+
+.comment-textarea:focus {
+  border-color: #557c61;
+  box-shadow: 0 0 0 2px rgba(85, 124, 97, 0.15);
+}
+
+.review-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  align-items: center;
+}
+
+.review-submit-btn {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 13px;
+  background: #557c61;
+  color: white;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.review-submit-btn:hover {
+  background: #405e49;
+  transform: translateY(-1px);
+}
+
+.skip-link-btn {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 4px;
+}
+
+.skip-link-btn:hover {
+  color: #555;
+}
+
+.review-done-box {
+  padding: 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.done-stars {
+  font-size: 26px;
+  color: #f59e0b;
+  margin-bottom: 6px;
+}
+
+.done-msg {
+  font-size: 13px;
+  color: #166534;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+/* Modal Review Popup */
+.review-modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 20px;
+  width: 440px;
+  max-width: 90vw;
+  position: relative;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  text-align: center;
+}
+
+.review-modal-header {
+  margin-bottom: 12px;
+}
+
+.review-modal-icon {
+  font-size: 40px;
+  margin-bottom: 4px;
+}
+
+.review-modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.review-modal-order {
+  font-size: 13px;
+  font-weight: 600;
+  color: #557c61;
+  margin-top: 2px;
+}
+
+.review-modal-desc {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.modal-star-row {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 12px 0 8px;
+}
+
+.modal-star-btn {
+  background: none;
+  border: none;
+  font-size: 38px;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: transform 0.15s ease, color 0.15s ease;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.modal-star-btn:hover {
+  transform: scale(1.22);
+}
+
+.modal-star-btn.star-active {
+  color: #f59e0b;
+  text-shadow: 0 0 12px rgba(245, 158, 11, 0.45);
+}
+
+.modal-rating-badge {
+  font-size: 13px;
+  font-weight: 600;
+  color: #b45309;
+  background: #fef3c7;
+  padding: 4px 14px;
+  border-radius: 999px;
+  display: inline-block;
+  margin-bottom: 14px;
+}
+
+.modal-tags-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.modal-tag-chip {
+  font-size: 12px;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modal-tag-chip:hover {
+  border-color: #557c61;
+  color: #557c61;
+}
+
+.modal-tag-chip.tag-active {
+  background: #eef7f1;
+  border-color: #557c61;
+  color: #2d5a43;
+  font-weight: 600;
+}
+
+.modal-comment-wrap {
+  text-align: left;
+  margin-bottom: 16px;
+}
+
+.modal-field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.modal-textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  resize: none;
+  background: white;
+}
+
+.modal-textarea:focus {
+  border-color: #557c61;
+  box-shadow: 0 0 0 2px rgba(85, 124, 97, 0.15);
+}
+
+.modal-action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modal-submit-review-btn {
+  background: #557c61;
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.modal-submit-review-btn:hover:not(:disabled) {
+  background: #405e49;
+}
+
+.modal-submit-review-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.modal-skip-btn {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 4px;
+}
+
+.modal-skip-btn:hover {
+  color: #555;
 }
 </style>

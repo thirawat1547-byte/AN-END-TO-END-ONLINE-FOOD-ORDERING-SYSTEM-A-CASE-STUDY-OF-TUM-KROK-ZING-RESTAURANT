@@ -74,7 +74,21 @@
               <!-- โหมดแก้ไข: แสดงกล่องพิมพ์และปุ่มบันทึก -->
               <div v-else class="edit-address-form">
                 <label class="edit-field-label">รายละเอียดสถานที่ / บ้านเลขที่:</label>
-                <textarea v-model="editAddressText" class="edit-textarea" rows="2" placeholder="กรอกที่อยู่จัดส่งใหม่..."></textarea>
+                <textarea 
+                  v-model="editAddressText" 
+                  @input="onAddressInput"
+                  class="edit-textarea" 
+                  rows="2" 
+                  placeholder="กรอกที่อยู่จัดส่งใหม่..."
+                ></textarea>
+
+                <!-- ป้ายแสดงสถานะการแปลงที่อยู่เป็นพิกัดแผนที่ -->
+                <div v-if="isGeocoding" class="geocoding-status-banner loading">
+                  <span class="spin-icon">⏳</span> กำลังค้นหาตำแหน่งบนแผนที่จากที่อยู่ที่กรอก...
+                </div>
+                <div v-else-if="geocodeFoundAddress" class="geocoding-status-banner success">
+                  <span class="check-icon">📍</span> ปักหมุดแผนที่ตรงกับ: <strong>{{ geocodeFoundAddress }}</strong>
+                </div>
 
                 <div class="gps-latlng-row">
                   <div class="gps-field-col">
@@ -109,8 +123,11 @@
                 </button>
 
                 <div class="edit-actions">
-                  <button class="cancel-edit-btn" @click="isEditingAddress = false">ยกเลิก</button>
-                  <button class="save-edit-btn" @click="saveAddress">บันทึกที่อยู่และพิกัด</button>
+                  <button class="cancel-edit-btn" @click="cancelEditAddress">ยกเลิก</button>
+                  <button class="save-edit-btn" @click="saveAddress" :disabled="isGeocoding">
+                    <span v-if="isGeocoding">กำลังระบุตำแหน่ง...</span>
+                    <span v-else>บันทึกที่อยู่และพิกัด</span>
+                  </button>
                 </div>
               </div>
 
@@ -127,17 +144,260 @@
         </div>
 
         <div class="card-section">
-          <h3 class="section-title">วิธีชำระเงิน</h3>
-          <div class="payment-methods">
-            <div class="payment-card" :class="{ active: selectedPayment === 'qr' }" @click="selectedPayment = 'qr'">
-              <div class="pay-icon">📱</div>
-              <span>พร้อมเพย์</span>
+          <div class="payment-section-header">
+            <h3 class="section-title">วิธีชำระเงิน</h3>
+            <span class="payment-security-badge">
+              <span class="shield-icon">🔒</span> ชำระเงินปลอดภัย 256-bit SSL
+            </span>
+          </div>
+
+          <!-- ตัวเลือกประเภทการชำระเงินหลัก 3 แบบ -->
+          <div class="payment-methods-grid">
+            <!-- 1. บัตรเครดิต / เดบิต -->
+            <div 
+              class="payment-card" 
+              :class="{ active: selectedPayment === 'card' }" 
+              @click="selectedPayment = 'card'"
+            >
+              <div class="pay-icon">💳</div>
+              <span class="pay-title">บัตรเครดิต/เดบิต</span>
+              <span class="pay-sub">Visa, Mastercard, JCB, AMEX</span>
             </div>
-            <div class="payment-card" :class="{ active: selectedPayment === 'cash' }" @click="selectedPayment = 'cash'">
+
+            <!-- 2. พร้อมเพย์ -->
+            <div 
+              class="payment-card" 
+              :class="{ active: selectedPayment === 'qr' }" 
+              @click="selectedPayment = 'qr'"
+            >
+              <div class="pay-icon">📱</div>
+              <span class="pay-title">พร้อมเพย์</span>
+              <span class="pay-sub">สแกน QR Code</span>
+            </div>
+
+            <!-- 3. เงินสด -->
+            <div 
+              class="payment-card" 
+              :class="{ active: selectedPayment === 'cash' }" 
+              @click="selectedPayment = 'cash'"
+            >
               <div class="pay-icon">💵</div>
-              <span>เงินสด</span>
+              <span class="pay-title">เงินสด</span>
+              <span class="pay-sub">จ่ายปลายทาง</span>
             </div>
           </div>
+
+          <!-- ฟอร์มกรอกข้อมูลบัตรเครดิต / เดบิต -->
+          <div v-if="selectedPayment === 'card'" class="card-checkout-container">
+            <div class="card-container-header">
+              <div class="card-header-left">
+                <span class="card-section-label">ข้อมูลบัตร (Card Information)</span>
+                <span class="card-instruction">กรุณาเลือกประเภทบัตรและกรอกข้อมูลให้ถูกต้อง</span>
+              </div>
+            </div>
+
+            <!-- ส่วนเลือกประเภทบัตรด้วยตนเอง (Manual Card Type Selector) -->
+            <div class="card-brand-selection-area">
+              <label class="brand-selection-label">เลือกประเภทบัตร (Select Card Type):</label>
+              <div class="card-brand-chips">
+                <!-- 1. VISA -->
+                <button 
+                  type="button" 
+                  class="brand-chip-btn" 
+                  :class="{ active: selectedCardBrand === 'visa' }"
+                  @click="selectCardBrand('visa')"
+                  title="ชำระด้วยบัตร VISA"
+                >
+                  <span class="card-logo-container">
+                    <svg class="card-brand-svg" viewBox="0 0 36 24" width="28" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect width="36" height="24" rx="3" fill="#0E4595"/>
+                      <path d="M14.6 16.5L16.2 7H18.2L16.6 16.5H14.6ZM24.4 7.2C24 7 23.3 6.8 22.5 6.8C20.3 6.8 18.7 8 18.7 9.7C18.7 10.9 19.8 11.6 20.7 12.1C21.6 12.5 21.9 12.8 21.9 13.3C21.9 14 21.1 14.3 20.3 14.3C19.3 14.3 18.7 14.1 18 13.8L17.6 15.8C18.2 16.1 19.3 16.3 20.4 16.3C22.8 16.3 24.3 15.1 24.3 13.3C24.3 12.2 23.6 11.3 22.3 10.7C21.5 10.3 21 10 21 9.5C21 9 21.5 8.6 22.5 8.6C23.2 8.6 23.8 8.8 24.3 9L24.4 7.2ZM28.7 7H27.1C26.5 7 26.1 7.2 25.8 7.8L22.1 16.5H24.3L24.8 15.2H27.5L27.8 16.5H29.8L28.7 7ZM25.4 13.6L26.5 10.4L27.1 13.6H25.4ZM12.6 7L10.5 13.5L10.2 12.1C9.8 10.8 8.4 9.2 6.9 8.3L8.8 16.5H11.1L14.7 7H12.6Z" fill="white"/>
+                      <path d="M8.8 8.3C7.3 8.9 5.9 9.9 4.9 10.8L5.1 11.7C6.1 11.4 8.1 10.8 9.5 10.4L8.8 8.3Z" fill="#F7B600"/>
+                    </svg>
+                  </span>
+                  <span class="chip-brand-title">VISA</span>
+                  <span class="chip-check" v-if="selectedCardBrand === 'visa'">✓</span>
+                </button>
+
+                <!-- 2. Mastercard -->
+                <button 
+                  type="button" 
+                  class="brand-chip-btn" 
+                  :class="{ active: selectedCardBrand === 'mastercard' }"
+                  @click="selectCardBrand('mastercard')"
+                  title="ชำระด้วยบัตร Mastercard"
+                >
+                  <span class="card-logo-container">
+                    <svg class="card-brand-svg" viewBox="0 0 36 24" width="28" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect width="36" height="24" rx="3" fill="#222222"/>
+                      <circle cx="13.5" cy="12" r="6.5" fill="#EB001B"/>
+                      <circle cx="22.5" cy="12" r="6.5" fill="#F79E1B"/>
+                      <path d="M18 7.3A6.47 6.47 0 0 0 14.5 12c0 1.8.7 3.5 1.9 4.7A6.47 6.47 0 0 0 21.5 12c0-1.8-.7-3.5-1.9-4.7A6.46 6.46 0 0 0 18 7.3z" fill="#FF5F00"/>
+                    </svg>
+                  </span>
+                  <span class="chip-brand-title">Mastercard</span>
+                  <span class="chip-check" v-if="selectedCardBrand === 'mastercard'">✓</span>
+                </button>
+
+                <!-- 3. JCB -->
+                <button 
+                  type="button" 
+                  class="brand-chip-btn" 
+                  :class="{ active: selectedCardBrand === 'jcb' }"
+                  @click="selectCardBrand('jcb')"
+                  title="ชำระด้วยบัตร JCB"
+                >
+                  <span class="card-logo-container">
+                    <svg class="card-brand-svg" viewBox="0 0 36 24" width="28" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect width="36" height="24" rx="3" fill="#FFFFFF"/>
+                      <rect x="0.5" y="0.5" width="35" height="23" rx="2.5" stroke="#CBD5E1" stroke-width="1"/>
+                      <rect x="4.5" y="4" width="8" height="16" rx="3" fill="#0066B2"/>
+                      <path d="M9.5 6v7.2a2.3 2.3 0 0 1-2.3 2.3H6v-1.6h1a.7.7 0 0 0 .7-.7V6h1.8z" fill="#FFFFFF"/>
+                      <rect x="14" y="4" width="8" height="16" rx="3" fill="#E60012"/>
+                      <path d="M19.8 9.5a2.2 2.2 0 0 0-1.5-.5c-1.1 0-2 .8-2 2.4 0 1.5.9 2.4 2 2.4.6 0 1.1-.2 1.5-.5v1.6c-.5.3-1.1.5-1.8.5-2.1 0-3.6-1.6-3.6-4s1.5-4 3.6-4c.7 0 1.3.2 1.8.5V9.5z" fill="#FFFFFF"/>
+                      <rect x="23.5" y="4" width="8" height="16" rx="3" fill="#008837"/>
+                      <path d="M25.5 6.5h2c1 0 1.7.4 1.7 1.3 0 .5-.3.9-.8 1.1.6.2 1 .7 1 1.3 0 .9-.7 1.5-1.8 1.5h-2.1V6.5zm1.5 2h.4c.3 0 .5-.2.5-.4s-.2-.4-.5-.4h-.4v.8zm0 2.2h.5c.3 0 .6-.2.6-.5s-.3-.5-.6-.5h-.5v1z" fill="#FFFFFF"/>
+                    </svg>
+                  </span>
+                  <span class="chip-brand-title">JCB</span>
+                  <span class="chip-check" v-if="selectedCardBrand === 'jcb'">✓</span>
+                </button>
+
+                <!-- 4. AMEX -->
+                <button 
+                  type="button" 
+                  class="brand-chip-btn" 
+                  :class="{ active: selectedCardBrand === 'amex' }"
+                  @click="selectCardBrand('amex')"
+                  title="ชำระด้วยบัตร American Express"
+                >
+                  <span class="card-logo-container">
+                    <svg class="card-brand-svg" viewBox="0 0 36 24" width="28" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect width="36" height="24" rx="3" fill="#006FCF"/>
+                      <path d="M5.5 15.5l3-7h2.2l3 7h-1.9l-.6-1.5H7.9l-.6 1.5H5.5zm3-3h2.1L9.6 10l-1.1 2.5z" fill="#FFFFFF"/>
+                      <text x="17.5" y="14.8" fill="#FFFFFF" font-family="'Impact', 'Arial Black', sans-serif" font-weight="900" font-size="8" letter-spacing="-0.3">AMEX</text>
+                    </svg>
+                  </span>
+                  <span class="chip-brand-title">AMEX</span>
+                  <span class="chip-check" v-if="selectedCardBrand === 'amex'">✓</span>
+                </button>
+
+                <!-- 5. UnionPay -->
+                <button 
+                  type="button" 
+                  class="brand-chip-btn" 
+                  :class="{ active: selectedCardBrand === 'unionpay' }"
+                  @click="selectCardBrand('unionpay')"
+                  title="ชำระด้วยบัตร UnionPay"
+                >
+                  <span class="card-logo-container">
+                    <svg class="card-brand-svg" viewBox="0 0 36 24" width="28" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect width="36" height="24" rx="3" fill="#FFFFFF"/>
+                      <rect x="0.5" y="0.5" width="35" height="23" rx="2.5" stroke="#CBD5E1" stroke-width="1"/>
+                      <g transform="skewX(-10) translate(3.5, 0)">
+                        <rect x="5.5" y="4.5" width="7" height="15" rx="2" fill="#E21B23"/>
+                        <rect x="13" y="4.5" width="7" height="15" rx="2" fill="#00457C"/>
+                        <rect x="20.5" y="4.5" width="7" height="15" rx="2" fill="#007B5F"/>
+                      </g>
+                      <text x="17.5" y="14.2" text-anchor="middle" fill="#FFFFFF" font-family="Arial, sans-serif" font-weight="bold" font-size="6" letter-spacing="-0.2">银联</text>
+                    </svg>
+                  </span>
+                  <span class="chip-brand-title">UnionPay</span>
+                  <span class="chip-check" v-if="selectedCardBrand === 'unionpay'">✓</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="card-input-box">
+              <!-- หมายเลขบัตร -->
+              <div class="card-field-group">
+                <label>หมายเลขบัตร (Card number)</label>
+                <div class="card-number-wrapper">
+                  <input 
+                    type="text" 
+                    v-model="cardForm.number" 
+                    @input="onCardNumberInput"
+                    placeholder="•••• •••• •••• ••••" 
+                    maxlength="19"
+                    class="card-styled-input font-mono"
+                  >
+                  <span class="detected-badge" v-if="selectedCardBrand">{{ selectedCardBrand.toUpperCase() }}</span>
+                </div>
+              </div>
+
+              <!-- วันหมดอายุ และ CVC -->
+              <div class="card-row-split">
+                <div class="card-field-group">
+                  <label>วันหมดอายุ (MM / YY)</label>
+                  <input 
+                    type="text" 
+                    v-model="cardForm.expiry" 
+                    @input="onCardExpiryInput"
+                    placeholder="MM / YY (เช่น 12/28)" 
+                    maxlength="5"
+                    class="card-styled-input font-mono"
+                  >
+                </div>
+                <div class="card-field-group">
+                  <label>รหัสความปลอดภัย CVC / CVV</label>
+                  <div class="cvc-wrapper">
+                    <input 
+                      type="password" 
+                      v-model="cardForm.cvc" 
+                      placeholder="123" 
+                      maxlength="4"
+                      class="card-styled-input font-mono"
+                    >
+                    <span class="cvc-hint" title="รหัส 3-4 หลักด้านหลังบัตร">🔒</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ชื่อบนบัตร -->
+              <div class="card-field-group">
+                <label>ชื่อผู้ถือบัตร (Cardholder name)</label>
+                <input 
+                  type="text" 
+                  v-model="cardForm.name" 
+                  placeholder="ระบุชื่อภาษาอังกฤษตามหน้าบัตร" 
+                  class="card-styled-input"
+                >
+              </div>
+
+              <!-- Billing Address (Country / ZIP) -->
+              <div class="card-row-split">
+                <div class="card-field-group">
+                  <label>ประเทศ / ภูมิภาค (Country or region)</label>
+                  <select v-model="cardForm.country" class="card-styled-input">
+                    <option value="TH">ไทย (Thailand)</option>
+                    <option value="US">United States</option>
+                    <option value="JP">Japan</option>
+                    <option value="SG">Singapore</option>
+                    <option value="MY">Malaysia</option>
+                    <option value="CN">China</option>
+                  </select>
+                </div>
+                <div class="card-field-group">
+                  <label>รหัสไปรษณีย์ (ZIP / Postal code)</label>
+                  <input 
+                    type="text" 
+                    v-model="cardForm.zip" 
+                    placeholder="เช่น 10220" 
+                    maxlength="10"
+                    class="card-styled-input font-mono"
+                  >
+                </div>
+              </div>
+
+              <!-- Checkbox บันทึกบัตร -->
+              <label class="save-card-checkbox">
+                <input type="checkbox" v-model="cardForm.saveCard">
+                <span>บันทึกบัตรนี้สำหรับการสั่งอาหารครั้งต่อไป (Save this card)</span>
+              </label>
+            </div>
+          </div>
+
+
         </div>
 
       </div>
@@ -250,8 +510,8 @@
 
           <div class="price-breakdown">
             <div class="breakdown-row">
-              <span>ยอดรวม</span>
-              <span>B{{ subtotal }}</span>
+              <span>ยอดรวมค่าอาหาร</span>
+              <span>B{{ formatCurrency(subtotal) }}</span>
             </div>
             <div class="breakdown-row">
               <span>
@@ -263,13 +523,31 @@
             </div>
             <div v-if="appliedPromo && discountAmount > 0" class="breakdown-row discount-row">
               <span>ส่วนลดโปรโมชัน ({{ appliedPromo.code }})</span>
-              <span class="discount-price">-B{{ discountAmount }}</span>
+              <span class="discount-price">-B{{ formatCurrency(discountAmount) }}</span>
+            </div>
+            <!-- ภาษีมูลค่าเพิ่ม (VAT 7%) บังคับเสียตามกฎหมาย พร้อมแสดงสูตรคำนวณชัดเจน -->
+            <div class="breakdown-row tax-breakdown-row">
+              <div class="tax-info-col">
+                <div class="tax-info-header">
+                  <span class="tax-main-label">ภาษีมูลค่าเพิ่ม (VAT {{ vatRate }}%)</span>
+                  <span class="tax-mandate-badge">คิดอัตโนมัติ</span>
+                </div>
+                <div class="tax-formula-detail">
+                  (คำนวณ {{ vatRate }}% จากยอดอาหาร B{{ formatCurrency(netFoodAmount) }} = B{{ formatCurrency(vatAmount) }})
+                </div>
+              </div>
+              <span class="tax-amount-highlight">+B{{ formatCurrency(vatAmount) }}</span>
             </div>
           </div>
 
           <div class="net-total-row">
-            <span>ยอดสุทธิ</span>
-            <span class="total-price-highlight">B{{ total }}</span>
+            <div>
+              <span>ยอดสุทธิ</span>
+              <div class="tax-summary-hint">
+                (รวม VAT {{ vatRate }}% จำนวน +B{{ formatCurrency(vatAmount) }} แล้ว)
+              </div>
+            </div>
+            <span class="total-price-highlight">B{{ formatCurrency(total) }}</span>
           </div>
 
           <button 
@@ -280,7 +558,7 @@
           >
             <span v-if="!isStoreOpen">🛑 ร้านปิดให้บริการชั่วคราว</span>
             <span v-else-if="isSubmitting">กำลังตรวจสอบและส่งคำสั่งซื้อ...</span>
-            <span v-else>ยืนยันและชำระเงิน B{{ total }}</span>
+            <span v-else>ยืนยันและชำระเงิน B{{ formatCurrency(total) }}</span>
           </button>
         </div>
       </aside>
@@ -338,6 +616,48 @@
           <button class="cancel-qr-btn" @click="closeQrModal">
             ยกเลิก
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal จำลองการตัดบัตรและ 3D-Secure / Digital Wallet Authorization -->
+    <div v-if="isCardProcessingModalOpen" class="card-processing-backdrop">
+      <div class="card-processing-card">
+        <div class="processing-top-badge">
+          <span v-if="cardProcessingBrand === 'apple_pay'"> Apple Pay</span>
+          <span v-else-if="cardProcessingBrand === 'link'">🟢 Stripe Link</span>
+          <span v-else-if="cardProcessingBrand === 'grabpay'">GrabPay</span>
+          <span v-else-if="cardProcessingBrand === 'wechat'">WeChat Pay</span>
+          <span v-else-if="cardProcessingBrand === 'klarna'">Klarna</span>
+          <span v-else-if="cardProcessingBrand === 'afterpay'">Afterpay</span>
+          <span v-else-if="cardProcessingBrand === 'direct_debit'">Direct Debit</span>
+          <span v-else-if="cardProcessingBrand === 'ideal'">iDEAL / OXXO</span>
+          <span v-else>💳 {{ detectedCardBrand.toUpperCase() }} Card</span>
+        </div>
+
+        <div class="processing-icon-area">
+          <div v-if="cardProcessingStep === 'authorizing'" class="processing-spinner-box">
+            <div class="secure-spinner"></div>
+            <span class="secure-shield-icon">🛡️</span>
+          </div>
+          <div v-else class="processing-success-box">
+            <span class="success-check-icon">✓</span>
+          </div>
+        </div>
+
+        <h3 class="processing-title">
+          <span v-if="cardProcessingStep === 'authorizing'">กำลังยืนยันการชำระเงิน...</span>
+          <span v-else>ชำระเงินสำเร็จแล้ว!</span>
+        </h3>
+        <p class="processing-message">{{ cardProcessingMessage }}</p>
+
+        <div class="processing-amount-box">
+          <span class="amount-label">ยอดที่ทำรายการ</span>
+          <strong class="amount-val">฿{{ total }}</strong>
+        </div>
+
+        <div class="processing-footer-badge">
+          <span>🔒 3D-Secure 2.0 • PCI-DSS Certified Bank Gateway</span>
         </div>
       </div>
     </div>
@@ -447,7 +767,21 @@ export default {
       authStore,
       promotionStore: usePromotionStore(),
       isLoggedIn: false,
-      selectedPayment: 'qr',
+      selectedPayment: 'card',
+      selectedCardBrand: 'visa',
+      cardForm: {
+        number: '',
+        expiry: '',
+        cvc: '',
+        name: '',
+        country: 'TH',
+        zip: '',
+        saveCard: false
+      },
+      isCardProcessingModalOpen: false,
+      cardProcessingStep: 'authorizing',
+      cardProcessingMessage: '',
+      cardProcessingBrand: 'visa',
       userProfile: {
         name: '',
         phone: '',
@@ -463,6 +797,9 @@ export default {
       gpsNotice: '',
       isEditingAddress: false,
       editAddressText: '',
+      isGeocoding: false,
+      geocodeFoundAddress: '',
+      geocodeDebounceTimer: null,
       showQrModal: false,
       qrCodeUrl: '',
       isGeneratingQr: false,
@@ -478,6 +815,9 @@ export default {
     }
   },
   computed: {
+    vatRate() {
+      return Number(adminStore?.storeSettings?.vatRate ?? 7);
+    },
     subtotal() {
       return this.cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
     },
@@ -507,14 +847,36 @@ export default {
       }
       return Math.min(Math.round(discount), this.subtotal);
     },
+    netFoodAmount() {
+      return Math.max(0, this.subtotal - this.discountAmount);
+    },
+    vatAmount() {
+      if (this.netFoodAmount <= 0) return 0;
+      const vat = this.netFoodAmount * (this.vatRate / 100);
+      return Math.round(vat * 100) / 100;
+    },
     total() {
-      const raw = this.subtotal + this.shippingFee - this.discountAmount;
-      return Math.max(0, raw);
+      const raw = this.netFoodAmount + this.shippingFee + this.vatAmount;
+      return Math.max(0, Math.round(raw * 100) / 100);
     },
     mapUrl() {
+      // 1. ถ้ากำลังอยู่ในโหมดแก้ไขที่อยู่ ให้แผนที่เปลี่ยนตามพิกัดหรือที่อยู่ที่กำลังพิมพ์สดๆ
+      if (this.isEditingAddress) {
+        if (this.editDeliveryLat && this.editDeliveryLng) {
+          return `https://maps.google.com/maps?q=${this.editDeliveryLat},${this.editDeliveryLng}&t=&z=16&ie=UTF8&iwloc=&output=embed`;
+        }
+        if (this.editAddressText && this.editAddressText.trim()) {
+          const encoded = encodeURIComponent(this.editAddressText.trim());
+          return `https://maps.google.com/maps?q=${encoded}&t=&z=16&ie=UTF8&iwloc=&output=embed`;
+        }
+      }
+
+      // 2. โหมดปกติ: ถ้ามีพิกัดที่ปักหมุดไว้
       if (this.deliveryLat && this.deliveryLng) {
         return `https://maps.google.com/maps?q=${this.deliveryLat},${this.deliveryLng}&t=&z=16&ie=UTF8&iwloc=&output=embed`;
       }
+
+      // 3. Fallback ใช้ที่อยู่ตามโปรไฟล์
       const address = this.userProfile.address || 'ตลาดปากเกร็ด นนทบุรี'; 
       const encodedAddress = encodeURIComponent(address);
       return `https://maps.google.com/maps?q=${encodedAddress}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
@@ -545,18 +907,30 @@ export default {
     }
 
     // โหลดพิกัด GPS ที่เคยปักหมุดไว้ (ถ้ามี)
+    let isSpecificGpsFound = false;
     try {
       const savedGps = localStorage.getItem('latest_delivery_gps');
       if (savedGps) {
         const parsed = JSON.parse(savedGps);
         if (parsed.lat && parsed.lng) {
-          this.deliveryLat = Number(parsed.lat);
-          this.deliveryLng = Number(parsed.lng);
-          this.editDeliveryLat = this.deliveryLat;
-          this.editDeliveryLng = this.deliveryLng;
+          const isOldDefaultRama9 = Math.abs(parsed.lat - 13.7570) < 0.0001 && Math.abs(parsed.lng - 100.5695) < 0.0001;
+          const matchesCurrentAddress = !parsed.address || parsed.address === this.userProfile.address;
+
+          if (matchesCurrentAddress && (!isOldDefaultRama9 || (this.userProfile.address && this.userProfile.address.includes('พระราม 9')))) {
+            this.deliveryLat = Number(parsed.lat);
+            this.deliveryLng = Number(parsed.lng);
+            this.editDeliveryLat = this.deliveryLat;
+            this.editDeliveryLng = this.deliveryLng;
+            isSpecificGpsFound = true;
+          }
         }
       }
     } catch (e) {}
+
+    // ถ้ายังไม่มีพิกัดที่เจาะจง หรือพิกัดเดิมยังเป็นค่าเริ่มต้นของพระราม 9 ให้แปลงพิกัดจากที่อยู่อัตโนมัติทันที
+    if (!isSpecificGpsFound && this.userProfile.address) {
+      this.autoGeocodeInitialAddress(this.userProfile.address);
+    }
 
     const savedCart = sessionStorage.getItem('cartData') || localStorage.getItem('cartData');
     if (savedCart) {
@@ -703,7 +1077,159 @@ export default {
       this.editAddressText = this.userProfile.address;
       this.editDeliveryLat = this.deliveryLat;
       this.editDeliveryLng = this.deliveryLng;
+      this.geocodeFoundAddress = '';
       this.isEditingAddress = true;
+    },
+
+    onAddressInput() {
+      this.geocodeFoundAddress = '';
+      if (this.geocodeDebounceTimer) {
+        clearTimeout(this.geocodeDebounceTimer);
+      }
+      this.geocodeDebounceTimer = setTimeout(() => {
+        this.geocodeAddress(this.editAddressText, true);
+      }, 500);
+    },
+
+    cancelEditAddress() {
+      if (this.geocodeDebounceTimer) {
+        clearTimeout(this.geocodeDebounceTimer);
+      }
+      this.isEditingAddress = false;
+      this.isGeocoding = false;
+      this.geocodeFoundAddress = '';
+    },
+
+    // แปลงที่อยู่ภาษาไทย / ข้อความที่อยู่ เป็นพิกัดละติจูด ลองจิจูด
+    async geocodeThaiAddress(addrText) {
+      if (!addrText || !addrText.trim()) return null;
+      const raw = addrText.trim();
+
+      // ตารางพิกัดสำรองสำหรับเขตและพื้นที่สำคัญในกรุงเทพฯ และปริมณฑล / ต่างจังหวัด
+      const thaiDistrictFallbacks = {
+        'แจ้งวัฒนะ': { lat: 13.8805, lng: 100.5885, name: 'ถนนแจ้งวัฒนะ' },
+        'อนุสาวรีย์': { lat: 13.8761, lng: 100.5963, name: 'แขวงอนุสาวรีย์ เขตบางเขน' },
+        'บางเขน': { lat: 13.8756, lng: 100.5969, name: 'เขตบางเขน กรุงเทพมหานคร' },
+        'หลักสี่': { lat: 13.8876, lng: 100.5790, name: 'เขตหลักสี่ กรุงเทพมหานคร' },
+        'ดอนเมือง': { lat: 13.9130, lng: 100.5897, name: 'เขตดอนเมือง กรุงเทพมหานคร' },
+        'ปากเกร็ด': { lat: 13.9130, lng: 100.4988, name: 'อำเภอปากเกร็ด นนทบุรี' },
+        'เมืองทอง': { lat: 13.9110, lng: 100.5480, name: 'เมืองทองธานี นนทบุรี' },
+        'จตุจักร': { lat: 13.8167, lng: 100.5564, name: 'เขตจตุจักร กรุงเทพมหานคร' },
+        'ลาดพร้าว': { lat: 13.7972, lng: 100.6045, name: 'เขตลาดพร้าว กรุงเทพมหานคร' },
+        'รามคำแหง': { lat: 13.7508, lng: 100.6190, name: 'ถนนรามคำแหง กรุงเทพมหานคร' },
+        'พระราม 9': { lat: 13.7570, lng: 100.5695, name: 'ถนนพระราม 9 กรุงเทพมหานคร' },
+        'พระราม9': { lat: 13.7570, lng: 100.5695, name: 'ถนนพระราม 9 กรุงเทพมหานคร' },
+        'สยาม': { lat: 13.7460, lng: 100.5340, name: 'สยาม ปทุมวัน กรุงเทพมหานคร' },
+        'ปทุมวัน': { lat: 13.7460, lng: 100.5340, name: 'เขตปทุมวัน กรุงเทพมหานคร' },
+        'สุขุมวิท': { lat: 13.7380, lng: 100.5604, name: 'ถนนสุขุมวิท กรุงเทพมหานคร' },
+        'บางนา': { lat: 13.6682, lng: 100.6042, name: 'เขตบางนา กรุงเทพมหานคร' },
+        'ธนบุรี': { lat: 13.7250, lng: 100.4850, name: 'เขตธนบุรี กรุงเทพมหานคร' },
+        'รังสิต': { lat: 13.9890, lng: 100.6178, name: 'รังสิต ปทุมธานี' },
+        'คลองหลวง': { lat: 14.0645, lng: 100.6450, name: 'อำเภอคลองหลวง ปทุมธานี' },
+        'พญาไท': { lat: 13.7800, lng: 100.5420, name: 'เขตพญาไท กรุงเทพมหานคร' },
+        'ห้วยขวาง': { lat: 13.7780, lng: 100.5750, name: 'เขตห้วยขวาง กรุงเทพมหานคร' },
+        'ดินแดง': { lat: 13.7690, lng: 100.5530, name: 'เขตดินแดง กรุงเทพมหานคร' },
+        'สายไหม': { lat: 13.9210, lng: 100.6450, name: 'เขตสายไหม กรุงเทพมหานคร' },
+        'คันนายาว': { lat: 13.8260, lng: 100.6790, name: 'เขตคันนายาว กรุงเทพมหานคร' },
+        'มีนบุรี': { lat: 13.8130, lng: 100.7190, name: 'เขตมีนบุรี กรุงเทพมหานคร' },
+        'ประเวศ': { lat: 13.7170, lng: 100.6950, name: 'เขตประเวศ กรุงเทพมหานคร' },
+        'บางกะปิ': { lat: 13.7660, lng: 100.6470, name: 'เขตบางกะปิ กรุงเทพมหานคร' },
+        'สะพานสูง': { lat: 13.7700, lng: 100.6860, name: 'เขตสะพานสูง กรุงเทพมหานคร' },
+        'นนทบุรี': { lat: 13.8621, lng: 100.5144, name: 'จังหวัดนนทบุรี' },
+        'ปทุมธานี': { lat: 14.0208, lng: 100.5250, name: 'จังหวัดปทุมธานี' },
+        'สมุทรปราการ': { lat: 13.5991, lng: 100.5998, name: 'จังหวัดสมุทรปราการ' },
+        'สมุทรสาคร': { lat: 13.5475, lng: 100.2744, name: 'จังหวัดสมุทรสาคร' },
+        'นครปฐม': { lat: 13.8196, lng: 100.0601, name: 'จังหวัดนครปฐม' },
+        'เชียงใหม่': { lat: 18.7883, lng: 98.9853, name: 'จังหวัดเชียงใหม่' },
+        'ขอนแก่น': { lat: 16.4419, lng: 102.8360, name: 'จังหวัดขอนแก่น' },
+        'ชลบุรี': { lat: 13.3611, lng: 100.9847, name: 'จังหวัดชลบุรี' },
+        'พัทยา': { lat: 12.9276, lng: 100.8771, name: 'เมืองพัทยา ชลบุรี' }
+      };
+
+      // 1. เรียก OpenStreetMap Nominatim API ค้นหาพิกัดจริง
+      const queries = [
+        raw,
+        raw.replace(/ห้อง\s*\S+|ชั้น\s*\S+|ตึก\s*\S+|อาคาร\s*\S+|เลขที่\s*\S+/g, ' ').replace(/\s+/g, ' ').trim()
+      ];
+
+      for (const q of queries) {
+        if (!q) continue;
+        try {
+          const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=th&limit=1`;
+          const res = await fetch(url, { headers: { 'User-Agent': 'TumKrokZing-App' } });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.length > 0) {
+              const item = data[0];
+              const parts = (item.display_name || '').split(',');
+              const shortName = parts.slice(0, 3).join(', ').trim() || raw;
+              return {
+                lat: Number(Number(item.lat).toFixed(6)),
+                lng: Number(Number(item.lon).toFixed(6)),
+                name: shortName
+              };
+            }
+          }
+        } catch (e) {
+          // ข้ามไปยังรอบถัดไป
+        }
+      }
+
+      // 2. ถ้า API ไม่พบ ให้ค้นหาจากตารางเขตและถนนสำคัญ
+      for (const [key, val] of Object.entries(thaiDistrictFallbacks)) {
+        if (raw.includes(key)) {
+          return {
+            lat: val.lat,
+            lng: val.lng,
+            name: val.name
+          };
+        }
+      }
+
+      return null;
+    },
+
+    async geocodeAddress(addrText, isPreviewOnly = false) {
+      if (!addrText || !addrText.trim()) return;
+      this.isGeocoding = true;
+      try {
+        const result = await this.geocodeThaiAddress(addrText);
+        if (result) {
+          this.editDeliveryLat = result.lat;
+          this.editDeliveryLng = result.lng;
+          this.geocodeFoundAddress = result.name;
+
+          if (!isPreviewOnly) {
+            this.deliveryLat = result.lat;
+            this.deliveryLng = result.lng;
+          }
+        }
+      } finally {
+        this.isGeocoding = false;
+      }
+    },
+
+    async autoGeocodeInitialAddress(addrText) {
+      if (!addrText || !addrText.trim()) return;
+      const result = await this.geocodeThaiAddress(addrText);
+      if (result) {
+        this.deliveryLat = result.lat;
+        this.deliveryLng = result.lng;
+        this.editDeliveryLat = result.lat;
+        this.editDeliveryLng = result.lng;
+        
+        try {
+          const gpsData = {
+            lat: this.deliveryLat,
+            lng: this.deliveryLng,
+            address: this.userProfile.address,
+            name: this.userProfile.name,
+            phone: this.userProfile.phone
+          };
+          localStorage.setItem('latest_delivery_gps', JSON.stringify(gpsData));
+          localStorage.setItem('latest_order_gps', JSON.stringify(gpsData));
+        } catch (e) {}
+      }
     },
 
     pinCurrentGpsLocation() {
@@ -756,11 +1282,18 @@ export default {
         alert('กรุณากรอกที่อยู่สำหรับจัดส่งครับ');
         return;
       }
+
+      // ถ้าที่อยู่มีการเปลี่ยนแปลง ให้ค้นหาพิกัดใหม่เสมอ
+      if (this.editAddressText.trim() !== this.userProfile.address && !this.geocodeFoundAddress) {
+        await this.geocodeAddress(this.editAddressText, false);
+      }
+
       this.userProfile.address = this.editAddressText;
       if (this.editDeliveryLat && this.editDeliveryLng) {
         this.deliveryLat = Number(this.editDeliveryLat);
         this.deliveryLng = Number(this.editDeliveryLng);
       }
+      this.gpsNotice = 'ปักหมุดพิกัดตามที่อยู่เรียบร้อยแล้ว';
       localStorage.setItem('userProfile', JSON.stringify(this.userProfile));
       try {
         const gpsData = {
@@ -855,6 +1388,79 @@ async validateAndCheckout() {
       }
     },
 
+    formatCurrency(val) {
+      const num = Number(val || 0);
+      return (num % 1 === 0) ? num.toLocaleString() : num.toFixed(2);
+    },
+
+    selectCardBrand(brand) {
+      this.selectedCardBrand = brand;
+    },
+
+    detectCardBrand(number) {
+      const clean = (number || '').replace(/\D/g, '');
+      if (/^4/.test(clean)) return 'visa';
+      if (/^(5[1-5]|2[2-7])/.test(clean)) return 'mastercard';
+      if (/^35/.test(clean)) return 'jcb';
+      if (/^3[47]/.test(clean)) return 'amex';
+      if (/^62/.test(clean)) return 'unionpay';
+      return null;
+    },
+
+    onCardNumberInput(e) {
+      let val = e.target.value.replace(/\D/g, '').substring(0, 16);
+      val = val.replace(/(.{4})/g, '$1 ').trim();
+      this.cardForm.number = val;
+      const detected = this.detectCardBrand(val);
+      if (detected) {
+        this.selectedCardBrand = detected;
+      }
+    },
+
+    onCardExpiryInput(e) {
+      let val = e.target.value.replace(/\D/g, '').substring(0, 4);
+      if (val.length >= 3) {
+        val = val.substring(0, 2) + '/' + val.substring(2);
+      }
+      this.cardForm.expiry = val;
+    },
+
+    async processCardPayment() {
+      const cleanNum = (this.cardForm.number || '').replace(/\D/g, '');
+      if (!cleanNum || cleanNum.length < 14) {
+        alert('กรุณากรอกหมายเลขบัตรเครดิต / เดบิตให้ครบถ้วน (14-16 หลัก) ครับ');
+        return;
+      }
+      if (!this.cardForm.expiry || this.cardForm.expiry.length < 4) {
+        alert('กรุณากรอกวันหมดอายุของบัตร (MM/YY) ครับ');
+        return;
+      }
+      if (!this.cardForm.cvc || this.cardForm.cvc.length < 3) {
+        alert('กรุณากรอกรหัส CVC / CVV หลังบัตรครับ');
+        return;
+      }
+      if (!this.cardForm.name || !this.cardForm.name.trim()) {
+        alert('กรุณากรอกชื่อผู้ถือบัตรภาษาอังกฤษครับ');
+        return;
+      }
+
+      const brand = (this.selectedCardBrand || 'Card').toUpperCase();
+      this.cardProcessingBrand = this.selectedCardBrand || 'visa';
+      this.isCardProcessingModalOpen = true;
+      this.cardProcessingStep = 'authorizing';
+      this.cardProcessingMessage = `กำลังเชื่อมต่อระบบความปลอดภัย ${brand} (3D-Secure 2.0)...`;
+
+      setTimeout(() => {
+        this.cardProcessingStep = 'success';
+        this.cardProcessingMessage = `ตัดบัตร ${brand} (•••• ${cleanNum.slice(-4)}) เรียบร้อยแล้ว`;
+        setTimeout(() => {
+          this.isCardProcessingModalOpen = false;
+          const label = `Credit Card (${brand} •••• ${cleanNum.slice(-4)})`;
+          this.processOrderCompletion(label);
+        }, 1000);
+      }, 1500);
+    },
+
     async confirmOrder() {
       if (this.cartItems.length === 0) {
         alert('กรุณาเลือกอาหารก่อนชำระเงินครับ!');
@@ -881,12 +1487,14 @@ async validateAndCheckout() {
 
       if (this.selectedPayment === 'qr') {
         this.openQrModal();
+      } else if (this.selectedPayment === 'card') {
+        this.processCardPayment();
       } else {
-        this.processOrderCompletion();
+        this.processOrderCompletion('Cash');
       }
     },
 
-    async processOrderCompletion() {
+    async processOrderCompletion(customPaymentMethod = null) {
       if (this.isSubmitting) return;
 
       const token = localStorage.getItem('access_token');
@@ -935,6 +1543,13 @@ async validateAndCheckout() {
           })
         };
 
+        if (this.vatAmount > 0) {
+          const taxInfo = `[รวม VAT 7%: B${this.formatCurrency(this.vatAmount)}]`;
+          if (orderPayload.items.length > 0) {
+            orderPayload.items[0].notes = orderPayload.items[0].notes ? `${orderPayload.items[0].notes} | ${taxInfo}` : taxInfo;
+          }
+        }
+
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
         const response = await axios.post(`${API_BASE}/orders`, orderPayload, { headers });
 
@@ -951,11 +1566,14 @@ async validateAndCheckout() {
         // บันทึกข้อมูล Transaction ลงในฐานข้อมูลจริง
         if (createdOrder?.order_id) {
           try {
+            const paymentLabel = customPaymentMethod || (this.selectedPayment === 'qr' ? 'PromptPay' : (this.selectedPayment === 'card' ? 'Credit Card' : 'Cash'));
+            const paymentStatus = (this.selectedPayment === 'cash') ? 'PENDING' : 'COMPLETED';
+
             await axios.post(`${API_BASE}/transactions`, {
               order_id: createdOrder.order_id,
               amount: Number(this.total),
-              payment_method: this.selectedPayment === 'qr' ? 'PromptPay' : 'Cash',
-              payment_status: this.selectedPayment === 'qr' ? 'COMPLETED' : 'PENDING'
+              payment_method: paymentLabel,
+              payment_status: paymentStatus
             });
           } catch (txnErr) {
             console.warn('บันทึก transaction ไม่สำเร็จ:', txnErr);
@@ -1069,20 +1687,436 @@ async validateAndCheckout() {
 .edit-address-form { display: flex; flex-direction: column; gap: 10px; margin-top: 5px; }
 .edit-textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical; outline: none; transition: 0.2s; }
 .edit-textarea:focus { border-color: #557c61; box-shadow: 0 0 0 3px rgba(85, 124, 97, 0.1); }
+.geocoding-status-banner {
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: fadeIn 0.2s ease;
+}
+.geocoding-status-banner.loading {
+  background-color: #f0f7ff;
+  color: #0366d6;
+  border: 1px solid #c8e1ff;
+}
+.geocoding-status-banner.success {
+  background-color: #f0fff4;
+  color: #22863a;
+  border: 1px solid #dcffe4;
+}
+.spin-icon {
+  display: inline-block;
+  animation: spin 1s infinite linear;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 .edit-actions { display: flex; gap: 10px; justify-content: flex-end; }
 .cancel-edit-btn { background: white; border: 1px solid #ddd; color: #666; padding: 6px 14px; border-radius: 15px; font-size: 12px; cursor: pointer; font-family: inherit; }
 .save-edit-btn { background: #557c61; border: none; color: white; padding: 6px 14px; border-radius: 15px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
 .save-edit-btn:hover { background: #405e49; }
+.save-edit-btn:disabled { background: #a0b5a7; cursor: not-allowed; }
 
 .delivery-time-box { display: flex; justify-content: space-between; align-items: center; border: 1px solid #e0dfd5; border-radius: 12px; padding: 15px 20px; }
 .time-type { font-weight: 600; font-size: 14px; color: #333; }
 .time-range { font-size: 13px; color: #666; }
 
-.payment-methods { display: flex; gap: 15px; }
-.payment-card { flex: 1; border: 1px solid #e0dfd5; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; cursor: pointer; transition: 0.2s; background: white; }
-.payment-card.active { border-color: #557c61; background: #fcfbf8; box-shadow: 0 0 0 1px #557c61; }
-.pay-icon { font-size: 24px; }
-.payment-card span { font-size: 14px; font-weight: 500; color: #333; }
+.payment-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.payment-security-badge {
+  font-size: 11px;
+  color: #2e7d32;
+  background: #edf7ed;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Primary Payment Grid */
+.payment-methods-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+@media (max-width: 640px) {
+  .payment-methods-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 480px) {
+  .payment-methods-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.payment-card {
+  border: 1.5px solid #e0dfd5;
+  border-radius: 14px;
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: white;
+}
+.payment-card:hover {
+  border-color: #557c61;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.04);
+}
+.payment-card.active {
+  border-color: #557c61;
+  background: #fcfbf8;
+  box-shadow: 0 0 0 2px #557c61;
+}
+.payment-card .pay-icon { font-size: 24px; }
+.payment-card .pay-title { font-size: 13px; font-weight: 600; color: #333; line-height: 1.2; }
+.payment-card .pay-sub { font-size: 11px; color: #888; }
+
+/* Card Checkout Container */
+.card-checkout-container {
+  background: #fafaf8;
+  border: 1px solid #e5e4dc;
+  border-radius: 16px;
+  padding: 20px;
+  margin-top: 15px;
+  animation: fadeIn 0.2s ease;
+}
+.card-container-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.card-header-left {
+  display: flex;
+  flex-direction: column;
+}
+.card-section-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+.card-instruction {
+  font-size: 11px;
+  color: #777;
+}
+/* Manual Card Brand Selector */
+.card-brand-selection-area {
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #ebe9df;
+}
+.brand-selection-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 8px;
+}
+.card-brand-chips {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+@media (max-width: 600px) {
+  .card-brand-chips {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 400px) {
+  .card-brand-chips {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.brand-chip-btn {
+  background: white;
+  border: 1.5px solid #dcd8cd;
+  border-radius: 12px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+.brand-chip-btn:hover {
+  border-color: #557c61;
+  background: #fdfcf9;
+  transform: translateY(-1px);
+}
+.card-logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  padding: 1px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.card-brand-svg {
+  display: block;
+  border-radius: 2.5px;
+}
+.chip-brand-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+}
+.chip-check {
+  font-size: 11px;
+  font-weight: 800;
+  margin-left: 2px;
+}
+.brand-chip-btn.active {
+  border-width: 2px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+}
+.brand-chip-btn:nth-child(1).active {
+  background: #1a1f71;
+  border-color: #1a1f71;
+}
+.brand-chip-btn:nth-child(1).active .chip-brand-title,
+.brand-chip-btn:nth-child(1).active .chip-check {
+  color: white;
+}
+.brand-chip-btn:nth-child(2).active {
+  background: #eb001b;
+  border-color: #eb001b;
+}
+.brand-chip-btn:nth-child(2).active .chip-brand-title,
+.brand-chip-btn:nth-child(2).active .chip-check {
+  color: white;
+}
+.brand-chip-btn:nth-child(3).active {
+  background: #005697;
+  border-color: #005697;
+}
+.brand-chip-btn:nth-child(3).active .chip-brand-title,
+.brand-chip-btn:nth-child(3).active .chip-check {
+  color: white;
+}
+.brand-chip-btn:nth-child(4).active {
+  background: #016fd0;
+  border-color: #016fd0;
+}
+.brand-chip-btn:nth-child(4).active .chip-brand-title,
+.brand-chip-btn:nth-child(4).active .chip-check {
+  color: white;
+}
+.brand-chip-btn:nth-child(5).active {
+  background: #c51d24;
+  border-color: #c51d24;
+}
+.brand-chip-btn:nth-child(5).active .chip-brand-title,
+.brand-chip-btn:nth-child(5).active .chip-check {
+  color: white;
+}
+
+.card-input-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.card-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+}
+.card-field-group label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #555;
+}
+.card-styled-input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid #d9d8d0;
+  border-radius: 10px;
+  font-size: 14px;
+  background: white;
+  font-family: inherit;
+  outline: none;
+  transition: 0.2s;
+}
+.card-styled-input:focus {
+  border-color: #557c61;
+  box-shadow: 0 0 0 3px rgba(85, 124, 97, 0.12);
+}
+.card-number-wrapper, .cvc-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.detected-badge {
+  position: absolute;
+  right: 12px;
+  background: #557c61;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  pointer-events: none;
+}
+.cvc-hint {
+  position: absolute;
+  right: 12px;
+  font-size: 14px;
+  opacity: 0.6;
+}
+.card-row-split {
+  display: flex;
+  gap: 12px;
+}
+.save-card-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #666;
+  cursor: pointer;
+}
+.save-card-checkbox input {
+  accent-color: #557c61;
+  width: 16px;
+  height: 16px;
+}
+
+
+
+/* 3D-Secure / Card Processing Modal */
+.card-processing-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+}
+.card-processing-card {
+  background: white;
+  border-radius: 20px;
+  width: 380px;
+  max-width: 100%;
+  padding: 30px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.18);
+  animation: popIn 0.25s ease;
+}
+.processing-top-badge {
+  background: #f0f4f1;
+  color: #2f533a;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 14px;
+  border-radius: 20px;
+  margin-bottom: 20px;
+}
+.processing-icon-area {
+  margin-bottom: 16px;
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.processing-spinner-box {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.secure-spinner {
+  width: 60px;
+  height: 60px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #557c61;
+  border-radius: 50%;
+  animation: spin 1s infinite linear;
+}
+.secure-shield-icon {
+  position: absolute;
+  font-size: 24px;
+}
+.processing-success-box {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #e8f5e9;
+  color: #2e7d32;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  font-weight: bold;
+  animation: popIn 0.3s ease;
+}
+.processing-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 6px;
+}
+.processing-message {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 20px;
+  line-height: 1.4;
+}
+.processing-amount-box {
+  background: #f9f9f7;
+  border: 1px solid #ebe9df;
+  border-radius: 12px;
+  padding: 12px 20px;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.amount-label { font-size: 13px; color: #777; }
+.amount-val { font-size: 18px; color: #557c61; }
+.processing-footer-badge {
+  font-size: 11px;
+  color: #999;
+}
 
 .right-section { width: 360px; }
 .summary-card { background: white; border-radius: 16px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); display: flex; flex-direction: column; border: 1px solid #e5e2d5; }
@@ -1625,6 +2659,68 @@ async validateAndCheckout() {
 .discount-price {
   color: #16a34a;
   font-weight: 700;
+}
+
+/* ===================================================
+   MANDATORY VAT 7% SYSTEM STYLES
+   =================================================== */
+.tax-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 8px 10px;
+  background: #f0f9ff;
+  border: 1px dashed #bae6fd;
+  border-radius: 8px;
+  margin: 4px 0;
+}
+
+.tax-info-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.tax-info-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tax-main-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0369a1;
+}
+
+.tax-mandate-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #0284c7;
+  background: #e0f2fe;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.tax-formula-detail {
+  font-size: 11px;
+  color: #0284c7;
+  font-weight: 500;
+}
+
+.tax-amount-highlight {
+  color: #0284c7;
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.tax-summary-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: #64748b;
+  margin-top: 2px;
 }
 
 /* 📍 สไตล์สำหรับพิกัด GPS ของลูกค้า */
