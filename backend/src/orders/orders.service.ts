@@ -718,7 +718,10 @@ export class OrdersService implements OnModuleInit {
 
     const updated = await this.prisma.order.update({
       where: { order_id: id },
-      data: { status: updateOrderStatusDto.status },
+      data: {
+        status: updateOrderStatusDto.status,
+        updated_at: new Date(),
+      },
     });
 
     // สำคัญ: การเปลี่ยนสถานะออเดอร์ในครัว (COOKING, READY, SERVED)

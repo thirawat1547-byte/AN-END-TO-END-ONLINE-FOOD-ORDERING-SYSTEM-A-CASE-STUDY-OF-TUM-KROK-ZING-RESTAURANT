@@ -108,6 +108,7 @@ model Order {
   status      String   @db.VarChar(30)
   total_price Decimal  @db.Decimal(10, 2)
   created_at  DateTime @default(now())
+  updated_at  DateTime @default(now()) @updatedAt
 
   user        User?         @relation(fields: [user_id], references: [user_id])
   table       Table?        @relation(fields: [table_id], references: [table_id])

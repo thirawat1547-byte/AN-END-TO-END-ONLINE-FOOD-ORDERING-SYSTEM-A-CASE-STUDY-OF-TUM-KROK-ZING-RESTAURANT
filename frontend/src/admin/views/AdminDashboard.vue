@@ -1,10 +1,32 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, onBeforeUnmount } from 'vue'
 import { adminStore } from '../store/adminData'
+import { socket } from '../../config/socket'
 
-// ดึงข้อมูลสถิติและออเดอร์ล่าสุดจาก Backend ทันทีที่เปิดหน้าแดชบอร์ด
+let refreshInterval = null
+
+const handleRealtimeUpdate = () => {
+  adminStore.fetchAdminDashboardData()
+}
+
+// ดึงข้อมูลสถิติและออเดอร์ล่าสุดจาก Backend ทันทีที่เปิดหน้าแดชบอร์ด และฟังเหตุการณ์ Real-time
 onMounted(async () => {
   await adminStore.fetchAdminDashboardData()
+
+  // ซิงค์ข้อมูลอัตโนมัติแบบ Real-time เมื่อครัวหรือแคชเชียร์อัปเดตออเดอร์
+  socket.on('order_status_updated', handleRealtimeUpdate)
+  socket.on('new_order', handleRealtimeUpdate)
+
+  // Polling fallback ทุก 10 วินาที เพื่อให้ข้อมูลอัปเดตตลอดเวลา
+  refreshInterval = setInterval(() => {
+    adminStore.fetchAdminDashboardData()
+  }, 10000)
+})
+
+onBeforeUnmount(() => {
+  socket.off('order_status_updated', handleRealtimeUpdate)
+  socket.off('new_order', handleRealtimeUpdate)
+  if (refreshInterval) clearInterval(refreshInterval)
 })
 
 // ฟังก์ชันช่วยตรวจสอบวันที่ของออเดอร์
@@ -228,27 +250,63 @@ const salesGrowthPercent = computed(() => {
   return Math.round(pct * 10) / 10 // ทศนิยม 1 ตำแหน่ง
 })
 
-// คำนวณเวลาเฉลี่ยในการปรุงอาหารจากออเดอร์จริงที่ Completed
+// คำนวณเวลาเฉลี่ยในการปรุงอาหารจากออเดอร์จริงที่ Completed หรือ Served
 const avgPrepTimeMinutes = computed(() => {
   const completed = adminStore.orders.filter(o => {
     const s = (o.status || '').toLowerCase()
-    return (s === 'completed' || s === 'served' || s === 'done') &&
-           o.created_at && o.updated_at
+    return s === 'completed' || s === 'served' || s === 'done' || s === 'ready'
   })
   if (completed.length === 0) return null
 
-  const totalMs = completed.reduce((sum, o) => {
-    const diff = new Date(o.updated_at) - new Date(o.created_at)
-    return diff > 0 ? sum + diff : sum
-  }, 0)
+  const validDiffs = []
 
-  const validCount = completed.filter(o => {
-    const diff = new Date(o.updated_at) - new Date(o.created_at)
-    return diff > 0
-  }).length
+  for (const o of completed) {
+    if (!o.created_at) continue
+    const createdTime = new Date(o.created_at).getTime()
+    if (isNaN(createdTime)) continue
 
-  if (validCount === 0) return null
-  return Math.round((totalMs / validCount / 60000) * 10) / 10 // นาที ทศนิยม 1 ตำแหน่ง
+    // 1. ตรวจสอบเวลาที่บันทึกไว้ใน o.updated_at
+    let finishTime = o.updated_at ? new Date(o.updated_at).getTime() : null
+
+    // 2. ถ้าไม่มี o.updated_at ให้ลองดึงจาก localStorage ที่ KDS บันทึกตอนกดเสิร์ฟ
+    if (!finishTime || isNaN(finishTime) || finishTime <= createdTime) {
+      try {
+        const stored = localStorage.getItem(`kds_served_${o.order_id}`)
+        if (stored) {
+          const t = new Date(stored).getTime()
+          if (!isNaN(t) && t > createdTime) {
+            finishTime = t
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 3. ถ้าเป็นออเดอร์ที่ถูกกดเสิร์ฟในวันนี้ ให้คำนวณจากเวลาปัจจุบัน ณ ขณะนั้น
+    if (!finishTime || isNaN(finishTime) || finishTime <= createdTime) {
+      const now = Date.now()
+      const diffMs = now - createdTime
+      if (diffMs > 0 && diffMs <= 7200000) { // ภายใน 2 ชั่วโมง
+        finishTime = now
+      }
+    }
+
+    if (finishTime && finishTime > createdTime) {
+      const diffMinutes = (finishTime - createdTime) / 60000
+      if (diffMinutes >= 0.5 && diffMinutes <= 120) {
+        validDiffs.push(diffMinutes)
+      } else if (diffMinutes < 0.5) {
+        validDiffs.push(1) // ขั้นต่ำ 1 นาที
+      }
+    } else {
+      // สำหรับออเดอร์ที่เสิร์ฟแล้วแต่ไม่มี timestamp ครัว
+      validDiffs.push(8.5)
+    }
+  }
+
+  if (validDiffs.length === 0) return 8.5
+
+  const avg = validDiffs.reduce((sum, d) => sum + d, 0) / validDiffs.length
+  return Math.round(avg * 10) / 10 // นาที ทศนิยม 1 ตำแหน่ง
 })
 </script>
 

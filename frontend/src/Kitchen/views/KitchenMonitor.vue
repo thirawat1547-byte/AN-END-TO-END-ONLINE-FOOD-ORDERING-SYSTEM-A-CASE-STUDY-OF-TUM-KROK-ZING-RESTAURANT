@@ -231,6 +231,9 @@ const serveOrder = async (orderId) => {
     await axios.patch(`${API_BASE}/orders/${orderId}/status`, {
       status: 'SERVED'
     })
+    try {
+      localStorage.setItem(`kds_served_${orderId}`, new Date().toISOString())
+    } catch (e) {}
     await fetchOrders()
   } catch (err) {
     console.error('ไม่สามารถอัปเดตสถานะออเดอร์ได้:', err)
