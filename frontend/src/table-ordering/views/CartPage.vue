@@ -29,10 +29,53 @@
         @update-qty="(newQty) => updateQuantity(item.cartItemId, newQty)"
         @remove="removeFromCart(item.cartItemId)"
       />
+
+      <!-- 🥗 ส่วนแสดงผลพลังงานรวมทั้งมื้อ (Total Calories) -->
+      <div class="calories-summary-box" v-if="cart.length > 0">
+        <div class="cal-box-header">
+          <div class="cal-title-left">
+            <div class="cal-badge-pill">
+              <span class="cal-fire-icon">🔥</span>
+              <span>ข้อมูลทางโภชนาการ</span>
+            </div>
+            <h4 class="cal-box-title">พลังงานรวมทั้งมื้อ (Total Calories)</h4>
+          </div>
+          <div class="cal-number-right">
+            <span class="cal-total-value">{{ (cartTotalCalories || 0).toLocaleString() }}</span>
+            <span class="cal-total-unit">kcal</span>
+          </div>
+        </div>
+
+        <div class="cal-progress-section">
+          <div class="cal-progress-bar-bg">
+            <div 
+              class="cal-progress-bar-fill" 
+              :style="{ width: caloriesPercentage + '%' }"
+              :class="{
+                'cal-fill-healthy': cartTotalCalories <= 700,
+                'cal-fill-balanced': cartTotalCalories > 700 && cartTotalCalories <= 1200,
+                'cal-fill-high': cartTotalCalories > 1200
+              }"
+            ></div>
+          </div>
+          <div class="cal-progress-meta">
+            <span class="cal-meta-desc">คิดเป็น <strong>{{ caloriesPercentage }}%</strong> ของพลังงานแนะนำต่อวัน (2,000 kcal)</span>
+            <span class="cal-status-tag healthy" v-if="cartTotalCalories <= 700">🥗 มื้อเบาสบาย</span>
+            <span class="cal-status-tag balanced" v-else-if="cartTotalCalories <= 1200">🍲 มื้ออิ่มพอดี</span>
+            <span class="cal-status-tag high" v-else>🎉 มื้อจัดเต็ม</span>
+          </div>
+        </div>
+      </div>
       
       <div class="cart-summary-total">
-        <span>ราคารวม</span>
-        <span class="total-amount">฿{{ cartTotal.toFixed(2) }}</span>
+        <div class="cal-summary-row" v-if="cartTotalCalories > 0">
+          <span class="cal-label">🔥 พลังงานรวมทั้งมื้อ (Total Calories)</span>
+          <span class="cal-value">{{ (cartTotalCalories || 0).toLocaleString() }} kcal</span>
+        </div>
+        <div class="price-summary-row">
+          <span>ราคารวม</span>
+          <span class="total-amount">฿{{ cartTotal.toFixed(2) }}</span>
+        </div>
       </div>
     </div>
     
@@ -43,7 +86,10 @@
 
     <div class="checkout-footer" v-if="cart.length > 0">
       <div class="footer-summary">
-        <span class="footer-count">รายการอาหาร {{ cartItemCount }} รายการ</span>
+        <div class="footer-info">
+          <span class="footer-count">รายการอาหาร {{ cartItemCount }} รายการ</span>
+          <span class="footer-cal" v-if="cartTotalCalories > 0">🔥 รวม {{ (cartTotalCalories || 0).toLocaleString() }} kcal</span>
+        </div>
         <span class="footer-total">฿{{ cartTotal.toFixed(2) }}</span>
       </div>
       <button 
@@ -78,6 +124,11 @@
           <strong class="confirm-total-amount">฿{{ cartTotal.toFixed(2) }}</strong>
         </div>
 
+        <div class="confirm-cal-row" v-if="cartTotalCalories > 0">
+          <span class="confirm-cal-label">🔥 พลังงานรวมทั้งมื้อ</span>
+          <span class="confirm-cal-val">{{ (cartTotalCalories || 0).toLocaleString() }} kcal</span>
+        </div>
+
         <div class="confirm-warning-note">
           ⚠️ เมื่อกดยืนยัน รายการจะถูกส่งตรงเข้าจอครัวและเริ่มปรุงอาหารทันที กรุณาตรวจสอบความถูกต้องเพื่อป้องกันการสั่งซ้ำครับ
         </div>
@@ -107,7 +158,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import OrderHeader from '../components/OrderHeader.vue'
@@ -123,7 +174,6 @@ const isSubmitting = ref(false)
 const isStoreOpen = ref(true)
 const showConfirmModal = ref(false)
 
-import { onMounted } from 'vue'
 onMounted(async () => {
   try {
     const res = await axios.get(`${API_BASE}/settings`)
@@ -135,7 +185,11 @@ onMounted(async () => {
   }
 })
 
-const { cart, updateQuantity, cartTotal, cartItemCount, placeOrderToHistory, removeFromCart } = useCart()
+const { cart, updateQuantity, cartTotal, cartItemCount, cartTotalCalories, placeOrderToHistory, removeFromCart } = useCart()
+
+const caloriesPercentage = computed(() => {
+  return Math.min(100, Math.round(((cartTotalCalories.value || 0) / 2000) * 100))
+})
 
 const goToMenu = () => {
   router.push(`/table/${tableId}`)
@@ -269,12 +323,41 @@ const executePlaceOrder = async () => {
 
 .cart-summary-total {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 0 24px;
+}
+
+.cal-summary-row {
+  display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px 0;
+  background: #fffbeb;
+  border-left: 3px solid #f59e0b;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.cal-summary-row .cal-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #b45309;
+}
+
+.cal-summary-row .cal-value {
+  font-size: 13px;
+  font-weight: 800;
+  color: #d97706;
+}
+
+.price-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   font-size: 16px;
   font-weight: bold;
   color: #333;
+  padding: 4px 0;
 }
 
 .empty-cart {
@@ -536,5 +619,175 @@ const executePlaceOrder = async () => {
 @keyframes scaleUp {
   from { transform: scale(0.95); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
+}
+
+/* 🥗 TOTAL CALORIES NUTRITION STYLES */
+.calories-summary-box {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border: 1.5px solid #fde68a;
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-top: 14px;
+  margin-bottom: 6px;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.08);
+}
+
+.cal-box-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.cal-title-left {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cal-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #b45309;
+  background: rgba(254, 243, 199, 0.9);
+  border: 1px solid #fcd34d;
+  padding: 1px 8px;
+  border-radius: 9999px;
+  width: fit-content;
+}
+
+.cal-box-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #92400e;
+  margin: 0;
+}
+
+.cal-number-right {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  background: white;
+  padding: 4px 10px;
+  border-radius: 10px;
+  border: 1px solid #fde68a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.cal-total-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: #d97706;
+  font-family: monospace, sans-serif;
+}
+
+.cal-total-unit {
+  font-size: 11px;
+  font-weight: 700;
+  color: #b45309;
+}
+
+.cal-progress-section {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cal-progress-bar-bg {
+  width: 100%;
+  height: 8px;
+  background: rgba(253, 230, 138, 0.5);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.cal-progress-bar-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.4s ease;
+}
+
+.cal-fill-healthy {
+  background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+.cal-fill-balanced {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.cal-fill-high {
+  background: linear-gradient(90deg, #ea580c, #f97316);
+}
+
+.cal-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: #78350f;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cal-meta-desc {
+  font-size: 10.5px;
+  color: #92400e;
+}
+
+.cal-status-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+
+.cal-status-tag.healthy {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.cal-status-tag.balanced {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.cal-status-tag.high {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.footer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.footer-cal {
+  font-size: 11px;
+  color: #fde68a;
+  font-weight: 600;
+}
+
+.confirm-cal-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  font-size: 13px;
+  color: #d97706;
+  border-top: 1px dashed #fed7aa;
+  margin-top: 6px;
+}
+
+.confirm-cal-label {
+  font-weight: 600;
+}
+
+.confirm-cal-val {
+  font-weight: 800;
 }
 </style>

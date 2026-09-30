@@ -73,6 +73,7 @@
             <p class="food-desc">{{ item.desc }}</p>
             <div class="food-footer">
               <span class="price">B{{ item.price }}</span>
+              <span class="food-card-cal" v-if="item.calories">🔥 {{ item.calories }} kcal</span>
               <button 
                 class="plus-btn" 
                 :disabled="item.is_available === false"
@@ -109,7 +110,10 @@
                 <span v-for="addon in item.addons" :key="addon.name" class="opt-badge">+ {{ addon.name }}</span>
               </div>
               
-              <div class="cart-item-price">B{{ item.price }}</div>
+              <div class="cart-item-price-cal">
+                <span class="cart-item-price">B{{ item.price }}</span>
+                <span class="cart-item-cal" v-if="item.calories">🔥 {{ item.calories * item.qty }} kcal</span>
+              </div>
             </div>
             
             <div class="cart-item-actions">
@@ -124,6 +128,10 @@
         </div>
 
         <div class="cart-summary-section">
+          <div class="summary-line cal-summary-line" v-if="cartTotalCalories > 0">
+            <span class="cal-summary-title">🔥 พลังงานรวมทั้งมื้อ</span>
+            <span class="cal-summary-val">{{ cartTotalCalories.toLocaleString() }} kcal</span>
+          </div>
           <div class="summary-line">
             <span>ยอดรวม</span>
             <span>B{{ subtotal }}</span>
@@ -391,6 +399,9 @@ export default {
   },
   computed: {
     subtotal() { return this.cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0); },
+    cartTotalCalories() {
+      return this.cartItems.reduce((sum, item) => sum + ((Number(item.calories) || 0) * item.qty), 0);
+    },
     filteredMenu() {
       const searchWord = this.searchQuery.trim().toLowerCase();
       if (searchWord !== '') {
@@ -1202,4 +1213,50 @@ export default {
   line-height: 1.3;
 }
 
+/* Calories styling */
+.food-card-cal {
+  font-size: 11px;
+  font-weight: 600;
+  color: #d97706;
+  background: #fef3c7;
+  padding: 1px 6px;
+  border-radius: 6px;
+  align-self: center;
+}
+
+.cart-item-price-cal {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.cart-item-cal {
+  font-size: 10px;
+  font-weight: 600;
+  color: #d97706;
+  background: #fef3c7;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.cal-summary-line {
+  background: #fffbeb;
+  border-left: 3px solid #f59e0b;
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+
+.cal-summary-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #b45309;
+}
+
+.cal-summary-val {
+  font-size: 13px;
+  font-weight: 800;
+  color: #d97706;
+}
 </style>

@@ -57,7 +57,10 @@
           </div>
 
           <p class="preview-desc" v-if="previewItem.desc">{{ previewItem.desc }}</p>
-          <div class="preview-price">฿{{ previewItem.price.toFixed(2) }}</div>
+          <div class="preview-price">
+            <span>฿{{ previewItem.price.toFixed(2) }}</span>
+            <span class="preview-cal-badge" v-if="previewItem.calories">🔥 {{ previewItem.calories }} kcal</span>
+          </div>
         </div>
         <button class="modal-add-btn" @click="addFromPreview">
           + เพิ่มลงตะกร้า ฿{{ previewItem.price.toFixed(2) }}
@@ -68,6 +71,7 @@
     <FloatingCartBar 
       :itemCount="cartItemCount" 
       :total="cartTotal" 
+      :calories="cartTotalCalories"
       @view-cart="goToCart"
     />
   </div>
@@ -89,7 +93,7 @@ const route = useRoute()
 const router = useRouter()
 const tableId = route.params.tableId || '1'
 
-const { addToCart, cartItemCount, cartTotal } = useCart()
+const { addToCart, cartItemCount, cartTotal, cartTotalCalories } = useCart()
 const isStoreOpen = ref(true)
 
 // แผนที่รูปภาพมาตรฐานเพื่อการแสดงผลที่ถูกต้อง
@@ -494,6 +498,19 @@ const goToCart = () => {
   font-size: 20px;
   font-weight: 700;
   color: #3e7654;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.preview-cal-badge {
+  font-size: 13px;
+  font-weight: 600;
+  color: #d97706;
+  background: #fef3c7;
+  padding: 2px 8px;
+  border-radius: 6px;
 }
 
 .modal-add-btn {

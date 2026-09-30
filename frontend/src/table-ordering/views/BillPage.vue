@@ -26,14 +26,23 @@
             <div v-if="item.specialInstructions" class="item-note">
               {{ item.specialInstructions }}
             </div>
+            <div class="item-cal-tag" v-if="getItemCalories(item)">
+              🔥 {{ getItemCalories(item) * item.quantity }} kcal
+            </div>
           </div>
         </div>
         <div class="item-price">฿{{ (calculateItemTotal(item) * item.quantity).toFixed(2) }}</div>
       </div>
       
       <div class="bill-summary-total">
-        <span>ราคารวมทั้งหมด</span>
-        <span class="total-amount">฿{{ billTotal.toFixed(2) }}</span>
+        <div class="bill-cal-row" v-if="billTotalCalories > 0">
+          <span class="bill-cal-label">🔥 พลังงานรวมทั้งมื้อ (Total Calories)</span>
+          <span class="bill-cal-val">{{ billTotalCalories.toLocaleString() }} kcal</span>
+        </div>
+        <div class="bill-price-row">
+          <span>ราคารวมทั้งหมด</span>
+          <span class="total-amount">฿{{ billTotal.toFixed(2) }}</span>
+        </div>
       </div>
     </div>
     
@@ -71,7 +80,7 @@ const route = useRoute()
 const router = useRouter()
 const tableId = route.params.tableId || '1'
 
-const { placedOrders, billTotal } = useCart()
+const { placedOrders, billTotal, billTotalCalories, getItemCalories } = useCart()
 const paymentQrUrl = ref('')
 
 function crc16(data) {
@@ -207,16 +216,56 @@ const calculateItemTotal = (item) => {
   color: #333;
 }
 
+.item-cal-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #d97706;
+  background: #fef3c7;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
 .bill-summary-total {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 0;
+  border-top: 2px solid #eee;
+  margin-top: 16px;
+}
+
+.bill-cal-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px 0;
+  background: #fffbeb;
+  border-left: 3px solid #f59e0b;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.bill-cal-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #b45309;
+}
+
+.bill-cal-val {
+  font-size: 14px;
+  font-weight: 800;
+  color: #d97706;
+}
+
+.bill-price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   font-size: 18px;
   font-weight: bold;
   color: #3e7654;
-  border-top: 2px solid #eee;
-  margin-top: 16px;
+  padding: 4px 0;
 }
 
 .empty-bill {

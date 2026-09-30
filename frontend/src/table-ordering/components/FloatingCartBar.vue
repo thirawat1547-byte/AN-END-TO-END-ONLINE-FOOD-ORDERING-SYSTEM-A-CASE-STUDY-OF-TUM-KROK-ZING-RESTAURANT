@@ -12,7 +12,10 @@
         </div>
         <div class="text-summary">
           <span class="label">รวมค่าอาหาร</span>
-          <span class="count">{{ itemCount }} รายการ</span>
+          <span class="count">
+            {{ itemCount }} รายการ
+            <span v-if="calories" class="floating-cal"> | 🔥 {{ (calories || 0).toLocaleString() }} kcal</span>
+          </span>
         </div>
       </div>
       
@@ -36,6 +39,10 @@ defineProps({
   total: {
     type: Number,
     required: true
+  },
+  calories: {
+    type: Number,
+    default: 0
   }
 })
 defineEmits(['view-cart'])
@@ -133,5 +140,11 @@ defineEmits(['view-cart'])
   gap: 8px;
   width: 100%;
   cursor: pointer;
+}
+
+.floating-cal {
+  color: #fef08a;
+  font-weight: 600;
+  font-size: 11px;
 }
 </style>

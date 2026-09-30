@@ -22,6 +22,7 @@
       </h3>
       <div class="price-action">
         <span class="item-price">฿{{ item.price.toFixed(2) }}</span>
+        <span class="item-cal-badge" v-if="item.calories">🔥 {{ item.calories }} kcal</span>
       </div>
       <button 
         class="add-button" 
@@ -226,5 +227,14 @@ const onCardClick = () => {
   border-radius: 6px;
   margin-left: 4px;
   vertical-align: middle;
+}
+
+.item-cal-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #d97706;
+  background: #fef3c7;
+  padding: 1px 6px;
+  border-radius: 6px;
 }
 </style>

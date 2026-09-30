@@ -73,6 +73,25 @@ export function useCart() {
     }, 0)
   })
 
+  const getItemCalories = (item) => {
+    if (item && item.calories !== undefined && item.calories !== null && !isNaN(Number(item.calories))) {
+      return Number(item.calories)
+    }
+    return 350
+  }
+
+  const cartTotalCalories = computed(() => {
+    return cart.value.reduce((total, item) => {
+      return total + (getItemCalories(item) * (item.quantity || 1))
+    }, 0)
+  })
+
+  const billTotalCalories = computed(() => {
+    return placedOrders.value.reduce((total, item) => {
+      return total + (getItemCalories(item) * (item.quantity || 1))
+    }, 0)
+  })
+
   return {
     cart,
     placedOrders,
@@ -83,7 +102,10 @@ export function useCart() {
     placeOrderToHistory,
     cartTotal,
     cartItemCount,
-    billTotal
+    billTotal,
+    getItemCalories,
+    cartTotalCalories,
+    billTotalCalories
   }
 }
 
