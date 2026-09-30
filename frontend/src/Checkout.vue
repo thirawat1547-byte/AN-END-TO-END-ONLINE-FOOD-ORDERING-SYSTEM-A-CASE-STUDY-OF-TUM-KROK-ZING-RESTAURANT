@@ -416,6 +416,12 @@
                   <span v-if="item.spiceLevel">🌶️ {{ item.spiceLevel }}</span>
                   <span v-for="addon in item.addons" :key="addon.name"> +{{ addon.name }}</span>
                 </div>
+                <!-- ⚡ แสดงพลังงานแคลอรี่ต่อรายการ -->
+                <div class="item-cal-tag">
+                  <span class="fire-icon">🔥</span>
+                  <span>{{ getItemCalories(item) }} kcal</span>
+                  <span v-if="item.qty > 1" class="item-cal-multiplier"> (รวม {{ getItemCalories(item) * item.qty }} kcal)</span>
+                </div>
               </div>
               <div class="item-price">B{{ item.price * item.qty }}</div>
             </div>
@@ -508,7 +514,51 @@
             </div>
           </div>
 
+          <!-- 🥗 ส่วนแสดงผลพลังงานรวมทั้งมื้อ (Total Calories) -->
+          <div class="calories-summary-box" v-if="cartItems.length > 0">
+            <div class="cal-box-header">
+              <div class="cal-title-left">
+                <div class="cal-badge-pill">
+                  <span class="cal-fire-icon">🔥</span>
+                  <span>ข้อมูลทางโภชนาการ</span>
+                </div>
+                <h4 class="cal-box-title">พลังงานรวมทั้งมื้อ (Total Calories)</h4>
+              </div>
+              <div class="cal-number-right">
+                <span class="cal-total-value">{{ totalCalories.toLocaleString() }}</span>
+                <span class="cal-total-unit">kcal</span>
+              </div>
+            </div>
+
+            <div class="cal-progress-section">
+              <div class="cal-progress-bar-bg">
+                <div 
+                  class="cal-progress-bar-fill" 
+                  :style="{ width: caloriesPercentage + '%' }"
+                  :class="{
+                    'cal-fill-healthy': totalCalories <= 700,
+                    'cal-fill-balanced': totalCalories > 700 && totalCalories <= 1200,
+                    'cal-fill-high': totalCalories > 1200
+                  }"
+                ></div>
+              </div>
+              <div class="cal-progress-meta">
+                <span class="cal-meta-desc">คิดเป็น <strong>{{ caloriesPercentage }}%</strong> ของพลังงานแนะนำต่อวัน (2,000 kcal)</span>
+                <span class="cal-status-tag healthy" v-if="totalCalories <= 700">🥗 มื้อเบาสบาย</span>
+                <span class="cal-status-tag balanced" v-else-if="totalCalories <= 1200">🍲 มื้ออิ่มพอดี</span>
+                <span class="cal-status-tag high" v-else>🎉 มื้อจัดเต็ม</span>
+              </div>
+            </div>
+          </div>
+
           <div class="price-breakdown">
+            <!-- แถวแสดงพลังงานรวมทั้งมื้อในตารางคำนวณ -->
+            <div class="breakdown-row calories-breakdown-row">
+              <span class="cal-breakdown-label">
+                <span class="cal-fire-icon">🔥</span> พลังงานรวมทั้งมื้อ (Total Calories)
+              </span>
+              <span class="cal-breakdown-value">{{ totalCalories.toLocaleString() }} kcal</span>
+            </div>
             <div class="breakdown-row">
               <span>ยอดรวมค่าอาหาร</span>
               <span>B{{ formatCurrency(subtotal) }}</span>
@@ -811,10 +861,21 @@ export default {
       promoError: '',
       promoSuccess: '',
       isValidatingPromo: false,
-      showCouponPickerModal: false
+      showCouponPickerModal: false,
+      allDbMenus: []
     }
   },
   computed: {
+    totalCalories() {
+      return this.cartItems.reduce((sum, item) => {
+        const cal = this.getItemCalories(item);
+        const qty = Number(item.qty) || 1;
+        return sum + (cal * qty);
+      }, 0);
+    },
+    caloriesPercentage() {
+      return Math.min(100, Math.round((this.totalCalories / 2000) * 100));
+    },
     vatRate() {
       return Number(adminStore?.storeSettings?.vatRate ?? 7);
     },
@@ -937,6 +998,16 @@ export default {
       this.cartItems = JSON.parse(savedCart);
     }
 
+    // ดึงข้อมูลเมนูและค่าพลังงานแคลอรี่ (Calories) ล่าสุดจากฐานข้อมูล Backend
+    try {
+      const menuRes = await axios.get(`${API_BASE}/menus`);
+      if (menuRes.data && Array.isArray(menuRes.data)) {
+        this.allDbMenus = menuRes.data;
+      }
+    } catch (e) {
+      console.warn('โหลดข้อมูลเมนูสำหรับคำนวณแคลอรี่ไม่สำเร็จ:', e);
+    }
+
     // เชื่อมต่อ Promotion Store: โหลดคูปองโปรโมชันที่ผู้ใช้กดรับไว้
     await this.promotionStore.loadClaimedCoupons();
     if (this.promotionStore.claimedCoupons.length > 0) {
@@ -964,6 +1035,60 @@ export default {
     }
   },
   methods: {
+    getItemCalories(item) {
+      if (!item) return 0;
+      // 1. หากมีค่า calories เก็บมาในอ็อบเจกต์รายการแล้ว
+      if (item.calories !== undefined && item.calories !== null && Number(item.calories) > 0) {
+        return Number(item.calories);
+      }
+
+      // 2. ค้นหาจากฐานข้อมูลเมนู (allDbMenus หรือ adminStore.menus)
+      const clean = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, '');
+      const itemName = clean(item.name);
+      
+      const menuList = (this.allDbMenus && this.allDbMenus.length > 0) 
+        ? this.allDbMenus 
+        : (adminStore.menus || []);
+
+      let found = menuList.find(m => clean(m.menu_name || m.name) === itemName || m.menu_id === item.id || m.id === item.id);
+      let baseCal = found && found.calories ? Number(found.calories) : 0;
+
+      // 3. Fallback อ้างอิงตามฐานข้อมูลเมนูจริงของร้าน
+      if (!baseCal) {
+        if (itemName.includes('เพรา')) baseCal = 320;
+        else if (itemName.includes('ส้มตำ')) baseCal = 150;
+        else if (itemName.includes('ลาบ') || itemName.includes('ยำ')) baseCal = 220;
+        else if (itemName.includes('ไก่ทอด')) baseCal = 250;
+        else if (itemName.includes('ข้าวผัด')) baseCal = 350;
+        else if (itemName.includes('ไข่เจียว')) baseCal = 390;
+        else if (itemName.includes('หมูกระเทียม')) baseCal = 360;
+        else if (itemName.includes('พริกแกง')) baseCal = 310;
+        else if (itemName.includes('คะน้า')) baseCal = 320;
+        else if (itemName.includes('น้ำตก')) baseCal = 200;
+        else if (itemName.includes('น้ำ') || itemName.includes('โค้ก') || itemName.includes('เก๊กฮวย')) baseCal = 120;
+        else if (itemName.includes('ข้าวเปล่า') || itemName.includes('ข้าวเหนียว')) baseCal = 150;
+        else baseCal = 250;
+      }
+
+      // บวกแคลอรี่ของส่วนเสริม (Addons)
+      let addonCal = 0;
+      if (Array.isArray(item.addons)) {
+        addonCal = item.addons.reduce((sum, a) => {
+          if (a.calories) return sum + Number(a.calories);
+          const aName = clean(a.name);
+          if (aName.includes('ไข่ดาว')) return sum + 160;
+          if (aName.includes('ไข่เจียว')) return sum + 220;
+          if (aName.includes('หมูยอ') || aName.includes('ไก่ยอ')) return sum + 120;
+          if (aName.includes('ปู')) return sum + 30;
+          if (aName.includes('ขนมจีน')) return sum + 80;
+          if (aName.includes('ผัก')) return sum + 20;
+          return sum + 50;
+        }, 0);
+      }
+
+      return baseCal + addonCal;
+    },
+
     logout() {
       localStorage.removeItem('access_token');
       localStorage.removeItem('isLoggedIn');
@@ -3037,5 +3162,193 @@ async validateAndCheckout() {
   color: #ff6b35;
   font-weight: 700;
   text-decoration: underline;
+}
+
+/* ===================================================
+   TOTAL CALORIES (พลังงานรวมทั้งมื้อ) NUTRITION STYLES
+   =================================================== */
+.item-cal-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #d97706;
+  background: #fef3c7;
+  padding: 1px 6px;
+  border-radius: 6px;
+  margin-top: 4px;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.item-cal-tag .fire-icon {
+  font-size: 11px;
+}
+
+.item-cal-multiplier {
+  color: #b45309;
+  font-weight: 700;
+}
+
+.calories-summary-box {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border: 1.5px solid #fde68a;
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-top: 14px;
+  margin-bottom: 6px;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.08);
+}
+
+.cal-box-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.cal-title-left {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cal-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #b45309;
+  background: rgba(254, 243, 199, 0.9);
+  border: 1px solid #fcd34d;
+  padding: 1px 8px;
+  border-radius: 9999px;
+  width: fit-content;
+}
+
+.cal-box-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #92400e;
+  margin: 0;
+}
+
+.cal-number-right {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  background: white;
+  padding: 4px 10px;
+  border-radius: 10px;
+  border: 1px solid #fde68a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.cal-total-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: #d97706;
+  font-family: monospace, sans-serif;
+}
+
+.cal-total-unit {
+  font-size: 11px;
+  font-weight: 700;
+  color: #b45309;
+}
+
+.cal-progress-section {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cal-progress-bar-bg {
+  width: 100%;
+  height: 8px;
+  background: rgba(253, 230, 138, 0.5);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.cal-progress-bar-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.4s ease;
+}
+
+.cal-fill-healthy {
+  background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+.cal-fill-balanced {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.cal-fill-high {
+  background: linear-gradient(90deg, #ea580c, #f97316);
+}
+
+.cal-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: #78350f;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cal-meta-desc {
+  font-size: 10.5px;
+  color: #92400e;
+}
+
+.cal-status-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+
+.cal-status-tag.healthy {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.cal-status-tag.balanced {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.cal-status-tag.high {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+/* Rows in Breakdown */
+.calories-breakdown-row {
+  background: #fffbeb;
+  border-left: 3px solid #f59e0b;
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin: 4px 0 8px 0;
+}
+
+.cal-breakdown-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #b45309;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cal-breakdown-value {
+  font-size: 13px;
+  font-weight: 800;
+  color: #d97706;
 }
 </style>
