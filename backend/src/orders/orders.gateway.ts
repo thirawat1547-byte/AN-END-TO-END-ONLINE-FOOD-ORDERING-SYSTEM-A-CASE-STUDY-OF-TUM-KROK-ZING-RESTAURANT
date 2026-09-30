@@ -1,4 +1,3 @@
-// src/orders/orders.gateway.ts
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -6,15 +5,15 @@ import {
   OnGatewayInit,
   OnGatewayConnection,
   OnGatewayDisconnect,
-  MessageBody,
   ConnectedSocket,
+  MessageBody,
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 
 @WebSocketGateway({
   cors: {
-    origin: '*', // รองรับทุก Origin สำหรับการทดสอบและใช้งานร่วมกับ Frontend
+    origin: '*',
     credentials: true,
   },
 })
@@ -24,18 +23,18 @@ export class OrdersGateway
   @WebSocketServer()
   server: Server;
 
-  private readonly logger = new Logger(OrdersGateway.name);
+  private readonly logger = new Logger('OrdersGateway');
 
   afterInit(server: Server) {
-    this.logger.log('⚡ Orders WebSocket Gateway เริ่มทำงานเรียบร้อยแล้ว');
+    this.logger.log('🚀 WebSocket Gateway initialized สำหรับระบบออเดอร์เรียลไทม์');
   }
 
   handleConnection(client: Socket) {
-    this.logger.log(`🔌 Client เชื่อมต่อ Socket: ${client.id}`);
+    this.logger.log(`🔌 Client เชื่อมต่อสำเร็จ: ${client.id}`);
   }
 
   handleDisconnect(client: Socket) {
-    this.logger.log(`❌ Client ตัดการเชื่อมต่อ Socket: ${client.id}`);
+    this.logger.log(`❌ Client ตัดการเชื่อมต่อ: ${client.id}`);
   }
 
   /**
@@ -44,36 +43,24 @@ export class OrdersGateway
    */
   sendNewOrder(order: any) {
     this.logger.log(`📢 กระจายสัญญาณ new_order: #${order?.order_id || order?.id}`);
-<<<<<<< HEAD
     try {
       this.server?.emit('new_order', order);
-    } catch (e) {
+    } catch (e: any) {
       this.logger.warn('ไม่สามารถกระจายสัญญาณ new_order:', e.message);
     }
   }
 
   /**
    * ฟังก์ชันส่งสัญญาณเมื่อสถานะออเดอร์มีการเปลี่ยนแปลง (เช่น จาก PENDING -> COOKING -> READY -> COMPLETED)
-=======
-    this.server.emit('new_order', order);
-  }
-
-  /**
-   * ฟังก์ชันส่งสัญญาณเมื่อสถานะออเดอร์มีการเปลี่ยนแปลง (เช่น จาก PENDING -> COOKING -> SERVED)
->>>>>>> origin/feature/social-login
    * @param order ข้อมูลออเดอร์หลังอัปเดตสถานะ
    */
   sendOrderStatusUpdated(order: any) {
     this.logger.log(`📢 กระจายสัญญาณ order_status_updated: #${order?.order_id || order?.id} -> ${order?.status}`);
-<<<<<<< HEAD
     try {
       this.server?.emit('order_status_updated', order);
-    } catch (e) {
+    } catch (e: any) {
       this.logger.warn('ไม่สามารถกระจายสัญญาณ order_status_updated:', e.message);
     }
-=======
-    this.server.emit('order_status_updated', order);
->>>>>>> origin/feature/social-login
   }
 
   /**
@@ -85,11 +72,10 @@ export class OrdersGateway
     @MessageBody() payload: any,
   ) {
     this.logger.log(`📥 ได้รับสัญญาณ place_order จาก Client: ${client.id}`);
-<<<<<<< HEAD
     if (payload) {
       try {
         this.server?.emit('new_order', payload);
-      } catch (e) {
+      } catch (e: any) {
         this.logger.warn('ไม่สามารถกระจายสัญญาณ place_order:', e.message);
       }
     }
@@ -104,7 +90,7 @@ export class OrdersGateway
     this.logger.log(`📢 กระจายสัญญาณ menu_updated: #${menu?.menu_id || menu?.id}`);
     try {
       this.server?.emit('menu_updated', menu);
-    } catch (e) {
+    } catch (e: any) {
       this.logger.warn('ไม่สามารถกระจายสัญญาณ menu_updated:', e.message);
     }
   }
@@ -118,9 +104,10 @@ export class OrdersGateway
     @MessageBody() payload: any,
   ) {
     this.logger.log(`📥 ได้รับสัญญาณ menu_updated จาก Client: ${client.id}`);
+    if (payload) {
       try {
         this.server?.emit('menu_updated', payload);
-      } catch (e) {
+      } catch (e: any) {
         this.logger.warn('ไม่สามารถกระจายสัญญาณ menu_updated:', e.message);
       }
     }

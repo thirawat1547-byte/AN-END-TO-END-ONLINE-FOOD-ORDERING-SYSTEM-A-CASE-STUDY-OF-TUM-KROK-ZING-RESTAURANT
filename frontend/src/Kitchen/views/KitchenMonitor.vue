@@ -251,33 +251,7 @@ const recallOrder = async (orderId) => {
   }
 }
 
-// จัดการ Event เมื่อมีออเดอร์ใหม่ส่งมาจาก Backend ผ่าน WebSocket
-const onNewOrderReceived = (order) => {
-  console.log('⚡ [KDS Real-time] มีออเดอร์ใหม่เข้ามา:', order)
-  playChime()
-  fetchOrders()
 
-  const orderNum = order?.order_id || order?.id || ''
-  const tableLabel = order?.table?.table_number ? ` (โต๊ะ ${order.table.table_number})` : ''
-  newOrderNotification.value = `🔔 มีคำสั่งซื้อใหม่ #${orderNum}${tableLabel} เข้ามาแล้ว!`
-  
-  setTimeout(() => {
-    newOrderNotification.value = null
-  }, 5000)
-}
-
-const onOrderStatusChanged = (order) => {
-  console.log('⚡ [KDS Real-time] สถานะออเดอร์เปลี่ยนแปลง:', order)
-  fetchOrders()
-}
-
-const onSocketConnect = () => {
-  isSocketConnected.value = true
-}
-
-const onSocketDisconnect = () => {
-  isSocketConnected.value = false
-}
 
 onMounted(() => {
   fetchOrders()
