@@ -43,10 +43,15 @@ export default {
 
     if (error) {
       this.status = 'error';
-      if (error === 'google_cancelled' || error === 'facebook_cancelled' || error === 'line_cancelled') {
-        this.errorMessage = 'คุณได้ยกเลิกการเข้าสู่ระบบผ่าน Social Account';
+      const decoded = decodeURIComponent(error);
+      if (decoded.includes('cancelled') || decoded === 'google_cancelled' || decoded === 'facebook_cancelled' || decoded === 'line_cancelled') {
+        this.errorMessage = 'การเข้าสู่ระบบผ่าน Social Account ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+      } else if (decoded.includes('redirect_uri_mismatch')) {
+        this.errorMessage = 'ข้อผิดพลาด: Callback URL ไม่ตรงกับที่ลงทะเบียนไว้ กรุณาแจ้งผู้ดูแลระบบ';
+      } else if (decoded.includes('invalid_client')) {
+        this.errorMessage = 'ข้อผิดพลาด: Client ID/Secret ไม่ถูกต้อง กรุณาแจ้งผู้ดูแลระบบ';
       } else {
-        this.errorMessage = decodeURIComponent(error);
+        this.errorMessage = `เข้าสู่ระบบไม่สำเร็จ: ${decoded}`;
       }
       return;
     }

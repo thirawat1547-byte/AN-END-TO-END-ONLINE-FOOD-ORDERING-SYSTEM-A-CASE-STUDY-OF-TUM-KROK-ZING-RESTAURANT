@@ -22,7 +22,18 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
           
-          # รัน Docker ที่โฟลเดอร์หลักสุดเลย (ลบ cd backend ออกแล้ว)
+          # ตรวจสอบว่ามีไฟล์ .env อยู่ (สำคัญมากสำหรับ OAuth)
+          if [ ! -f .env ]; then
+            echo "⚠️ WARNING: .env file not found! OAuth will NOT work!"
+            echo "Please create .env file with GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, etc."
+          else
+            echo "✅ .env file found"
+            # แสดงชื่อตัวแปรที่มี (ไม่แสดงค่าเพื่อความปลอดภัย)
+            echo "Environment variables defined:"
+            grep -oP '^[A-Z_]+(?==)' .env || true
+          fi
+          
+          # รัน Docker โดยอ่านค่าจากไฟล์ .env อัตโนมัติ (docker-compose อ่าน .env เองในโฟลเดอร์เดียวกัน)
           sudo docker-compose up -d --build
 
           # รอให้ Database และ Backend พร้อมทำงาน
@@ -36,3 +47,7 @@ jobs:
           sudo docker-compose restart backend || sudo docker-compose up -d backend
           sudo docker-compose up -d
 
+          # แสดง Log ล่าสุดของ Backend เพื่อตรวจสอบ OAuth Initialization
+          echo "=== Backend Startup Logs (last 20 lines) ==="
+          sleep 3
+          sudo docker logs tumkrokzing_backend --tail 20
