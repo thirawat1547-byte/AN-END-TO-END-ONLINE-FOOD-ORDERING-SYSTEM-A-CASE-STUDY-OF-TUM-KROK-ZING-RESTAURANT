@@ -174,25 +174,38 @@ export class AuthController {
   }
 
   // Helper สำหรับจัดการผลลัพธ์ OAuth และส่ง Token กลับไปยัง Frontend
+  // ⚠️ ตรวจสอบ res.headersSent ก่อนทุกครั้ง เพราะ Passport บางตัว (เช่น passport-line-auth)
+  //    อาจเรียก callback ซ้ำหลายครั้ง ทำให้เกิด ERR_HTTP_HEADERS_SENT
   private async handleOAuthSuccess(userProfile: any, res: Response) {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     try {
       if (!userProfile) {
-        return res.redirect(
-          `${frontendUrl}/login?error=${encodeURIComponent('ไม่สามารถดึงข้อมูลผู้ใช้งานได้')}`,
-        );
+        console.warn('OAuth: No user profile received from guard');
+        if (!res.headersSent) {
+          return res.redirect(
+            `${frontendUrl}/login?error=${encodeURIComponent('ไม่สามารถดึงข้อมูลผู้ใช้งานได้')}`,
+          );
+        }
+        return;
       }
 
+      console.log('OAuth: Processing user profile -', userProfile.provider, userProfile.providerId);
       const result = await this.authService.validateOAuthUser(userProfile);
-      return res.redirect(
-        `${frontendUrl}/auth/callback?token=${result.access_token}`,
-      );
+      console.log('OAuth: Token generated successfully for user #', result.user.user_id);
+
+      if (!res.headersSent) {
+        return res.redirect(
+          `${frontendUrl}/auth/callback?token=${result.access_token}`,
+        );
+      }
     } catch (err: any) {
-      console.error('OAuth Callback processing error:', err);
-      const msg = encodeURIComponent(
-        err?.message || 'การเข้าสู่ระบบผ่าน Social Account ขัดข้อง',
-      );
-      return res.redirect(`${frontendUrl}/login?error=${msg}`);
+      console.error('OAuth Callback processing error:', err?.message || err);
+      if (!res.headersSent) {
+        const msg = encodeURIComponent(
+          err?.message || 'การเข้าสู่ระบบผ่าน Social Account ขัดข้อง',
+        );
+        return res.redirect(`${frontendUrl}/login?error=${msg}`);
+      }
     }
   }
 }
