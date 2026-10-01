@@ -35,12 +35,14 @@ export class LineStrategy extends PassportStrategy(Strategy, 'line') {
   ): Promise<any> {
     this.logger.log(`LINE validate() called - Profile ID: ${profile?.id}, DisplayName: ${profile?.displayName}`);
     const email = profile?.email || (profile?._json && profile?._json?.email);
+    const displayName = profile?.displayName || profile?._json?.displayName || `line_${profile?.id}`;
+    const avatarUrl = profile?.pictureUrl || profile?._json?.pictureUrl || (profile?.photos && profile?.photos[0]?.value);
     const user = {
       provider: 'LINE',
       providerId: profile?.id,
       email: email || undefined,
-      displayName: profile?.displayName || `line_${profile?.id}`,
-      avatarUrl: profile?.pictureUrl || (profile?.photos && profile?.photos[0]?.value),
+      displayName: displayName,
+      avatarUrl: avatarUrl,
     };
     done(null, user);
   }

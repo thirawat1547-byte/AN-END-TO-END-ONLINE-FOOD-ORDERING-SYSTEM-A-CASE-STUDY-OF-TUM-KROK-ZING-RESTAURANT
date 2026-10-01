@@ -424,6 +424,15 @@ export class AuthService implements OnModuleInit {
           role: 'CUSTOMER',
         },
       });
+    } else if (profile.email && !user.email) {
+      try {
+        user = await this.prisma.user.update({
+          where: { user_id: user.user_id },
+          data: { email: profile.email },
+        });
+      } catch (err) {
+        this.logger.warn(`Could not sync email for user #${user.user_id}: ${err.message}`);
+      }
     }
 
     // 4. ออก JWT Access Token และ Session ID
@@ -443,6 +452,8 @@ export class AuthService implements OnModuleInit {
     const payload = {
       sub: user.user_id,
       username: user.username,
+      name: profile.displayName || user.username,
+      avatar: profile.avatarUrl || null,
       role: normalizedRole,
       session_id: sessionId,
     };
@@ -453,6 +464,8 @@ export class AuthService implements OnModuleInit {
       user: {
         user_id: user.user_id,
         username: user.username,
+        name: profile.displayName || user.username,
+        avatar: profile.avatarUrl || null,
         email: user.email,
         phone_number: user.phone_number,
         role: normalizedRole,

@@ -11,4 +11,9 @@ export class UpdateProfileDto {
   @IsString()
   @IsOptional()
   address?: string;
+
+  @ApiProperty({ example: 'user@example.com', required: false })
+  @IsString()
+  @IsOptional()
+  email?: string;
 }

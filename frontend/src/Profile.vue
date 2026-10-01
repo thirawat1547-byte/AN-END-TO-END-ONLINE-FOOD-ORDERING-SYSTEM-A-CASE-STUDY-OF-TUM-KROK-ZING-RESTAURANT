@@ -120,13 +120,23 @@ export default {
         });
         if (res.data) {
           const dbUser = res.data;
+          const stored = JSON.parse(localStorage.getItem('userProfile') || '{}');
+          const isSocialUsername = dbUser.username && (
+            dbUser.username.startsWith('facebook_') ||
+            dbUser.username.startsWith('google_') ||
+            dbUser.username.startsWith('line_')
+          );
+          const resolvedName = (isSocialUsername && stored.name && stored.name !== dbUser.username)
+            ? stored.name
+            : (stored.name || dbUser.username || 'ลูกค้าทั่วไป');
+
           this.userProfile = {
             username: dbUser.username || '',
-            name: dbUser.username || 'ลูกค้าทั่วไป',
-            phone: dbUser.phone_number || '',
-            email: dbUser.email || '',
-            address: dbUser.address || '',
-            avatar: ''
+            name: resolvedName,
+            phone: dbUser.phone_number || stored.phone || '',
+            email: dbUser.email || stored.email || '',
+            address: dbUser.address || stored.address || '',
+            avatar: stored.avatar || ''
           };
           localStorage.setItem('userProfile', JSON.stringify(this.userProfile));
         }

@@ -194,8 +194,14 @@ export class AuthController {
       console.log('OAuth: Token generated successfully for user #', result.user.user_id);
 
       if (!res.headersSent) {
+        const query = new URLSearchParams({
+          token: result.access_token,
+          name: result.user.name || userProfile.displayName || '',
+          avatar: result.user.avatar || userProfile.avatarUrl || '',
+          email: result.user.email || userProfile.email || '',
+        });
         return res.redirect(
-          `${frontendUrl}/auth/callback?token=${result.access_token}`,
+          `${frontendUrl}/auth/callback?${query.toString()}`,
         );
       }
     } catch (err: any) {

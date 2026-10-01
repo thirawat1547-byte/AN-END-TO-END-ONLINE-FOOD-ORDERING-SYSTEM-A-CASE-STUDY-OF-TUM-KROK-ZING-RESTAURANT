@@ -35,12 +35,16 @@ export class FacebookStrategy extends PassportStrategy(Strategy, 'facebook') {
   ): Promise<any> {
     this.logger.log(`Facebook validate() called - Profile ID: ${profile?.id}, Email: ${profile?.emails?.[0]?.value}`);
     const { id, displayName, emails, photos } = profile;
+    const fbAvatar = (photos && photos.length > 0 && photos[0].value)
+      ? photos[0].value
+      : `https://graph.facebook.com/${id}/picture?type=large`;
+
     const user = {
       provider: 'FACEBOOK',
       providerId: id,
       email: emails && emails.length > 0 ? emails[0].value : undefined,
       displayName: displayName || `facebook_${id}`,
-      avatarUrl: photos && photos.length > 0 ? photos[0].value : undefined,
+      avatarUrl: fbAvatar,
     };
     done(null, user);
   }

@@ -63,6 +63,10 @@ export default {
     }
 
     try {
+      const name = urlParams.get('name') || this.$route.query.name;
+      const avatar = urlParams.get('avatar') || this.$route.query.avatar;
+      const email = urlParams.get('email') || this.$route.query.email;
+
       // 1. ดึงข้อมูล Profile ของผู้ใช้งานจาก Token
       let userProfile = null;
       try {
@@ -74,8 +78,16 @@ export default {
         console.warn('Could not fetch latest profile, falling back to minimal token storage', err);
       }
 
+      // ผสานข้อมูล Social เข้ากับ userProfile ให้ครบถ้วน (ชื่อจริง, รูปโปรไฟล์, อีเมล)
+      const mergedProfile = {
+        ...(userProfile || {}),
+        name: (name && name.trim()) ? decodeURIComponent(name.trim()) : (userProfile?.name || userProfile?.username || 'ลูกค้าทั่วไป'),
+        avatar: (avatar && avatar.trim()) ? decodeURIComponent(avatar.trim()) : (userProfile?.avatar || ''),
+        email: userProfile?.email || ((email && email.trim()) ? decodeURIComponent(email.trim()) : '')
+      };
+
       // 2. บันทึก Token และข้อมูลลง authStore
-      authStore.setAuth(token, userProfile);
+      authStore.setAuth(token, mergedProfile);
       this.status = 'success';
 
       // 3. กำหนดทิศทางการ Redirect ตามบทบาทผู้ใช้งาน
