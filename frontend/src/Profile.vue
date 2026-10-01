@@ -100,12 +100,11 @@ export default {
   },
   computed: {
     displayAddress() {
-      if (!this.isLoggedIn) return 'ตลาดปากเกร็ด';
-      if (this.userProfile && this.userProfile.address) {
-        let addr = this.userProfile.address;
+      const addr = this.userProfile?.address?.trim();
+      if (this.isLoggedIn && addr && addr !== 'ตลาดปากเกร็ด นนทบุรี' && addr !== 'ตลาดปากเกร็ด') {
         return addr.length > 20 ? addr.substring(0, 20) + '...' : addr;
       }
-      return 'กรุณาเพิ่มที่อยู่';
+      return 'ยังไม่ระบุที่อยู่จัดส่ง';
     }
   },
   async mounted() {

@@ -27,21 +27,29 @@
       </div>
 
       <div class="location-wrapper" ref="locationWrapper">
-        <div class="location-box" @click="showAddressDropdown = !showAddressDropdown">
-          <span class="loc-icon">📍</span>
+        <div class="location-box" :class="{ 'loc-unspecified-box': !hasValidAddress }" @click="showAddressDropdown = !showAddressDropdown">
+          <span class="loc-icon">{{ hasValidAddress ? '📍' : '⚠️' }}</span>
           <span class="loc-text">
-            จัดส่งที่: <b>{{ displayAddress }}</b>
+            <template v-if="hasValidAddress">
+              จัดส่งที่: <b>{{ displayAddress }}</b>
+            </template>
+            <template v-else>
+              <b class="text-unspecified">ยังไม่ระบุที่อยู่จัดส่ง</b>
+            </template>
           </span>
           <span class="dropdown-arrow" :class="{ 'arrow-up': showAddressDropdown }">▼</span>
         </div>
 
         <div class="address-dropdown-menu" v-if="showAddressDropdown">
           <div class="addr-title">📍 ที่อยู่จัดส่งปัจจุบัน</div>
-          <div class="addr-full-text">
-            {{ (authStore.isLoggedIn && authStore.userProfile?.address) ? authStore.userProfile.address : 'ตลาดปากเกร็ด (ค่าเริ่มต้น)' }}
+          <div class="addr-full-text" v-if="hasValidAddress">
+            {{ authStore.userProfile.address }}
+          </div>
+          <div class="addr-full-text addr-empty-alert" v-else>
+            ⚠️ บัญชีของคุณยังไม่ได้ระบุที่อยู่สำหรับจัดส่งอาหาร
           </div>
           <button class="addr-edit-btn" @click.stop="goToProfileEdit">
-            ✏️ แก้ไขที่อยู่
+            {{ hasValidAddress ? '✏️ แก้ไขที่อยู่' : '➕ ระบุที่อยู่จัดส่ง' }}
           </button>
         </div>
       </div>
@@ -146,12 +154,17 @@ export default {
     const isPromotionsActive = computed(() => route.path === '/promotions');
     const isHelpActive = computed(() => route.path === '/help');
 
+    const hasValidAddress = computed(() => {
+      const addr = authStore.userProfile?.address?.trim();
+      return !!(authStore.isLoggedIn && addr && addr !== 'ตลาดปากเกร็ด นนทบุรี' && addr !== 'ตลาดปากเกร็ด');
+    });
+
     const displayAddress = computed(() => {
-      if (authStore.isLoggedIn && authStore.userProfile?.address) {
+      if (hasValidAddress.value) {
         const full = authStore.userProfile.address.trim();
         return full.length > 15 ? full.substring(0, 15) + '...' : full;
       }
-      return 'ตลาดปากเกร็ด';
+      return 'ยังไม่ระบุที่อยู่';
     });
 
     const handleClickOutside = (e) => {
@@ -204,6 +217,7 @@ export default {
       showAddressDropdown,
       locationWrapper,
       displayAddress,
+      hasValidAddress,
       isHomeActive,
       isTrackingActive,
       isHistoryActive,
@@ -395,6 +409,22 @@ export default {
   border-color: #d6d2c4;
 }
 
+.location-box.loc-unspecified-box {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.location-box.loc-unspecified-box:hover {
+  background: #fef3c7;
+  border-color: #f59e0b;
+}
+
+.text-unspecified {
+  color: #b45309;
+  font-weight: 600;
+}
+
 .loc-icon {
   color: #557c61;
   font-size: 14px;
@@ -424,6 +454,16 @@ export default {
   box-shadow: 0 10px 25px rgba(0,0,0,0.1);
   z-index: 1050;
   cursor: default;
+}
+
+.addr-empty-alert {
+  color: #b45309 !important;
+  background: #fffbeb;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px dashed #fcd34d;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .address-dropdown-menu::before {

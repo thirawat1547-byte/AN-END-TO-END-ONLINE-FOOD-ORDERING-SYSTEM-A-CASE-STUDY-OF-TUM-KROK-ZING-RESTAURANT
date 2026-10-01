@@ -493,11 +493,11 @@ export default {
         const parsed = JSON.parse(profileData);
         this.userProfile = {
           name: parsed.name || parsed.username || 'ลูกค้าทั่วไป',
-          phone: parsed.phone || '08x-xxx-xxxx',
-          address: parsed.address || 'ตลาดปากเกร็ด นนทบุรี'
+          phone: (parsed.phone && parsed.phone !== '08x-xxx-xxxx') ? parsed.phone : '',
+          address: (parsed.address && parsed.address !== 'ตลาดปากเกร็ด นนทบุรี') ? parsed.address : ''
         };
       } catch (e) {
-        this.userProfile = { name: 'ลูกค้าทั่วไป', phone: '08x-xxx-xxxx', address: 'ตลาดปากเกร็ด นนทบุรี' };
+        this.userProfile = { name: 'ลูกค้าทั่วไป', phone: '', address: '' };
       }
     }
 
