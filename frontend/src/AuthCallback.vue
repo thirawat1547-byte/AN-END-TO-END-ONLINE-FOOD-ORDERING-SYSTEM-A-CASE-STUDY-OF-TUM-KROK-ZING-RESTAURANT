@@ -93,11 +93,29 @@ export default {
       // 3. กำหนดทิศทางการ Redirect ตามบทบาทผู้ใช้งาน
       setTimeout(() => {
         let redirect = this.$route.query.redirect;
+        const isMissingDeliveryInfo = !userProfile?.phone_number || !userProfile?.address;
+
         if (!redirect) {
           if (authStore.isAdmin) redirect = '/admin/dashboard';
           else if (authStore.isKitchen) redirect = '/kitchen/monitor';
           else if (authStore.isRider) redirect = '/rider';
-          else redirect = '/';
+          else {
+            const savedCart = sessionStorage.getItem('cartData') || localStorage.getItem('cartData');
+            let hasCart = false;
+            try {
+              hasCart = savedCart && JSON.parse(savedCart).length > 0;
+            } catch (e) {}
+
+            if (hasCart) {
+              redirect = isMissingDeliveryInfo ? '/checkout?require_info=true' : '/checkout';
+            } else if (isMissingDeliveryInfo) {
+              redirect = '/profile?first_login=true';
+            } else {
+              redirect = '/';
+            }
+          }
+        } else if (isMissingDeliveryInfo && redirect.includes('/checkout')) {
+          redirect = '/checkout?require_info=true';
         }
         this.$router.push(redirect);
       }, 700);

@@ -34,12 +34,28 @@
             <div class="address-details">
               <h4 class="location-name">
                 {{ userProfile.name }} 
-                <span class="phone-text">({{ userProfile.phone }})</span>
+                <span class="phone-text" v-if="hasValidPhone">({{ userProfile.phone }})</span>
+                <span class="phone-text phone-missing-pill" v-else>⚠️ ยังไม่ระบุเบอร์โทรศัพท์</span>
               </h4>
+
+              <!-- ป้ายเตือนด่วนกรณีข้อมูลเบอร์โทรหรือที่อยู่ยังไม่ครบ -->
+              <div v-if="isMissingRequiredInfo" class="missing-info-warning-banner" @click="openMissingInfoModal">
+                <div class="warning-banner-left">
+                  <span class="warning-pulse-icon">⚠️</span>
+                  <div class="warning-text-group">
+                    <span class="warning-main-title">
+                      ยังไม่ได้ระบุ<span v-if="!hasValidPhone">เบอร์โทรศัพท์</span><span v-if="!hasValidPhone && !hasValidAddress"> และ </span><span v-if="!hasValidAddress">ที่อยู่จัดส่ง</span>
+                    </span>
+                    <span class="warning-sub-desc">จำเป็นสำหรับไรเดอร์จัดส่งอาหารถึงมือท่าน คลิกเพื่อระบุข้อมูล</span>
+                  </div>
+                </div>
+                <button type="button" class="warning-action-btn">กรอกข้อมูล ➔</button>
+              </div>
               
               <!-- โหมดปกติ: แสดงที่อยู่, พิกัด GPS และปุ่มแก้ไข/ปักหมุด -->
               <div v-if="!isEditingAddress">
-                <p class="address-text">{{ userProfile.address }}</p>
+                <p class="address-text" v-if="hasValidAddress">{{ userProfile.address }}</p>
+                <p class="address-text address-empty-text" v-else>📍 ยังไม่ได้ระบุที่อยู่จัดส่งเดลิเวอรี่</p>
 
                 <!-- ป้ายแสดงพิกัด GPS จริงที่ปักหมุดไว้ -->
                 <div class="gps-pinned-badge" v-if="deliveryLat && deliveryLng">
@@ -761,6 +777,102 @@
         </div>
       </div>
     </div>
+
+    <!-- Popup Modal แจ้งเตือนและกรอกเบอร์โทรศัพท์ / ที่อยู่จัดส่งเดลิเวอรี่ (เมื่อตรวจพบว่าข้อมูลยังว่าง) -->
+    <div v-if="showMissingInfoModal" class="missing-info-modal-backdrop" @click.self="closeMissingInfoModal">
+      <div class="missing-info-modal-card">
+        <div class="missing-info-modal-header">
+          <div class="missing-info-title-group">
+            <span class="missing-info-modal-icon">🛵</span>
+            <div>
+              <h3 class="missing-info-modal-title">ข้อมูลสำหรับจัดส่งอาหาร</h3>
+              <p class="missing-info-modal-sub">กรุณาระบุเบอร์โทรศัพท์และที่อยู่ก่อนดำเนินการสั่งซื้อ</p>
+            </div>
+          </div>
+          <button class="missing-info-close-btn" @click="closeMissingInfoModal" title="ปิด">✕</button>
+        </div>
+
+        <div class="missing-info-modal-body">
+          <div v-if="missingInfoError" class="missing-info-alert-banner">
+            ⚠️ {{ missingInfoError }}
+          </div>
+
+          <div class="missing-info-form-group">
+            <label class="missing-info-label">
+              👤 ชื่อ-นามสกุล ผู้รับอาหาร <span class="required-star">*</span>
+            </label>
+            <input 
+              type="text"
+              v-model="missingInfoForm.name"
+              placeholder="เช่น คุณธีรวัฒน์ หรือ สมชาย"
+              class="missing-info-input"
+            />
+            <span class="missing-info-hint">ใช้สำหรับให้ไรเดอร์เรียกชื่อผู้รับอาหารเมื่อเดินทางไปถึง</span>
+          </div>
+
+          <div class="missing-info-form-group">
+            <label class="missing-info-label">
+              📱 เบอร์โทรศัพท์ติดต่อสำหรับไรเดอร์ <span class="required-star">*</span>
+            </label>
+            <input 
+              type="tel"
+              v-model="missingInfoForm.phone"
+              placeholder="เช่น 0812345678 หรือ 081-234-5678"
+              class="missing-info-input"
+              maxlength="12"
+            />
+            <span class="missing-info-hint">ใช้สำหรับให้ไรเดอร์โทรติดต่อเพื่อจัดส่งอาหารถึงมือท่านได้อย่างแม่นยำ</span>
+          </div>
+
+          <div class="missing-info-form-group">
+            <label class="missing-info-label">
+              🏠 ที่อยู่จัดส่งเดลิเวอรี่ <span class="required-star">*</span>
+            </label>
+            <textarea 
+              v-model="missingInfoForm.address"
+              placeholder="ระบุบ้านเลขที่, ชื่อหมู่บ้าน/คอนโด, ซอย, ถนน, แขวง/ตำบล หรือจุดสังเกต..."
+              class="missing-info-textarea"
+              rows="3"
+            ></textarea>
+            <span class="missing-info-hint">ระบุรายละเอียดให้ชัดเจนเพื่อให้ไรเดอร์เดินทางไปส่งได้ถูกต้อง</span>
+          </div>
+
+          <div class="missing-info-gps-action">
+            <button 
+              type="button" 
+              class="modal-gps-btn"
+              :disabled="isGettingGpsInModal"
+              @click="getGpsInModal"
+            >
+              <span v-if="isGettingGpsInModal">⏳ กำลังดึงพิกัด...</span>
+              <span v-else>📍 ปักหมุดพิกัด GPS ปัจจุบันอัตโนมัติ</span>
+            </button>
+            <span v-if="missingInfoGpsNotice" class="modal-gps-notice">
+              {{ missingInfoGpsNotice }}
+            </span>
+          </div>
+        </div>
+
+        <div class="missing-info-modal-actions">
+          <button 
+            type="button"
+            class="save-missing-info-btn"
+            :disabled="isSavingMissingInfo"
+            @click="submitMissingInfo"
+          >
+            <span v-if="isSavingMissingInfo">⏳ กำลังบันทึกข้อมูล...</span>
+            <span v-else>💾 บันทึกข้อมูลและดำเนินการสั่งซื้อต่อ ➔</span>
+          </button>
+          <button 
+            type="button"
+            class="cancel-missing-info-btn"
+            @click="closeMissingInfoModal"
+          >
+            ไว้กรอกภายหลัง
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -862,10 +974,33 @@ export default {
       promoSuccess: '',
       isValidatingPromo: false,
       showCouponPickerModal: false,
-      allDbMenus: []
+      allDbMenus: [],
+      // ตัวแปรสำหรับ Modal แจ้งเตือนกรอกเบอร์โทรและที่อยู่จัดส่ง
+      showMissingInfoModal: false,
+      missingInfoForm: {
+        phone: '',
+        address: '',
+        lat: null,
+        lng: null
+      },
+      missingInfoError: '',
+      missingInfoGpsNotice: '',
+      isGettingGpsInModal: false,
+      isSavingMissingInfo: false
     }
   },
   computed: {
+    hasValidPhone() {
+      const p = (this.userProfile.phone || '').trim();
+      return !!p && p !== '08x-xxx-xxxx' && p.replace(/[^0-9]/g, '').length >= 9;
+    },
+    hasValidAddress() {
+      const a = (this.userProfile.address || '').trim();
+      return !!a && a !== 'ตลาดปากเกร็ด นนทบุรี' && a.length >= 5;
+    },
+    isMissingRequiredInfo() {
+      return !this.hasValidPhone || !this.hasValidAddress;
+    },
     totalCalories() {
       return this.cartItems.reduce((sum, item) => {
         const cal = this.getItemCalories(item);
@@ -956,15 +1091,46 @@ export default {
       const parsed = JSON.parse(profileData);
       this.userProfile = {
         name: parsed.name || parsed.username || 'ลูกค้าทั่วไป',
-        phone: parsed.phone || '08x-xxx-xxxx',
-        address: parsed.address || 'ตลาดปากเกร็ด นนทบุรี'
+        phone: (parsed.phone && parsed.phone !== '08x-xxx-xxxx') ? parsed.phone : '',
+        address: (parsed.address && parsed.address !== 'ตลาดปากเกร็ด นนทบุรี') ? parsed.address : ''
       };
     } else {
       this.userProfile = {
         name: 'ลูกค้าทั่วไป',
-        phone: '08x-xxx-xxxx',
-        address: 'ตลาดปากเกร็ด นนทบุรี'
+        phone: '',
+        address: ''
       };
+    }
+
+    // ซิงค์ข้อมูลโปรไฟล์สดจากเซิร์ฟเวอร์ Backend ทันที (หากเข้าสู่ระบบอยู่)
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      try {
+        const profileRes = await axios.get(`${API_BASE}/auth/profile`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (profileRes.data) {
+          if (profileRes.data.phone_number) {
+            this.userProfile.phone = profileRes.data.phone_number;
+          }
+          if (profileRes.data.address) {
+            this.userProfile.address = profileRes.data.address;
+          }
+          if (profileRes.data.username && !this.userProfile.name) {
+            this.userProfile.name = profileRes.data.username;
+          }
+          localStorage.setItem('userProfile', JSON.stringify(this.userProfile));
+        }
+      } catch (err) {
+        console.warn('ซิงค์ข้อมูลโปรไฟล์จาก Backend ไม่สำเร็จ:', err);
+      }
+    }
+
+    // หากเข้าสู่ระบบมาครั้งแรกหรือมีพารามิเตอร์ require_info=true และข้อมูลยังว่าง ให้เปิด Modal แนะนำทันที
+    if ((this.$route.query.require_info === 'true' || this.$route.query.first_login === 'true') && this.isMissingRequiredInfo) {
+      setTimeout(() => {
+        this.openMissingInfoModal();
+      }, 350);
     }
 
     // โหลดพิกัด GPS ที่เคยปักหมุดไว้ (ถ้ามี)
@@ -1226,6 +1392,125 @@ export default {
       this.isEditingAddress = false;
       this.isGeocoding = false;
       this.geocodeFoundAddress = '';
+    },
+
+    // 🛑 ฟังก์ชันเปิด-ปิดและบันทึกข้อมูลเบอร์โทรศัพท์และที่อยู่จัดส่งผ่าน Modal
+    openMissingInfoModal() {
+      const currentName = (this.userProfile.name || '').trim();
+      const isAutoUsername = currentName.startsWith('facebook_') || currentName.startsWith('google_') || currentName.startsWith('line_');
+      this.missingInfoForm = {
+        name: isAutoUsername ? '' : currentName,
+        phone: (this.userProfile.phone && this.userProfile.phone !== '08x-xxx-xxxx') ? this.userProfile.phone : '',
+        address: (this.userProfile.address && this.userProfile.address !== 'ตลาดปากเกร็ด นนทบุรี') ? this.userProfile.address : '',
+        lat: this.deliveryLat || null,
+        lng: this.deliveryLng || null
+      };
+      this.missingInfoError = '';
+      this.missingInfoGpsNotice = '';
+      this.showMissingInfoModal = true;
+    },
+
+    closeMissingInfoModal() {
+      this.showMissingInfoModal = false;
+      this.missingInfoError = '';
+    },
+
+    getGpsInModal() {
+      if (!navigator.geolocation) {
+        this.missingInfoError = 'อุปกรณ์หรือเบราว์เซอร์ไม่รองรับ GPS อัตโนมัติ';
+        return;
+      }
+      this.isGettingGpsInModal = true;
+      this.missingInfoGpsNotice = 'กำลังค้นหาตำแหน่งพิกัด GPS...';
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          this.missingInfoForm.lat = Number(position.coords.latitude);
+          this.missingInfoForm.lng = Number(position.coords.longitude);
+          this.deliveryLat = this.missingInfoForm.lat;
+          this.deliveryLng = this.missingInfoForm.lng;
+          this.isGettingGpsInModal = false;
+          this.missingInfoGpsNotice = `📍 ดึงพิกัดสำเร็จ (${this.deliveryLat.toFixed(5)}, ${this.deliveryLng.toFixed(5)})`;
+        },
+        (error) => {
+          console.warn('GPS Error in modal:', error);
+          this.isGettingGpsInModal = false;
+          this.missingInfoGpsNotice = 'ไม่สามารถดึงพิกัดได้ กรุณากรอกที่อยู่เป็นข้อความ';
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    },
+
+    async submitMissingInfo() {
+      const rawName = (this.missingInfoForm.name || '').trim();
+      const rawPhone = (this.missingInfoForm.phone || '').trim();
+      const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+      const rawAddress = (this.missingInfoForm.address || '').trim();
+
+      if (!rawName) {
+        this.missingInfoError = 'กรุณาระบุชื่อผู้รับอาหารครับ';
+        return;
+      }
+
+      if (!cleanPhone || cleanPhone.length < 9 || cleanPhone.length > 10) {
+        this.missingInfoError = 'กรุณาระบุหมายเลขโทรศัพท์ 9-10 หลักให้ถูกต้อง (เช่น 0812345678)';
+        return;
+      }
+
+      if (!rawAddress || rawAddress.length < 5) {
+        this.missingInfoError = 'กรุณาระบุรายละเอียดที่อยู่จัดส่งให้ชัดเจน (บ้านเลขที่, ถนน, แขวง/ตำบล)';
+        return;
+      }
+
+      this.isSavingMissingInfo = true;
+      this.missingInfoError = '';
+
+      try {
+        const token = localStorage.getItem('access_token');
+        if (token) {
+          try {
+            await axios.patch(`${API_BASE}/auth/profile`, {
+              phone_number: rawPhone,
+              address: rawAddress
+            }, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+          } catch (patchErr) {
+            console.warn('อัปเดตโปรไฟล์ผ่าน API ไม่สำเร็จ แต่จะบันทึกในเซสชัน:', patchErr);
+          }
+        }
+
+        // อัปเดตข้อมูลในหน้าและ LocalStorage
+        if (rawName) {
+          this.userProfile.name = rawName;
+        }
+        this.userProfile.phone = rawPhone;
+        this.userProfile.address = rawAddress;
+        localStorage.setItem('userProfile', JSON.stringify(this.userProfile));
+        if (authStore && typeof authStore.updateProfile === 'function') {
+          authStore.updateProfile(this.userProfile);
+        }
+
+        // อัปเดตพิกัดแผนที่ Geocoding ถ้ายังไม่มีพิกัด GPS
+        if (this.missingInfoForm.lat && this.missingInfoForm.lng) {
+          this.deliveryLat = Number(this.missingInfoForm.lat);
+          this.deliveryLng = Number(this.missingInfoForm.lng);
+        } else {
+          await this.geocodeAddress(rawAddress, false);
+        }
+
+        this.gpsNotice = 'บันทึกเบอร์โทรและที่อยู่จัดส่งเรียบร้อยแล้ว';
+        this.showMissingInfoModal = false;
+        this.isSavingMissingInfo = false;
+
+        // ดำเนินการสั่งซื้อต่ออัตโนมัติ
+        setTimeout(() => {
+          this.confirmOrder();
+        }, 200);
+      } catch (err) {
+        console.error('Save missing info error:', err);
+        this.missingInfoError = 'เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง';
+        this.isSavingMissingInfo = false;
+      }
     },
 
     // แปลงที่อยู่ภาษาไทย / ข้อความที่อยู่ เป็นพิกัดละติจูด ลองจิจูด
@@ -1602,6 +1887,12 @@ async validateAndCheckout() {
       if (!this.authStore.isLoggedIn || !token) {
         alert('กรุณาเข้าสู่ระบบก่อนทำการสั่งซื้ออาหารครับ');
         this.$router.push('/login?redirect=/checkout');
+        return;
+      }
+
+      // 🛑 ตรวจสอบว่ามีเบอร์โทรศัพท์และที่อยู่จัดส่งครบถ้วนแล้วหรือยัง (ถ้ายังว่างให้เปิด Modal ทันที)
+      if (this.isMissingRequiredInfo) {
+        this.openMissingInfoModal();
         return;
       }
 
@@ -3353,5 +3644,329 @@ async validateAndCheckout() {
   font-size: 13px;
   font-weight: 800;
   color: #d97706;
+}
+
+/* ===================================================
+   MISSING DELIVERY INFO WARNING BANNER & MODAL STYLES
+   =================================================== */
+.phone-missing-pill {
+  color: #dc2626 !important;
+  font-size: 12px;
+  font-weight: 700;
+  background: #fee2e2;
+  padding: 2px 8px;
+  border-radius: 6px;
+  margin-left: 6px;
+}
+
+.address-empty-text {
+  color: #b45309 !important;
+  font-style: italic;
+  font-weight: 600;
+}
+
+.missing-info-warning-banner {
+  background: #fffbeb;
+  border: 1.5px solid #fcd34d;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 10px 0 14px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.08);
+}
+
+.missing-info-warning-banner:hover {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(245, 158, 11, 0.15);
+}
+
+.warning-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.warning-pulse-icon {
+  font-size: 20px;
+  animation: pulse 1.5s infinite;
+}
+
+.warning-text-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.warning-main-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #92400e;
+}
+
+.warning-sub-desc {
+  font-size: 11px;
+  color: #b45309;
+}
+
+.warning-action-btn {
+  background: #f59e0b;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  transition: 0.2s;
+}
+
+.warning-action-btn:hover {
+  background: #d97706;
+}
+
+/* Modal Backdrop & Card */
+.missing-info-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 16px;
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+.missing-info-modal-card {
+  background: white;
+  width: 100%;
+  max-width: 450px;
+  border-radius: 20px;
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.missing-info-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 18px 22px;
+  background: #fdfcf9;
+  border-bottom: 1px solid #f0eee6;
+}
+
+.missing-info-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.missing-info-modal-icon {
+  font-size: 26px;
+  background: #f0fdf4;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid #bbf7d0;
+}
+
+.missing-info-modal-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 3px;
+}
+
+.missing-info-modal-sub {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+.missing-info-close-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  transition: 0.2s;
+}
+
+.missing-info-close-btn:hover {
+  color: #334155;
+}
+
+.missing-info-modal-body {
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.missing-info-alert-banner {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 10px 14px;
+  border-radius: 8px;
+  animation: fadeIn 0.2s ease;
+}
+
+.missing-info-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.missing-info-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.required-star {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.missing-info-input,
+.missing-info-textarea {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  background: #f8fafc;
+  transition: all 0.2s;
+}
+
+.missing-info-input:focus,
+.missing-info-textarea:focus {
+  border-color: #557c61;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(85, 124, 97, 0.12);
+}
+
+.missing-info-textarea {
+  resize: vertical;
+  min-height: 70px;
+}
+
+.missing-info-hint {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.missing-info-gps-action {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: -4px;
+}
+
+.modal-gps-btn {
+  background: #f0fdf4;
+  border: 1.5px solid #86efac;
+  color: #166534;
+  padding: 9px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.modal-gps-btn:hover:not(:disabled) {
+  background: #dcfce7;
+  border-color: #4ade80;
+  transform: translateY(-1px);
+}
+
+.modal-gps-notice {
+  font-size: 11px;
+  color: #166534;
+  font-weight: 600;
+  text-align: center;
+}
+
+.missing-info-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 22px 20px 22px;
+  background: #f8fafc;
+  border-top: 1px solid #f1f5f9;
+}
+
+.save-missing-info-btn {
+  background: #557c61;
+  color: white;
+  border: none;
+  padding: 13px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(85, 124, 97, 0.25);
+}
+
+.save-missing-info-btn:hover:not(:disabled) {
+  background: #405e49;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(85, 124, 97, 0.35);
+}
+
+.save-missing-info-btn:disabled {
+  background: #a3b8aa;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.cancel-missing-info-btn {
+  background: none;
+  border: none;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px;
+  font-family: inherit;
+  transition: color 0.2s;
+}
+
+.cancel-missing-info-btn:hover {
+  color: #0f172a;
+  text-decoration: underline;
 }
 </style>
