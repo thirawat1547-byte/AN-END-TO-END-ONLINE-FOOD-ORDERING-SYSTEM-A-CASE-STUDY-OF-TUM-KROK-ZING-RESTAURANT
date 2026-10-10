@@ -18,7 +18,8 @@ model User {
   address      String?  @db.VarChar(255)
   role         String   @default("Customer") @db.VarChar(20)
 
-  orders Order[]
+  orders     Order[]
+  deliveries Delivery[]
 
   @@map("USERS")
 }
@@ -41,7 +42,7 @@ model Table {
   table_id     Int    @id @default(autoincrement())
   table_number String @db.VarChar(10)
   capacity     Int
-  status       String @db.VarChar(20)
+  status       String @default("AVAILABLE") @db.VarChar(20)
 
   orders Order[]
 
@@ -67,13 +68,43 @@ model Menu {
   calories     Int?
   is_available Boolean @default(true)
 
-  category    Category         @relation(fields: [category_id], references: [category_id])
-  allergens   MenuAllergen[]
-  ingredients MenuIngredient[]
-  order_items OrderItem[]
+  category      Category          @relation(fields: [category_id], references: [category_id])
+  allergens     MenuAllergen[]
+  ingredients   MenuIngredient[]
+  order_items   OrderItem[]
+  option_groups MenuOptionGroup[]
 
   @@index([category_id])
   @@map("MENUS")
+}
+
+model MenuOptionGroup {
+  group_id    Int          @id @default(autoincrement())
+  menu_id     Int
+  group_name  String       @db.VarChar(100)
+  is_required Boolean      @default(false)
+  min_select  Int          @default(0)
+  max_select  Int          @default(1)
+
+  menu        Menu         @relation(fields: [menu_id], references: [menu_id], onDelete: Cascade)
+  options     MenuOption[]
+
+  @@index([menu_id])
+  @@map("MENU_OPTION_GROUPS")
+}
+
+model MenuOption {
+  option_id        Int               @id @default(autoincrement())
+  group_id         Int
+  option_name      String            @db.VarChar(100)
+  additional_price Decimal           @default(0.00) @db.Decimal(10, 2)
+  is_available     Boolean           @default(true)
+
+  group            MenuOptionGroup   @relation(fields: [group_id], references: [group_id], onDelete: Cascade)
+  selected_items   OrderItemOption[]
+
+  @@index([group_id])
+  @@map("MENU_OPTIONS")
 }
 
 model Allergen {
@@ -100,21 +131,28 @@ model MenuAllergen {
 }
 
 model Order {
-  order_id    Int      @id @default(autoincrement())
-  user_id     Int?
-  table_id    Int?
-  promo_id    Int?
-  order_type  String   @db.VarChar(20)
-  status      String   @db.VarChar(30)
-  total_price Decimal  @db.Decimal(10, 2)
-  created_at  DateTime @default(now())
-  updated_at  DateTime @default(now()) @updatedAt
+  order_id         Int           @id @default(autoincrement())
+  user_id          Int?
+  table_id         Int?
+  promo_id         Int?
+  order_type       String        @db.VarChar(20)
+  status           String        @db.VarChar(30)
+  subtotal         Decimal       @default(0.00) @db.Decimal(10, 2)
+  discount_amount  Decimal       @default(0.00) @db.Decimal(10, 2)
+  delivery_fee     Decimal       @default(0.00) @db.Decimal(10, 2)
+  total_price      Decimal       @db.Decimal(10, 2)
+  delivery_address String?       @db.VarChar(255)
+  delivery_phone   String?       @db.VarChar(20)
+  order_notes      String?       @db.Text
+  created_at       DateTime      @default(now())
+  updated_at       DateTime      @default(now()) @updatedAt
 
   user        User?         @relation(fields: [user_id], references: [user_id])
   table       Table?        @relation(fields: [table_id], references: [table_id])
   promotion   Promotion?    @relation(fields: [promo_id], references: [promo_id])
   order_items OrderItem[]
   transaction Transaction[]
+  delivery    Delivery?
 
   @@index([user_id])
   @@index([table_id])
@@ -132,10 +170,51 @@ model OrderItem {
   notes         String?  @db.Text
   created_at    DateTime @default(now())
 
-  order Order @relation(fields: [order_id], references: [order_id], onDelete: Cascade)
-  menu  Menu  @relation(fields: [menu_id], references: [menu_id])
+  order              Order             @relation(fields: [order_id], references: [order_id], onDelete: Cascade)
+  menu               Menu              @relation(fields: [menu_id], references: [menu_id])
+  order_item_options OrderItemOption[]
 
   @@map("ORDER_ITEMS")
+}
+
+model OrderItemOption {
+  item_option_id Int         @id @default(autoincrement())
+  order_item_id  Int
+  option_id      Int?
+  option_name    String      @db.VarChar(100)
+  price          Decimal     @default(0.00) @db.Decimal(10, 2)
+
+  order_item     OrderItem   @relation(fields: [order_item_id], references: [order_item_id], onDelete: Cascade)
+  option         MenuOption? @relation(fields: [option_id], references: [option_id], onDelete: SetNull)
+
+  @@index([order_item_id])
+  @@index([option_id])
+  @@map("ORDER_ITEM_OPTIONS")
+}
+
+model Delivery {
+  delivery_id      Int       @id @default(autoincrement())
+  order_id         Int       @unique
+  rider_id         Int?
+  delivery_status  String    @default("WAITING_RIDER") @db.VarChar(30)
+  customer_name    String    @db.VarChar(100)
+  customer_phone   String    @db.VarChar(20)
+  delivery_address String    @db.VarChar(255)
+  customer_lat     Decimal?  @db.Decimal(10, 7)
+  customer_lng     Decimal?  @db.Decimal(10, 7)
+  distance_km      Decimal   @default(0.00) @db.Decimal(5, 2)
+  rider_fee        Decimal   @default(40.00) @db.Decimal(10, 2)
+  proof_image_url  String?   @db.VarChar(255)
+  assigned_at      DateTime?
+  picked_up_at     DateTime?
+  delivered_at     DateTime?
+
+  order            Order     @relation(fields: [order_id], references: [order_id], onDelete: Cascade)
+  rider            User?     @relation(fields: [rider_id], references: [user_id], onDelete: SetNull)
+
+  @@index([rider_id])
+  @@index([delivery_status])
+  @@map("DELIVERIES")
 }
 
 model Transaction {
@@ -239,19 +318,24 @@ view LiveTableStatus {
 
 // 6. การตั้งค่าร้านค้า (Store Settings)
 model StoreSetting {
-  id               Int      @id @default(1)
-  store_name       String   @default("ร้านตำครกซิ่ง (Tum Krok Zing)") @db.VarChar(150)
-  tagline          String?  @default("แซ่บนัว ถึงใจ อาหารอีสานแท้รสเด็ด") @db.VarChar(255)
-  promptpay_number String?  @default("081-234-5678") @db.VarChar(50)
-  promptpay_name   String?  @default("นายธีรวัฒน์ แสนคำเฮียง (ตำครกซิ่ง)") @db.VarChar(150)
-  tax_id           String?  @default("0105566099881") @db.VarChar(50)
-  address          String?  @default("123/45 ถนนแจ้งวัฒนะ แขวงทุ่งสองห้อง เขตหลักสี่ กรุงเทพมหานคร 10210") @db.VarChar(255)
-  phone            String?  @default("02-987-6543, 081-234-5678") @db.VarChar(100)
-  open_time        String?  @default("10:30") @db.VarChar(20)
-  close_time       String?  @default("22:00") @db.VarChar(20)
-  is_open          Boolean  @default(true)
-  vat_rate         Decimal? @default(7.00) @db.Decimal(5, 2)
-  updated_at       DateTime @default(now()) @updatedAt
+  id                  Int      @id @default(1)
+  store_name          String   @default("ร้านตำครกซิ่ง (Tum Krok Zing)") @db.VarChar(150)
+  tagline             String?  @default("แซ่บนัว ถึงใจ อาหารอีสานแท้รสเด็ด") @db.VarChar(255)
+  promptpay_number    String?  @default("081-234-5678") @db.VarChar(50)
+  promptpay_name      String?  @default("นายธีรวัฒน์ แสนคำเฮียง (ตำครกซิ่ง)") @db.VarChar(150)
+  tax_id              String?  @default("0105566099881") @db.VarChar(50)
+  address             String?  @default("123/45 ถนนแจ้งวัฒนะ แขวงทุ่งสองห้อง เขตหลักสี่ กรุงเทพมหานคร 10210") @db.VarChar(255)
+  phone               String?  @default("02-987-6543, 081-234-5678") @db.VarChar(100)
+  open_time           String?  @default("10:30") @db.VarChar(20)
+  close_time          String?  @default("22:00") @db.VarChar(20)
+  is_open             Boolean  @default(true)
+  base_delivery_fee   Decimal  @default(20.00) @db.Decimal(10, 2)
+  delivery_fee_per_km Decimal  @default(10.00) @db.Decimal(10, 2)
+  max_delivery_km     Decimal  @default(15.00) @db.Decimal(5, 2)
+  min_order_delivery  Decimal  @default(100.00) @db.Decimal(10, 2)
+  base_rider_fee      Decimal  @default(40.00) @db.Decimal(10, 2)
+  vat_rate            Decimal? @default(7.00) @db.Decimal(5, 2)
+  updated_at          DateTime @default(now()) @updatedAt
 
   @@map("STORE_SETTINGS")
 }

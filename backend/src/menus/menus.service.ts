@@ -129,6 +129,9 @@ export class MenusService {
         ingredients: {
           include: { ingredient: true },
         },
+        option_groups: {
+          include: { options: true },
+        },
       },
       orderBy: { menu_id: 'asc' },
     });
@@ -157,6 +160,7 @@ export class MenusService {
         allergens: filteredAllergens,
         allergen_ids: filteredAllergens.map((a) => a.allergen_id),
         ingredients: (m.ingredients || []).filter((i) => i.ingredient != null),
+        option_groups: (m as any).option_groups || [],
       };
     });
   }
@@ -173,6 +177,9 @@ export class MenusService {
         allergens: {
           include: { allergen: true },
         },
+        option_groups: {
+          include: { options: true },
+        },
       },
     });
 
@@ -186,6 +193,7 @@ export class MenusService {
       allergens: filteredAllergens,
       allergen_ids: filteredAllergens.map((a) => a.allergen_id),
       ingredients: (menu.ingredients || []).filter((i) => i.ingredient != null),
+      option_groups: (menu as any).option_groups || [],
     };
   }
 

@@ -191,6 +191,46 @@ async function saveSettings() {
       </div>
     </div>
 
+    <!-- Delivery & Rider Logistics Settings Card -->
+    <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4 text-xs">
+      <h2 class="text-sm font-bold text-slate-900 pb-2 border-b border-slate-100 flex items-center gap-2">
+        <span>🛵</span> ตั้งค่าเดลิเวอรีและค่ารอบไรเดอร์ (Delivery & Rider Logistics)
+      </h2>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">ค่าจัดส่งพื้นฐาน (บาท)</label>
+          <input 
+            type="number" 
+            step="1"
+            v-model="adminStore.storeSettings.baseDeliveryFee"
+            class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none font-bold text-slate-800"
+          />
+          <span class="text-[10px] text-slate-400 mt-0.5 block">คิดเป็นอัตราเริ่มต้นทุกออเดอร์เดลิเวอรี</span>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">ค่าส่งต่อ กม. (บาท/กม.)</label>
+          <input 
+            type="number" 
+            step="1"
+            v-model="adminStore.storeSettings.deliveryFeePerKm"
+            class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none font-bold text-slate-800"
+          />
+          <span class="text-[10px] text-slate-400 mt-0.5 block">อัตราคิดเพิ่มตามระยะทางคำนวณจาก GPS</span>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">ค่ารอบไรเดอร์ (บาท/เที่ยว)</label>
+          <input 
+            type="number" 
+            step="1"
+            v-model="adminStore.storeSettings.riderFee"
+            class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none font-bold text-emerald-700 font-mono"
+          />
+          <span class="text-[10px] text-slate-400 mt-0.5 block">รายได้ค่าเที่ยวส่งมอบของไรเดอร์ต่อบิล</span>
+        </div>
+      </div>
+    </div>
+
     <!-- Staff Accounts Table -->
     <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4 text-xs">
       <h2 class="text-sm font-bold text-slate-900 pb-2 border-b border-slate-100 flex items-center gap-2">

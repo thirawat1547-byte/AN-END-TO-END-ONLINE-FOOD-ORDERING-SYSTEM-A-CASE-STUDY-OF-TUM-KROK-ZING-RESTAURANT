@@ -1935,6 +1935,13 @@ async validateAndCheckout() {
             : undefined,
           promo_id: this.appliedPromo?.promo_id ? Number(this.appliedPromo.promo_id) : undefined,
           promo_code: this.appliedPromo?.code || undefined,
+          subtotal: Number(this.subtotal || 0),
+          discount_amount: Number(this.discountAmount || 0),
+          delivery_fee: Number(this.shippingFee || 0),
+          delivery_address: this.userProfile.address || undefined,
+          delivery_phone: this.userProfile.phone || undefined,
+          delivery_lat: this.deliveryLat ? Number(this.deliveryLat) : undefined,
+          delivery_lng: this.deliveryLng ? Number(this.deliveryLng) : undefined,
           items: this.cartItems.map(item => {
             const cleanItemName = (item.name || '').trim().toLowerCase();
             const matched = dbMenus.find(m => {
@@ -1945,19 +1952,50 @@ async validateAndCheckout() {
             const realMenuId = matched?.menu_id ?? matched?.id ?? item.id ?? item.menu_id ?? (dbMenus[0]?.menu_id || dbMenus[0]?.id || 10);
 
             const options = [];
-            if (item.dishType) options.push(item.dishType);
-            if (item.spiceLevel) options.push(item.spiceLevel);
+            const structuredOptions = [];
+
+            if (item.dishType) {
+              options.push(item.dishType);
+              if (matched?.option_groups) {
+                for (const grp of matched.option_groups) {
+                  const opt = grp.options?.find(o => o.option_name === item.dishType);
+                  if (opt) structuredOptions.push({ option_id: opt.option_id, option_name: opt.option_name, price: Number(opt.price) });
+                }
+              }
+            }
+
+            if (item.spiceLevel) {
+              options.push(item.spiceLevel);
+              if (matched?.option_groups) {
+                for (const grp of matched.option_groups) {
+                  const opt = grp.options?.find(o => o.option_name === item.spiceLevel);
+                  if (opt) structuredOptions.push({ option_id: opt.option_id, option_name: opt.option_name, price: Number(opt.price) });
+                }
+              }
+            }
+
             if (item.seafoodChoice) options.push(item.seafoodChoice);
+
             if (item.addons && item.addons.length > 0) {
               options.push('ส่วนเสริม: ' + item.addons.map(a => a.name).join(', '));
+              if (matched?.option_groups) {
+                for (const addon of item.addons) {
+                  for (const grp of matched.option_groups) {
+                    const opt = grp.options?.find(o => o.option_name === addon.name);
+                    if (opt) structuredOptions.push({ option_id: opt.option_id, option_name: opt.option_name, price: Number(opt.price) });
+                  }
+                }
+              }
             }
+
             if (item.note) options.push('โน้ต: ' + item.note);
 
             return {
               menu_id: Number(realMenuId),
               quantity: Number(item.qty || item.quantity || 1),
               notes: options.join(' | '),
-              dish_type: item.dishType || undefined
+              dish_type: item.dishType || undefined,
+              options: structuredOptions.length > 0 ? structuredOptions : undefined
             };
           })
         };

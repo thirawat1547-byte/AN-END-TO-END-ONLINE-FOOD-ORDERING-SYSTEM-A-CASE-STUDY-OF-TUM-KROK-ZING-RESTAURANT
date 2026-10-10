@@ -777,6 +777,142 @@ async function main() {
   }
   console.log('✅ บันทึกโปรโมชันตั้งต้นเรียบร้อยแล้ว (5 โค้ดส่วนลด)');
 
+  // 8. Seed การตั้งค่าร้านค้า (STORE_SETTINGS)
+  const existingSetting = await prisma.storeSetting.findUnique({ where: { id: 1 } });
+  if (!existingSetting) {
+    await prisma.storeSetting.create({
+      data: {
+        id: 1,
+        store_name: 'ร้านตำครกซิ่ง (Tum Krok Zing)',
+        tagline: 'แซ่บนัว ถึงใจ อาหารอีสานแท้รสเด็ด',
+        promptpay_number: '081-234-5678',
+        promptpay_name: 'นายธีรวัฒน์ แสนคำเฮียง (ตำครกซิ่ง)',
+        tax_id: '0105566099881',
+        address: '123/45 ถนนแจ้งวัฒนะ แขวงทุ่งสองห้อง เขตหลักสี่ กรุงเทพมหานคร 10210',
+        phone: '02-987-6543, 081-234-5678',
+        open_time: '10:30',
+        close_time: '22:00',
+        is_open: true,
+        base_delivery_fee: 20.00,
+        delivery_fee_per_km: 10.00,
+        max_delivery_km: 15.00,
+        min_order_delivery: 100.00,
+        base_rider_fee: 40.00,
+        vat_rate: 7.00,
+      },
+    });
+    console.log('✅ สร้างการตั้งค่าร้านค้าเริ่มต้นเรียบร้อยแล้ว (Store Settings)');
+  } else {
+    await prisma.storeSetting.update({
+      where: { id: 1 },
+      data: {
+        base_delivery_fee: 20.00,
+        delivery_fee_per_km: 10.00,
+        max_delivery_km: 15.00,
+        min_order_delivery: 100.00,
+        base_rider_fee: 40.00,
+      },
+    });
+    console.log('✅ อัปเดตการตั้งค่าค่าจัดส่งและค่ารอบไรเดอร์เรียบร้อยแล้ว (Store Settings)');
+  }
+
+  // 9. Seed กลุ่มตัวเลือกและท็อปปิ้ง (MENU_OPTION_GROUPS & MENU_OPTIONS)
+  const menusForOptions = await prisma.menu.findMany();
+  let seededOptionGroupsCount = 0;
+
+  for (const menu of menusForOptions) {
+    const isDrink = menu.category_id === 5;
+    if (isDrink) continue; // เครื่องดื่มไม่ต้องใส่ตัวเลือกความเผ็ด
+
+    // ตรวจสอบว่าเมนูนี้มี Option Group หรือยัง
+    const existingGroups = await prisma.menuOptionGroup.findMany({
+      where: { menu_id: menu.menu_id },
+    });
+
+    if (existingGroups.length === 0) {
+      // 1. กลุ่มระดับความเผ็ด (Required, Single Choice)
+      await prisma.menuOptionGroup.create({
+        data: {
+          menu_id: menu.menu_id,
+          group_name: 'ระดับความเผ็ด',
+          is_required: true,
+          min_select: 1,
+          max_select: 1,
+          options: {
+            create: [
+              { option_name: 'ไม่เผ็ด (ไม่ใส่พริก)', additional_price: 0.00 },
+              { option_name: 'เผ็ดน้อย (พริก 1-2 เม็ด)', additional_price: 0.00 },
+              { option_name: 'เผ็ดกลาง (มาตรฐาน)', additional_price: 0.00 },
+              { option_name: 'เผ็ดมาก (พริกยกสวน)', additional_price: 0.00 },
+            ],
+          },
+        },
+      });
+
+      // 2. ถ้าเป็นอาหารจานเดียว / ผัด (category_id = 1) -> เพิ่มกลุ่มรูปแบบอาหาร และ ท็อปปิ้งไข่/เนื้อสัตว์
+      if (menu.category_id === 1) {
+        await prisma.menuOptionGroup.create({
+          data: {
+            menu_id: menu.menu_id,
+            group_name: 'รูปแบบอาหาร',
+            is_required: false,
+            min_select: 0,
+            max_select: 1,
+            options: {
+              create: [
+                { option_name: 'ราดข้าว', additional_price: 0.00 },
+                { option_name: 'กับข้าว (เพิ่มปริมาณ)', additional_price: 20.00 },
+              ],
+            },
+          },
+        });
+
+        await prisma.menuOptionGroup.create({
+          data: {
+            menu_id: menu.menu_id,
+            group_name: 'ท็อปปิ้งเพิ่มเติม',
+            is_required: false,
+            min_select: 0,
+            max_select: 3,
+            options: {
+              create: [
+                { option_name: 'ไข่ดาวไม่สุก', additional_price: 10.00 },
+                { option_name: 'ไข่ดาวสุก', additional_price: 10.00 },
+                { option_name: 'ไข่เจียวหมูสับ', additional_price: 15.00 },
+                { option_name: 'หมูกรอบพิเศษ', additional_price: 25.00 },
+                { option_name: 'แคบหมูโบราณ', additional_price: 15.00 },
+              ],
+            },
+          },
+        });
+      }
+
+      // 3. ถ้าเป็นส้มตำ (category_id = 2) หรือ ยำ (category_id = 3) -> เพิ่มเครื่องเคียงท็อปปิ้ง
+      if (menu.category_id === 2 || menu.category_id === 3) {
+        await prisma.menuOptionGroup.create({
+          data: {
+            menu_id: menu.menu_id,
+            group_name: 'ท็อปปิ้งเครื่องเคียง',
+            is_required: false,
+            min_select: 0,
+            max_select: 3,
+            options: {
+              create: [
+                { option_name: 'แคบหมูโบราณ (ห่อ)', additional_price: 15.00 },
+                { option_name: 'ไข่เค็ม (1 ฟอง)', additional_price: 15.00 },
+                { option_name: 'ขนมจีนเส้นสด', additional_price: 10.00 },
+                { option_name: 'หมูยอทอดชิ้นโต', additional_price: 20.00 },
+              ],
+            },
+          },
+        });
+      }
+
+      seededOptionGroupsCount++;
+    }
+  }
+  console.log(`✅ บันทึกกลุ่มตัวเลือกและท็อปปิ้งพร้อมราคาให้ ${seededOptionGroupsCount} เมนูเรียบร้อยแล้ว`);
+
   console.log('🎉 Seeding ข้อมูลพื้นฐานเสร็จสิ้นสมบูรณ์!');
 }
 

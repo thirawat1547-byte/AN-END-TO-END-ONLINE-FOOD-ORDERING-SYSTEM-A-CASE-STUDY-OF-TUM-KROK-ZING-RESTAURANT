@@ -90,17 +90,23 @@ const onSocketConnect = () => {
 const onSocketDisconnect = () => {
   socketStore.isConnected = false
 }
-// ฟังก์ชันดึงรายละเอียด/หมายเหตุที่ลูกค้าเลือก (ความเผ็ด, ไม่ใส่ผัก, โน้ตเพิ่มเติม)
+// ฟังก์ชันดึงรายละเอียด/หมายเหตุและท็อปปิ้งที่ลูกค้าเลือก
 const extractNote = (oi) => {
+  const parts = []
+
+  // ดึงตัวเลือกและท็อปปิ้งจาก ORDER_ITEM_OPTIONS (ถ้ามี)
+  if (oi.order_item_options && Array.isArray(oi.order_item_options) && oi.order_item_options.length > 0) {
+    const optLabels = oi.order_item_options.map(o => o.option_name).join(', ')
+    parts.push(`✨ ${optLabels}`)
+  }
+
   if (oi.notes && typeof oi.notes === 'string' && oi.notes.trim()) {
-    return oi.notes.trim()
+    parts.push(oi.notes.trim())
   }
   if (oi.customization) {
     if (typeof oi.customization === 'string' && oi.customization.trim()) {
-      return oi.customization.trim()
-    }
-    if (typeof oi.customization === 'object') {
-      const parts = []
+      parts.push(oi.customization.trim())
+    } else if (typeof oi.customization === 'object') {
       if (oi.customization.spicy && oi.customization.spicy !== '-') {
         parts.push(`🔥 เผ็ด: ${oi.customization.spicy}`)
       }
@@ -110,10 +116,9 @@ const extractNote = (oi) => {
       if (oi.customization.note) {
         parts.push(`💬 โน้ต: ${oi.customization.note}`)
       }
-      return parts.join(' | ')
     }
   }
-  return ''
+  return parts.join(' | ')
 }
 
 // แปลงรูปแบบออเดอร์จาก Backend เข้า Component

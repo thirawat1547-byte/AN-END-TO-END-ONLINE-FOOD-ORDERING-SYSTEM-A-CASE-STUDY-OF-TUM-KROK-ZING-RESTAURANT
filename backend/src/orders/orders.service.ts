@@ -132,8 +132,25 @@ export class OrdersService implements OnModuleInit {
           throw new BadRequestException(`ขออภัย เมนู "${menu.menu_name}" ปิดรับออเดอร์ชั่วคราว`);
         }
 
-        const unitPrice = Number(menu.price);
-        totalAmount += unitPrice * item.quantity;
+        const basePrice = Number(menu.price);
+        
+        // คำนวณราคา Option เสริม (ถ้ามี)
+        let optionPriceSum = 0;
+        const optionsList: any[] = [];
+        if (item.options && Array.isArray(item.options)) {
+          for (const opt of item.options) {
+            const addPrice = Number(opt.price || 0);
+            optionPriceSum += addPrice;
+            optionsList.push({
+              option_id: opt.option_id ? Number(opt.option_id) : null,
+              option_name: opt.option_name,
+              price: addPrice,
+            });
+          }
+        }
+
+        const unitPriceWithOption = basePrice + optionPriceSum;
+        totalAmount += unitPriceWithOption * item.quantity;
 
         const dishType = (item as any).dish_type || (item as any).dishType;
         let finalNotes = item.notes || '';
@@ -141,18 +158,24 @@ export class OrdersService implements OnModuleInit {
           finalNotes = finalNotes ? `${dishType} | ${finalNotes}` : dishType;
         }
 
-        // บันทึกข้อมูลรายการอาหาร พร้อมหมายเหตุตัวเลือกที่ลูกค้าเลือก (notes)
+        // บันทึกข้อมูลรายการอาหาร พร้อมหมายเหตุตัวเลือกที่ลูกค้าเลือก (notes) และตาราง ORDER_ITEM_OPTIONS
         orderItemsData.push({
           menu_id: item.menu_id,
           quantity: item.quantity,
-          unit_price: unitPrice,
+          unit_price: unitPriceWithOption,
           notes: finalNotes || null,
+          ...(optionsList.length > 0 && {
+            order_item_options: {
+              create: optionsList,
+            },
+          }),
         });
       }
 
       let validUserId: number | undefined = undefined;
+      let existingUser: any = null;
       if (createOrderDto.user_id) {
-        const existingUser = await tx.user.findUnique({
+        existingUser = await tx.user.findUnique({
           where: { user_id: createOrderDto.user_id },
         });
         if (existingUser) {
@@ -202,7 +225,6 @@ export class OrdersService implements OnModuleInit {
         }
 
         discountAmount = Math.min(discountAmount, totalAmount);
-        totalAmount = Math.max(0, totalAmount - discountAmount);
         appliedPromoId = promo.promo_id;
 
         // บันทึกสถานะว่าผู้ใช้ใช้คูปองนี้แล้วในตาราง USER_CLAIMED_PROMOTIONS
@@ -218,11 +240,35 @@ export class OrdersService implements OnModuleInit {
         }
       }
 
+      const foodSubtotal = totalAmount; // ยอดรวมอาหารและท็อปปิ้งทั้งหมด
+
+      // คำนวณค่าส่ง (สำหรับ DELIVERY)
+      let deliveryFee = 0;
+      let storeSetting: any = null;
+      try {
+        storeSetting = await tx.storeSetting.findUnique({ where: { id: 1 } });
+      } catch (e) {}
+
+      if (createOrderDto.order_type === 'DELIVERY') {
+        deliveryFee = createOrderDto.delivery_fee !== undefined
+          ? Number(createOrderDto.delivery_fee)
+          : Number(storeSetting?.base_delivery_fee || 20.00);
+      }
+
+      // คำนวณยอดสุทธิ: total_price = subtotal - discount_amount + delivery_fee
+      const finalTotalPrice = Math.max(0, foodSubtotal - discountAmount + deliveryFee);
+
       const order = await tx.order.create({
         data: {
           order_type: createOrderDto.order_type || 'DINE_IN',
-          total_price: totalAmount,
           status: 'PENDING',
+          subtotal: foodSubtotal,
+          discount_amount: discountAmount,
+          delivery_fee: deliveryFee,
+          total_price: finalTotalPrice,
+          delivery_address: createOrderDto.delivery_address || (existingUser ? existingUser.address : null),
+          delivery_phone: createOrderDto.delivery_phone || (existingUser ? existingUser.phone_number : null),
+          order_notes: createOrderDto.order_notes || null,
           ...(createOrderDto.table_id && {
             table: {
               connect: { table_id: createOrderDto.table_id },
@@ -246,12 +292,34 @@ export class OrdersService implements OnModuleInit {
           order_items: {
             include: {
               menu: true,
+              order_item_options: true,
             },
           },
           table: true,
           promotion: true,
+          delivery: true,
         },
       });
+
+      // ถ้าเป็นการสั่งประเภทจัดส่ง (DELIVERY) ให้สร้างข้อมูลลงตาราง DELIVERIES อัตโนมัติ (1:1)
+      if (createOrderDto.order_type === 'DELIVERY') {
+        const riderTripFee = Number(storeSetting?.base_rider_fee || 40.00);
+        try {
+          await tx.delivery.create({
+            data: {
+              order_id: order.order_id,
+              delivery_status: 'WAITING_RIDER',
+              customer_name: createOrderDto.customer_name || existingUser?.username || 'ลูกค้าเดลิเวอรี',
+              customer_phone: createOrderDto.delivery_phone || existingUser?.phone_number || '-',
+              delivery_address: createOrderDto.delivery_address || existingUser?.address || 'ตามหมุดจัดส่ง',
+              rider_fee: riderTripFee,
+              distance_km: 0.0,
+            },
+          });
+        } catch (delivErr) {
+          console.warn('ไม่สามารถสร้างเรคอร์ด Delivery เริ่มต้น:', delivErr);
+        }
+      }
 
       // ถ้าเป็นการสั่งที่โต๊ะ ให้ปรับสถานะโต๊ะเป็น OCCUPIED ทันที
       if (createOrderDto.table_id) {
@@ -438,10 +506,11 @@ export class OrdersService implements OnModuleInit {
       },
       include: {
         order_items: {
-          include: { menu: true },
+          include: { menu: true, order_item_options: true },
         },
         table: true,
         transaction: true,
+        delivery: true,
         user: {
           select: {
             user_id: true,
@@ -695,10 +764,11 @@ export class OrdersService implements OnModuleInit {
       where: { order_id: id },
       include: {
         order_items: {
-          include: { menu: true },
+          include: { menu: true, order_item_options: true },
         },
         table: true,
         transaction: true,
+        delivery: true,
         user: {
           select: { user_id: true, username: true, phone_number: true, address: true },
         },
@@ -800,5 +870,128 @@ export class OrdersService implements OnModuleInit {
     }
 
     return updated;
+  }
+
+  // 6. ดึงรายการงานจัดส่งที่เปิดรับไรเดอร์ หรือกำลังจัดส่งอยู่
+  async getAvailableDeliveries() {
+    return this.prisma.order.findMany({
+      where: {
+        order_type: 'DELIVERY',
+        status: { in: ['READY', 'COOKING', 'IN_DELIVERY', 'PENDING'] },
+      },
+      include: {
+        order_items: {
+          include: { menu: true, order_item_options: true },
+        },
+        delivery: true,
+        user: {
+          select: { user_id: true, username: true, phone_number: true, address: true },
+        },
+      },
+      orderBy: { order_id: 'desc' },
+    });
+  }
+
+  // 7. ไรเดอร์กดรับงานจัดส่ง
+  async claimDelivery(orderId: number, riderId: number) {
+    const order = await this.findOne(orderId);
+    if (!order) throw new NotFoundException(`ไม่พบออเดอร์ #${orderId}`);
+
+    // อัปเดตข้อมูล Delivery
+    const delivery = await this.prisma.delivery.upsert({
+      where: { order_id: orderId },
+      update: {
+        rider_id: riderId,
+        delivery_status: 'ASSIGNED',
+        assigned_at: new Date(),
+      },
+      create: {
+        order_id: orderId,
+        rider_id: riderId,
+        delivery_status: 'ASSIGNED',
+        customer_name: (order.user as any)?.username || 'ลูกค้าเดลิเวอรี',
+        customer_phone: order.delivery_phone || (order.user as any)?.phone_number || '-',
+        delivery_address: order.delivery_address || (order.user as any)?.address || '-',
+        rider_fee: 40.00,
+        assigned_at: new Date(),
+      },
+    });
+
+    const updatedOrder = await this.prisma.order.update({
+      where: { order_id: orderId },
+      data: {
+        status: 'READY',
+      },
+      include: {
+        order_items: { include: { menu: true, order_item_options: true } },
+        delivery: true,
+        user: true,
+      },
+    });
+
+    try {
+      this.ordersGateway.sendOrderStatusUpdated(updatedOrder);
+    } catch (e) {}
+
+    return { order: updatedOrder, delivery };
+  }
+
+  // 8. ไรเดอร์อัปเดตสถานะการนำส่ง (PICKED_UP, DELIVERED) พร้อมแนบรูปถ่าย
+  async updateDeliveryStatus(orderId: number, riderId: number, status: string, proofImageUrl?: string) {
+    const stUpper = (status || '').toUpperCase();
+    const isDelivered = stUpper === 'DELIVERED';
+    const isPickedUp = stUpper === 'PICKED_UP' || stUpper === 'IN_DELIVERY';
+
+    await this.prisma.delivery.updateMany({
+      where: { order_id: orderId },
+      data: {
+        delivery_status: isDelivered ? 'DELIVERED' : (isPickedUp ? 'DELIVERING' : stUpper),
+        ...(isPickedUp && { picked_up_at: new Date() }),
+        ...(isDelivered && {
+          delivered_at: new Date(),
+          ...(proofImageUrl && { proof_image_url: proofImageUrl }),
+        }),
+      },
+    });
+
+    // อัปเดตสถานะ Order ให้สอดคล้องกัน (เมื่อส่งสำเร็จเปลี่ยนเป็น COMPLETED)
+    const newOrderStatus = isDelivered ? 'COMPLETED' : 'IN_DELIVERY';
+    const updatedOrder = await this.prisma.order.update({
+      where: { order_id: orderId },
+      data: {
+        status: newOrderStatus,
+      },
+      include: {
+        order_items: { include: { menu: true, order_item_options: true } },
+        delivery: true,
+        user: true,
+      },
+    });
+
+    try {
+      this.ordersGateway.sendOrderStatusUpdated(updatedOrder);
+    } catch (e) {}
+
+    return updatedOrder;
+  }
+
+  // 9. คำนวณรายได้สะสมของไรเดอร์ (ค่ารอบสะสม)
+  async getRiderEarnings(riderId: number) {
+    const deliveries = await this.prisma.delivery.findMany({
+      where: {
+        rider_id: riderId,
+        delivery_status: 'DELIVERED',
+      },
+      orderBy: { delivered_at: 'desc' },
+    });
+
+    const totalEarnings = deliveries.reduce((sum, d) => sum + Number(d.rider_fee || 40), 0);
+
+    return {
+      rider_id: riderId,
+      total_trips: deliveries.length,
+      total_earnings: totalEarnings,
+      trips: deliveries,
+    };
   }
 }

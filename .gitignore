@@ -27,6 +27,10 @@ backend/node_modules
 *.sln
 *.sw?
 
-# Documents
+# Documents & Scripts
 *.docx
 *.bak
+diagrams/
+build_report.py
+
+

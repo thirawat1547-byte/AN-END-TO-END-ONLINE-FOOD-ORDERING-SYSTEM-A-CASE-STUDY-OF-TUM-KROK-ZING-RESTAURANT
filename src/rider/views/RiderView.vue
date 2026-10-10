@@ -341,16 +341,31 @@ const fetchActiveOrders = async () => {
         eta: '12 นาที'
       }
 
-      // แปลงรายการอาหาร
+      // แปลงรายการอาหาร พร้อมแสดงตัวเลือกและท็อปปิ้ง
       if (active.order_items && active.order_items.length > 0) {
-        orderItems.value = active.order_items.map((item, index) => ({
-          id: item.order_item_id || index + 1,
-          name: item.menu?.menu_name || 'อาหารจานอร่อย',
-          quantity: item.quantity || 1,
-          price: Number(item.unit_price) * (item.quantity || 1),
-          detail: item.notes || item.menu?.description || 'ปรุงสดใหม่ตามมาตรฐานร้าน',
-          checked: true
-        }))
+        orderItems.value = active.order_items.map((item, index) => {
+          const optTexts = (item.order_item_options || []).map(o => `${o.option_name}${Number(o.price) > 0 ? ` (+฿${o.price})` : ''}`).join(', ')
+          const noteText = item.notes ? item.notes : ''
+          const fullDetail = optTexts 
+            ? `${noteText ? noteText + ' | ' : ''}ท็อปปิ้ง/ออปชัน: ${optTexts}`
+            : (noteText || item.menu?.description || 'ปรุงสดใหม่ตามมาตรฐานร้าน')
+
+          return {
+            id: item.order_item_id || index + 1,
+            name: item.menu?.menu_name || 'อาหารจานอร่อย',
+            quantity: item.quantity || 1,
+            price: Number(item.unit_price) * (item.quantity || 1),
+            detail: fullDetail,
+            checked: true
+          }
+        })
+      }
+
+      // ดึงค่ารอบไรเดอร์จริงจากเรคอร์ด Delivery
+      if (active.delivery && active.delivery.rider_fee) {
+        earnings.value = Number(active.delivery.rider_fee)
+      } else {
+        await fetchEarnings()
       }
 
       // ตรวจสอบสถานะอาหารจากครัว
@@ -363,7 +378,7 @@ const fetchActiveOrders = async () => {
         currentStep.value = 0
       }
 
-      showToast(`✅ เชื่อมต่อออเดอร์จริง #${active.order_id} สำเร็จ!`)
+      showToast(`✅ เชื่อมต่อออเดอร์เดลิเวอรีจริง #${active.order_id} สำเร็จ!`)
     } else {
       switchToDemo()
       showToast('ℹ️ ยังไม่มีออเดอร์เดลิเวอรี่ค้างในระบบ (เปิดโหมดจำลอง Demo)')
@@ -372,6 +387,17 @@ const fetchActiveOrders = async () => {
     console.warn('ดึงออเดอร์จริงไม่สำเร็จ ใช้โหมด Demo:', error)
     switchToDemo()
   }
+}
+
+const fetchEarnings = async () => {
+  try {
+    const token = localStorage.getItem('access_token')
+    const headers = token ? { Authorization: `Bearer ${token}` } : {}
+    const res = await axios.get(`${API_BASE}/orders/rider/earnings`, { headers })
+    if (res.data && res.data.total_earnings !== undefined) {
+      earnings.value = Number(res.data.total_earnings) || 58.00
+    }
+  } catch (e) {}
 }
 
 const switchToDemo = () => {

@@ -11,6 +11,22 @@ import {
   ValidateNested,
 } from 'class-validator';
 
+export class OrderItemOptionDto {
+  @ApiPropertyOptional({ example: 1, description: 'ID ของ Option' })
+  @IsInt()
+  @IsOptional()
+  option_id?: number;
+
+  @ApiProperty({ example: 'ไข่ดาวไม่สุก', description: 'ชื่อของ Option' })
+  @IsString()
+  @IsNotEmpty()
+  option_name: string;
+
+  @ApiPropertyOptional({ example: 10, description: 'ราคาบวกเพิ่ม (บาท)' })
+  @IsOptional()
+  price?: number;
+}
+
 export class OrderItemDto {
   @ApiProperty({ example: 5, description: 'ID ของเมนูอาหาร' })
   @IsInt()
@@ -36,6 +52,13 @@ export class OrderItemDto {
   @IsString()
   @IsOptional()
   dishType?: string;
+
+  @ApiPropertyOptional({ type: [OrderItemOptionDto], description: 'ท็อปปิ้งและตัวเลือกเสริมที่เลือก' })
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => OrderItemOptionDto)
+  options?: OrderItemOptionDto[];
 }
 
 export class CreateOrderDto {
@@ -54,6 +77,7 @@ export class CreateOrderDto {
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)
   items: OrderItemDto[];
+
   @ApiPropertyOptional({
     example: 'DINE_IN',
     enum: ['DINE_IN', 'TAKEAWAY', 'DELIVERY'],
@@ -73,4 +97,36 @@ export class CreateOrderDto {
   @IsString()
   @IsOptional()
   promo_code?: string;
+
+  @ApiPropertyOptional({ example: 150, description: 'ยอดรวมอาหารก่อนหักส่วนลดและค่าส่ง' })
+  @IsOptional()
+  subtotal?: number;
+
+  @ApiPropertyOptional({ example: 20, description: 'ส่วนลดโปรโมชั่น' })
+  @IsOptional()
+  discount_amount?: number;
+
+  @ApiPropertyOptional({ example: 30, description: 'ค่าจัดส่ง' })
+  @IsOptional()
+  delivery_fee?: number;
+
+  @ApiPropertyOptional({ example: '123/45 ถนนแจ้งวัฒนะ แขวงทุ่งสองห้อง เขตหลักสี่ กทม.', description: 'ที่อยู่จัดส่ง' })
+  @IsString()
+  @IsOptional()
+  delivery_address?: string;
+
+  @ApiPropertyOptional({ example: '081-234-5678', description: 'เบอร์โทรผู้รับสำหรับจัดส่ง' })
+  @IsString()
+  @IsOptional()
+  delivery_phone?: string;
+
+  @ApiPropertyOptional({ example: 'ฝากไว้ที่ล็อบบี้ชั้น 1', description: 'หมายเหตุเพิ่มเติมของคำสั่งซื้อ' })
+  @IsString()
+  @IsOptional()
+  order_notes?: string;
+
+  @ApiPropertyOptional({ example: 'คุณณัฐวุฒิ ใจดี', description: 'ชื่อผู้รับอาหาร (สำหรับงานจัดส่ง)' })
+  @IsString()
+  @IsOptional()
+  customer_name?: string;
 }

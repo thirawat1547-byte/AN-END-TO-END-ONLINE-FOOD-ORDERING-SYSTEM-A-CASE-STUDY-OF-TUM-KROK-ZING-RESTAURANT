@@ -86,10 +86,54 @@ export class OrdersController {
     return this.ordersService.findByUser(userId);
   }
 
+  // ดึงรายการออเดอร์เดลิเวอรี่สำหรับให้ไรเดอร์รับงาน
+  @Get('deliveries/available')
+  @ApiOperation({ summary: 'ดูรายการงานจัดส่งที่เปิดรับไรเดอร์' })
+  getAvailableDeliveries() {
+    return this.ordersService.getAvailableDeliveries();
+  }
+
+  // ดูยอดรายได้สะสมของไรเดอร์
+  @Get('rider/earnings')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'ดูยอดรายได้ค่ารอบสะสมของไรเดอร์' })
+  getRiderEarnings(@Req() req: any) {
+    const rawUserId = req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub;
+    const riderId = Number(rawUserId) || 1;
+    return this.ordersService.getRiderEarnings(riderId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'ดูรายละเอียดคำสั่งซื้อตาม ID' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.ordersService.findOne(id);
+  }
+
+  // ไรเดอร์กดรับงานจัดส่ง
+  @Post(':id/claim-delivery')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'ไรเดอร์กดรับงานจัดส่งออเดอร์' })
+  claimDelivery(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    const rawUserId = req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub;
+    const riderId = Number(rawUserId) || 1;
+    return this.ordersService.claimDelivery(id, riderId);
+  }
+
+  // ไรเดอร์อัปเดตสถานะงานจัดส่ง (PICKED_UP, DELIVERED)
+  @Patch(':id/delivery-status')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'ไรเดอร์อัปเดตสถานะการจัดส่ง (พร้อมแนบรูปถ่ายหลักฐาน)' })
+  updateDeliveryStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { status: string; proof_image_url?: string },
+    @Req() req: any,
+  ) {
+    const rawUserId = req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub;
+    const riderId = Number(rawUserId) || 1;
+    return this.ordersService.updateDeliveryStatus(id, riderId, body.status, body.proof_image_url);
   }
 
   @Patch(':id/status')

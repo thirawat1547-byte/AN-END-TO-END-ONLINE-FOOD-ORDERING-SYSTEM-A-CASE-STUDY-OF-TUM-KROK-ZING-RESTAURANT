@@ -239,6 +239,9 @@ const executePlaceOrder = async () => {
     const orderPayload = {
       table_id: parsedTableId,
       order_type: 'DINE_IN',
+      subtotal: Number(finalTotal || 0),
+      discount_amount: 0,
+      delivery_fee: 0,
       items: cart.value.map(item => {
         const notesList = []
         if (item.spicyLevel && item.spicyLevel !== 'normal') notesList.push(`เผ็ด: ${item.spicyLevel}`)
@@ -254,12 +257,19 @@ const executePlaceOrder = async () => {
           dishTypeVal = 'ราดข้าว'
         }
 
+        // Map options if selected
+        const optionsList = Array.isArray(item.selectedOptions) ? item.selectedOptions : (item.addons ? item.addons.map(a => ({
+          option_name: a.name,
+          price: Number(a.price || 0)
+        })) : undefined)
+
         const validMenuId = Number(item.menu_id || item.id)
         return {
           menu_id: validMenuId,
           quantity: Number(item.quantity || 1),
           notes: notesList.join(' | ') || undefined,
-          dish_type: dishTypeVal
+          dish_type: dishTypeVal,
+          options: optionsList && optionsList.length > 0 ? optionsList : undefined
         }
       })
     }
