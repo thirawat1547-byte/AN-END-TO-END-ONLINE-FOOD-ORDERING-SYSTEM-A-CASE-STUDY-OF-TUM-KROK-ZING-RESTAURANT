@@ -1,0 +1,760 @@
+-- MySQL dump 10.13  Distrib 8.0.46, for Linux (x86_64)
+--
+-- Host: localhost    Database: tum_krok_zing
+-- ------------------------------------------------------
+-- Server version	8.0.46
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8mb4 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `ALLERGENS`
+--
+
+DROP TABLE IF EXISTS `ALLERGENS`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ALLERGENS` (
+  `allergen_id` int NOT NULL AUTO_INCREMENT,
+  `allergen_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `icon_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`allergen_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `ALLERGENS`
+--
+
+LOCK TABLES `ALLERGENS` WRITE;
+/*!40000 ALTER TABLE `ALLERGENS` DISABLE KEYS */;
+INSERT INTO `ALLERGENS` VALUES (1,'กุ้ง / อาหารทะเล','/icons/shrimp.png'),(2,'ถั่วลิสง','/icons/peanut.png'),(3,'นม / ผลิตภัณฑ์นม','/icons/milk.png'),(4,'กลูเตน / แป้งสาลี','/icons/gluten.png'),(5,'ไข่','/icons/egg.png');
+/*!40000 ALTER TABLE `ALLERGENS` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `CATEGORIES`
+--
+
+DROP TABLE IF EXISTS `CATEGORIES`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `CATEGORIES` (
+  `category_id` int NOT NULL AUTO_INCREMENT,
+  `category_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`category_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `CATEGORIES`
+--
+
+LOCK TABLES `CATEGORIES` WRITE;
+/*!40000 ALTER TABLE `CATEGORIES` DISABLE KEYS */;
+INSERT INTO `CATEGORIES` VALUES (1,'อาหารจานเดียว / ผัด'),(2,'ส้มตำแซ่บซิ่ง'),(3,'ลาบ / ยำ'),(4,'ของทอด'),(5,'เครื่องดื่ม');
+/*!40000 ALTER TABLE `CATEGORIES` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `DELIVERIES`
+--
+
+DROP TABLE IF EXISTS `DELIVERIES`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `DELIVERIES` (
+  `delivery_id` int NOT NULL AUTO_INCREMENT,
+  `order_id` int NOT NULL,
+  `rider_id` int DEFAULT NULL,
+  `delivery_status` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'WAITING_RIDER',
+  `customer_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `customer_phone` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `delivery_address` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `customer_lat` decimal(10,7) DEFAULT NULL,
+  `customer_lng` decimal(10,7) DEFAULT NULL,
+  `distance_km` decimal(5,2) NOT NULL DEFAULT '0.00',
+  `rider_fee` decimal(10,2) NOT NULL DEFAULT '40.00',
+  `proof_image_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `assigned_at` datetime(3) DEFAULT NULL,
+  `picked_up_at` datetime(3) DEFAULT NULL,
+  `delivered_at` datetime(3) DEFAULT NULL,
+  PRIMARY KEY (`delivery_id`),
+  UNIQUE KEY `DELIVERIES_order_id_key` (`order_id`),
+  KEY `DELIVERIES_rider_id_idx` (`rider_id`),
+  KEY `DELIVERIES_delivery_status_idx` (`delivery_status`),
+  CONSTRAINT `DELIVERIES_order_id_fkey` FOREIGN KEY (`order_id`) REFERENCES `ORDERS` (`order_id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `DELIVERIES_rider_id_fkey` FOREIGN KEY (`rider_id`) REFERENCES `USERS` (`user_id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `DELIVERIES`
+--
+
+LOCK TABLES `DELIVERIES` WRITE;
+/*!40000 ALTER TABLE `DELIVERIES` DISABLE KEYS */;
+/*!40000 ALTER TABLE `DELIVERIES` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `INGREDIENTS`
+--
+
+DROP TABLE IF EXISTS `INGREDIENTS`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `INGREDIENTS` (
+  `ingredient_id` int NOT NULL AUTO_INCREMENT,
+  `ingredient_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `quantity_in_stock` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `unit` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `reorder_level` decimal(10,2) NOT NULL DEFAULT '5.00',
+  `last_updated` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`ingredient_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=34 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `INGREDIENTS`
+--
+
+LOCK TABLES `INGREDIENTS` WRITE;
+/*!40000 ALTER TABLE `INGREDIENTS` DISABLE KEYS */;
+INSERT INTO `INGREDIENTS` VALUES (1,'มะละกอดิบ',15.00,'กิโลกรัม',5.00,'2026-09-05 08:18:10.609'),(2,'ปูเค็ม',50.00,'ตัว',10.00,'2026-09-05 08:18:10.620'),(3,'สะโพกไก่',10.00,'กิโลกรัม',3.00,'2026-09-05 08:18:10.628'),(4,'กุ้งและหมึก',8.00,'กิโลกรัม',2.00,'2026-09-05 08:18:10.637'),(5,'หมูสด / หมูสับ',19.02,'กก.',5.00,'2026-09-21 16:33:56.246'),(6,'กุ้งและหมึกสด',15.00,'กก.',3.00,'2026-09-21 15:18:24.070'),(7,'หมูกรอบ',10.00,'กก.',3.00,'2026-09-21 15:18:24.081'),(8,'เนื้อสะโพกไก่',18.00,'กก.',4.00,'2026-09-21 15:18:24.092'),(9,'ปีกไก่สด',15.00,'กก.',4.00,'2026-09-21 15:18:24.103'),(10,'มะละกอดิบขูด',25.00,'กก.',5.00,'2026-09-21 15:18:24.114'),(11,'พริกสดจินดาแดง',7.94,'กก.',2.00,'2026-09-21 16:33:56.250'),(12,'กระเทียมสด',5.91,'กก.',2.00,'2026-09-21 16:33:56.253'),(13,'ผักคะน้าสด',9.68,'กก.',3.00,'2026-09-21 15:18:24.155'),(14,'ใบกะเพราสด',4.88,'กก.',1.00,'2026-09-21 16:33:56.256'),(15,'ถั่วฝักยาว',8.00,'กก.',2.00,'2026-09-21 15:18:24.186'),(16,'มะเขือเทศสีดา',7.94,'กก.',2.00,'2026-09-21 15:18:24.199'),(17,'มะนาวสด',58.00,'ลูก',15.00,'2026-09-21 15:18:24.210'),(18,'น้ำปลาร้าปรุงสุก',15.00,'ขวด',3.00,'2026-09-21 15:18:24.235'),(19,'ถั่วลิสงคั่วบด',5.96,'กก.',2.00,'2026-09-21 15:18:24.259'),(20,'กุ้งแห้ง',9.50,'กก.',1.00,'2026-09-21 15:18:24.284'),(21,'พริกแกงเผ็ด',6.00,'กก.',2.00,'2026-09-21 15:18:24.305'),(22,'วุ้นเส้น',28.00,'ห่อ',10.00,'2026-09-21 15:18:24.322'),(23,'ไข่ไก่สด',119.00,'ฟอง',30.00,'2026-09-21 15:18:24.353'),(24,'ข้าวสารหอมมะลิ',48.47,'กก.',10.00,'2026-09-21 16:33:56.259'),(25,'ข้าวเหนียว',30.00,'กก.',8.00,'2026-09-21 15:18:24.409'),(26,'แป้งทอดกรอบ',10.00,'กก.',3.00,'2026-09-21 15:18:24.436'),(27,'ข้าวคั่ว',5.00,'กก.',1.50,'2026-09-21 15:18:24.461'),(28,'พริกป่น',1.00,'กก.',1.50,'2026-09-21 15:18:24.487'),(29,'ดอกเก๊กฮวยอบแห้ง',20.00,'ห่อ',5.00,'2026-09-21 15:18:24.504'),(30,'โค้กกระป๋อง',100.00,'กระป๋อง',20.00,'2026-09-21 15:18:24.520'),(31,'สไปรท์กระป๋อง',100.00,'กระป๋อง',20.00,'2026-09-21 15:18:24.537'),(32,'น้ำดื่มขวด',100.00,'ขวด',25.00,'2026-09-21 15:18:24.551'),(33,'กุ้งสด',15.00,'กก.',3.00,'2026-09-30 07:32:59.688');
+/*!40000 ALTER TABLE `INGREDIENTS` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Temporary view structure for view `LIVE_TABLE_STATUS_VIEW`
+--
+
+DROP TABLE IF EXISTS `LIVE_TABLE_STATUS_VIEW`;
+/*!50001 DROP VIEW IF EXISTS `LIVE_TABLE_STATUS_VIEW`*/;
+SET @saved_cs_client     = @@character_set_client;
+/*!50503 SET character_set_client = utf8mb4 */;
+/*!50001 CREATE VIEW `LIVE_TABLE_STATUS_VIEW` AS SELECT 
+ 1 AS `table_id`,
+ 1 AS `table_number`,
+ 1 AS `capacity`,
+ 1 AS `current_status`,
+ 1 AS `current_order_id`,
+ 1 AS `current_total`*/;
+SET character_set_client = @saved_cs_client;
+
+--
+-- Temporary view structure for view `LOW_STOCK_ALERTS_VIEW`
+--
+
+DROP TABLE IF EXISTS `LOW_STOCK_ALERTS_VIEW`;
+/*!50001 DROP VIEW IF EXISTS `LOW_STOCK_ALERTS_VIEW`*/;
+SET @saved_cs_client     = @@character_set_client;
+/*!50503 SET character_set_client = utf8mb4 */;
+/*!50001 CREATE VIEW `LOW_STOCK_ALERTS_VIEW` AS SELECT 
+ 1 AS `ingredient_id`,
+ 1 AS `ingredient_name`,
+ 1 AS `quantity_in_stock`,
+ 1 AS `reorder_level`,
+ 1 AS `unit`*/;
+SET character_set_client = @saved_cs_client;
+
+--
+-- Table structure for table `MENUS`
+--
+
+DROP TABLE IF EXISTS `MENUS`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `MENUS` (
+  `menu_id` int NOT NULL AUTO_INCREMENT,
+  `category_id` int NOT NULL,
+  `menu_name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci,
+  `price` decimal(10,2) NOT NULL,
+  `image_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `calories` int DEFAULT NULL,
+  `is_available` tinyint(1) NOT NULL DEFAULT '1',
+  PRIMARY KEY (`menu_id`),
+  KEY `MENUS_category_id_idx` (`category_id`),
+  CONSTRAINT `MENUS_category_id_fkey` FOREIGN KEY (`category_id`) REFERENCES `CATEGORIES` (`category_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=31 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `MENUS`
+--
+
+LOCK TABLES `MENUS` WRITE;
+/*!40000 ALTER TABLE `MENUS` DISABLE KEYS */;
+INSERT INTO `MENUS` VALUES (1,1,'กระเพราหมู','กะเพราหมูสับผัดพริกแห้ง หอมฟุ้ง อร่อยเด็ดสะใจ',40.00,'/images/kapaomu.jpg',880,1),(2,1,'กระเพราทะเล/หมึก/กุ้ง','กะเพราซีฟู้ดสดใหม่ กุ้งปลาหมึกเด้ง เผ็ดร้อน ถึงเครื่อง',60.00,'/images/kapaotaley.jpg',695,1),(3,1,'ข้าวผัดหมู','ข้าวผัดหอมกรุ่นกระทะ เมล็ดข้าวร่วนสวย ใส่หมูนุ่ม',40.00,'/images/khaopadmu.jpg',950,1),(4,1,'ข้าวผัดกุ้ง','ข้าวผัดกุ้งสดเด้ง รสชาติกลมกล่อม หอมกลิ่นกระทะ',50.00,'/images/khaopadtalay.jpg',840,1),(5,1,'ข้าวผัดทะเล/หมึก/กุ้ง','รวมมิตรทะเลผัดข้าวหอมมะลิ รสชาติกลมกล่อม',60.00,'/images/khaopadtalay.jpg',860,1),(6,1,'ผัดพริกแกงหมู','พริกแกงเข้มข้นถึงเครื่องแกงใต้ ผัดถั่วฝักยาวและหมูนุ่ม',40.00,'/images/pikkangmu.jpg',810,1),(7,1,'ผัดพริกแกงทะเล/หมึก/กุ้ง','ผัดพริกแกงรวมมิตรทะเล รสชาติจัดจ้านถึงใจ',60.00,'/images/prikkangtalay.jpg',680,1),(8,1,'ผัดคะน้าหมู','คะน้าสดกรอบผัดหมูกรอบชิ้นโต รสชาติกลมกล่อมหอมน้ำมันหอย',40.00,'/images/kanamokrop.jpg',920,1),(9,1,'ผัดคะน้าทะเล/หมึก/กุ้ง','คะน้าสดกรอบผัดซีฟู้ดเนื้อแน่น ปรุงร้อนๆ จานต่อจาน',60.00,'/images/kanatalay.jpg',650,1),(10,1,'ข้าวหมูกระเทียม','หมูหมักนุ่มผัดกระเทียมพริกไทยดำหอมเตะจมูก',40.00,'/images/mookratiem.jpg',790,1),(11,1,'ข้าวไข่เจียวหมูสับ','ไข่เจียวฟูกรอบนอกนุ่มใน หมูสับแน่นๆ ทอดร้อนๆ',40.00,'/images/kaijeawmoosub.jpg',890,1),(12,1,'ข้าวไข่เจียวกุ้ง','ไข่เจียวฟูใส่กุ้งสดเด้ง ทานคู่น้ำปลาพริกมะนาว',50.00,'/images/kaikung.jpg',810,1),(13,3,'ยำวุ้นเส้นทะเล','เปรี้ยวเผ็ดแซ่บ กุ้ง หมึก หมูสับ วุ้นเส้นเหนียวนุ่ม',70.00,'/images/yumtalay.jpg',410,1),(14,2,'ส้มตำปูปลาร้า','เส้นมะละกอดิบ มะเขือเทศ และพริก ปลาร้านัวแท้สูตรเฉพาะ',40.00,'/images/tumprara.jpg',120,1),(15,2,'ส้มตำไทย','รสเปรี้ยวหวาน ถั่วลิสงคั่วเอง กุ้งแห้งตัวโต มะนาวสดแท้',40.00,'/images/tumtai.jpg',240,1),(16,3,'ลาบหมู','หมูสับนุ่ม ข้าวคั่วหอมกรุ่น พริกป่นคั่วเอง มะนาวแท้',50.00,'/images/larbmoo.jpg',360,1),(17,4,'ไก่ทอด (ปีก)','ปีกไก่หมักซอสทอดกรอบ ร้อนๆ เสิร์ฟพร้อมน้ำจิ้มแจ่ว',50.00,'/images/wingchick.jpg',540,1),(18,4,'ไก่ทอด (สะโพก)','เนื้อฉ่ำๆ ชิ้นใหญ่ กรอบนอกนุ่มใน ไม่อมน้ำมัน',50.00,'/images/chick.jpg',680,1),(19,5,'น้ำเก๊กฮวย','น้ำเก๊กฮวยต้มสมุนไพรแท้ หวานน้อย หอมเย็นชื่นใจ',20.00,'/images/gek.jpg',110,1),(20,5,'โค้ก (Coke)','เครื่องดื่มน้ำอัดลมโค้ก เย็นซ่าสดชื่น',20.00,'/images/coke.jpg',140,1),(21,5,'สไปรท์ (Sprite)','น้ำอัดลมกลิ่นเลมอนไลม์ ใสซ่า สดชื่นทันใจ',20.00,'/images/sprite.jpg',140,1),(22,5,'น้ำเปล่า','น้ำดื่มสะอาด ตราตำครกซิ่ง',10.00,'/images/water.jpg',0,1),(23,1,'ข้าวเปล่า','ข้าวสวยหอมมะลิหุงสุก ร้อนๆ นุ่มอร่อย',10.00,'/images/kao.jpg',430,1),(24,2,'ข้าวเหนียว','ข้าวเหนียวนุ่ม ร้อนๆ หอมอร่อย ทานคู่กับส้มตำ ลาบ ไก่ทอด',10.00,'/images/kaon.jpg',340,1),(25,1,'กะเพราหมู','กะเพราหมูสับผัดพริกแห้ง หอมฟุ้ง อร่อยเด็ดสะใจ',40.00,'/images/kapaomu.jpg',320,1),(26,1,'กะเพราทะเล/หมึก/กุ้ง','กะเพราซีฟู้ดสดใหม่ กุ้งปลาหมึกเด้ง เผ็ดร้อน ถึงเครื่อง',60.00,'/images/kapaotaley.jpg',280,1),(27,1,'ผัดคะน้าหมูกรอบ','คะน้าสดกรอบผัดหมูกรอบชิ้นโต รสชาติกลมกล่อมหอมน้ำมันหอย',40.00,'/images/kanamokrop.jpg',380,1),(28,5,'โค้ก (กระป๋อง)','น้ำอัดลมโค้ก เย็นซ่าสดชื่น',20.00,'/images/coke.jpg',140,1),(29,5,'น้ำดื่ม','น้ำดื่มสะอาด ตราตำครกซิ่ง',10.00,'/images/water.jpg',0,1),(30,3,'น้ำตกหมู','หมูนุ่ม หอมมะนาว ข้าวคั่ว รสจัดจ้าน',70.00,'/images/namtokmoo.jpg',360,1);
+/*!40000 ALTER TABLE `MENUS` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `MENU_ALLERGENS`
+--
+
+DROP TABLE IF EXISTS `MENU_ALLERGENS`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `MENU_ALLERGENS` (
+  `menu_id` int NOT NULL,
+  `allergen_id` int NOT NULL,
+  PRIMARY KEY (`menu_id`,`allergen_id`),
+  KEY `MENU_ALLERGENS_allergen_id_idx` (`allergen_id`),
+  KEY `MENU_ALLERGENS_menu_id_idx` (`menu_id`),
+  CONSTRAINT `MENU_ALLERGENS_allergen_id_fkey` FOREIGN KEY (`allergen_id`) REFERENCES `ALLERGENS` (`allergen_id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `MENU_ALLERGENS_menu_id_fkey` FOREIGN KEY (`menu_id`) REFERENCES `MENUS` (`menu_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `MENU_ALLERGENS`
+--
+
+LOCK TABLES `MENU_ALLERGENS` WRITE;
+/*!40000 ALTER TABLE `MENU_ALLERGENS` DISABLE KEYS */;
+INSERT INTO `MENU_ALLERGENS` VALUES (2,1),(4,1),(5,1),(7,1),(9,1),(12,1),(13,1),(14,1),(15,1),(26,1),(13,2),(14,2),(15,2),(17,4),(18,4),(4,5),(5,5),(11,5),(12,5);
+/*!40000 ALTER TABLE `MENU_ALLERGENS` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `MENU_INGREDIENTS`
+--
+
+DROP TABLE IF EXISTS `MENU_INGREDIENTS`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `MENU_INGREDIENTS` (
+  `menu_id` int NOT NULL,
+  `ingredient_id` int NOT NULL,
+  `quantity_used` decimal(10,2) NOT NULL,
+  PRIMARY KEY (`menu_id`,`ingredient_id`),
+  KEY `MENU_INGREDIENTS_ingredient_id_idx` (`ingredient_id`),
+  KEY `MENU_INGREDIENTS_menu_id_idx` (`menu_id`),
+  CONSTRAINT `MENU_INGREDIENTS_ingredient_id_fkey` FOREIGN KEY (`ingredient_id`) REFERENCES `INGREDIENTS` (`ingredient_id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `MENU_INGREDIENTS_menu_id_fkey` FOREIGN KEY (`menu_id`) REFERENCES `MENUS` (`menu_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `MENU_INGREDIENTS`
+--
+
+LOCK TABLES `MENU_INGREDIENTS` WRITE;
+/*!40000 ALTER TABLE `MENU_INGREDIENTS` DISABLE KEYS */;
+INSERT INTO `MENU_INGREDIENTS` VALUES (1,5,0.15),(1,11,0.01),(1,12,0.01),(1,14,0.02),(1,24,0.15),(2,4,0.07),(2,11,0.01),(2,12,0.01),(2,14,0.02),(2,24,0.15),(2,33,0.08),(3,5,0.10),(3,13,0.02),(3,23,1.00),(3,24,0.18),(4,13,0.02),(4,23,1.00),(4,24,0.18),(4,33,0.12),(5,4,0.07),(5,13,0.02),(5,23,1.00),(5,24,0.18),(5,33,0.07),(6,5,0.12),(6,15,0.03),(6,21,0.03),(6,24,0.15),(7,4,0.07),(7,15,0.03),(7,21,0.03),(7,24,0.15),(7,33,0.07),(8,7,0.10),(8,11,0.01),(8,12,0.01),(8,13,0.10),(8,24,0.15),(9,4,0.07),(9,12,0.01),(9,13,0.10),(9,24,0.15),(9,33,0.07),(10,5,0.14),(10,12,0.02),(10,24,0.15),(11,5,0.06),(11,23,2.00),(11,24,0.15),(12,23,2.00),(12,24,0.15),(12,33,0.06),(13,4,0.06),(13,5,0.04),(13,16,0.03),(13,17,1.00),(13,19,0.02),(13,22,1.00),(13,33,0.06),(14,2,1.00),(14,10,0.20),(14,11,0.02),(14,15,0.02),(14,16,0.03),(14,17,1.00),(14,18,0.05),(15,10,0.20),(15,11,0.02),(15,16,0.03),(15,17,1.00),(15,19,0.02),(15,20,0.01),(16,5,0.15),(16,17,1.00),(16,27,0.01),(16,28,0.01),(17,9,0.20),(17,26,0.02),(18,8,0.25),(18,26,0.03),(19,29,1.00),(20,30,1.00),(21,31,1.00),(22,32,1.00),(23,24,0.15),(24,25,0.15),(25,5,0.15),(25,11,0.01),(25,12,0.01),(25,14,0.02),(25,24,0.15),(26,4,0.07),(26,11,0.01),(26,12,0.01),(26,14,0.02),(26,24,0.15),(26,33,0.08),(27,7,0.10),(27,11,0.01),(27,12,0.01),(27,13,0.10),(27,24,0.15),(28,30,1.00),(29,32,1.00),(30,5,0.15),(30,17,1.00),(30,27,0.01),(30,28,0.01);
+/*!40000 ALTER TABLE `MENU_INGREDIENTS` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `MENU_OPTIONS`
+--
+
+DROP TABLE IF EXISTS `MENU_OPTIONS`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `MENU_OPTIONS` (
+  `option_id` int NOT NULL AUTO_INCREMENT,
+  `group_id` int NOT NULL,
+  `option_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `additional_price` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `is_available` tinyint(1) NOT NULL DEFAULT '1',
+  PRIMARY KEY (`option_id`),
+  KEY `MENU_OPTIONS_group_id_idx` (`group_id`),
+  CONSTRAINT `MENU_OPTIONS_group_id_fkey` FOREIGN KEY (`group_id`) REFERENCES `MENU_OPTION_GROUPS` (`group_id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=233 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `MENU_OPTIONS`
+--
+
+LOCK TABLES `MENU_OPTIONS` WRITE;
+/*!40000 ALTER TABLE `MENU_OPTIONS` DISABLE KEYS */;
+INSERT INTO `MENU_OPTIONS` VALUES (1,1,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(2,1,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(3,1,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(4,1,'เผ็ดมาก (พริกยกสวน)',0.00,1),(5,2,'ราดข้าว',0.00,1),(6,2,'กับข้าว (เพิ่มปริมาณ)',20.00,1),(7,3,'ไข่ดาวไม่สุก',10.00,1),(8,3,'ไข่ดาวสุก',10.00,1),(9,3,'ไข่เจียวหมูสับ',15.00,1),(10,3,'หมูกรอบพิเศษ',25.00,1),(11,3,'แคบหมูโบราณ',15.00,1),(12,4,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(13,4,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(14,4,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(15,4,'เผ็ดมาก (พริกยกสวน)',0.00,1),(16,5,'ราดข้าว',0.00,1),(17,5,'กับข้าว (เพิ่มปริมาณ)',20.00,1),(18,6,'ไข่ดาวไม่สุก',10.00,1),(19,6,'ไข่ดาวสุก',10.00,1),(20,6,'ไข่เจียวหมูสับ',15.00,1),(21,6,'หมูกรอบพิเศษ',25.00,1),(22,6,'แคบหมูโบราณ',15.00,1),(23,7,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(24,7,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(25,7,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(26,7,'เผ็ดมาก (พริกยกสวน)',0.00,1),(27,8,'ราดข้าว',0.00,1),(28,8,'กับข้าว (เพิ่มปริมาณ)',20.00,1),(29,9,'ไข่ดาวไม่สุก',10.00,1),(30,9,'ไข่ดาวสุก',10.00,1),(31,9,'ไข่เจียวหมูสับ',15.00,1),(32,9,'หมูกรอบพิเศษ',25.00,1),(33,9,'แคบหมูโบราณ',15.00,1),(34,10,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(35,10,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(36,10,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(37,10,'เผ็ดมาก (พริกยกสวน)',0.00,1),(38,11,'ราดข้าว',0.00,1),(39,11,'กับข้าว (เพิ่มปริมาณ)',20.00,1),(40,12,'ไข่ดาวไม่สุก',10.00,1),(41,12,'ไข่ดาวสุก',10.00,1),(42,12,'ไข่เจียวหมูสับ',15.00,1),(43,12,'หมูกรอบพิเศษ',25.00,1),(44,12,'แคบหมูโบราณ',15.00,1),(45,13,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(46,13,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(47,13,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(48,13,'เผ็ดมาก (พริกยกสวน)',0.00,1),(49,14,'ราดข้าว',0.00,1),(50,14,'กับข้าว (เพิ่มปริมาณ)',20.00,1),(51,15,'ไข่ดาวไม่สุก',10.00,1),(52,15,'ไข่ดาวสุก',10.00,1),(53,15,'ไข่เจียวหมูสับ',15.00,1),(54,15,'หมูกรอบพิเศษ',25.00,1),(55,15,'แคบหมูโบราณ',15.00,1),(56,16,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(57,16,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(58,16,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(59,16,'เผ็ดมาก (พริกยกสวน)',0.00,1),(60,17,'ราดข้าว',0.00,1),(61,17,'กับข้าว (เพิ่มปริมาณ)',20.00,1),(62,18,'ไข่ดาวไม่สุก',10.00,1),(63,18,'ไข่ดาวสุก',10.00,1),(64,18,'ไข่เจียวหมูสับ',15.00,1),(65,18,'หมูกรอบพิเศษ',25.00,1),(66,18,'แคบหมูโบราณ',15.00,1),(67,19,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(68,19,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(69,19,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(70,19,'เผ็ดมาก (พริกยกสวน)',0.00,1),(71,20,'ราดข้าว',0.00,1),(72,20,'กับข้าว (เพิ่มปริมาณ)',20.00,1),(73,21,'ไข่ดาวไม่สุก',10.00,1),(74,21,'ไข่ดาวสุก',10.00,1),(75,21,'ไข่เจียวหมูสับ',15.00,1),(76,21,'หมูกรอบพิเศษ',25.00,1),(77,21,'แคบหมูโบราณ',15.00,1),(78,22,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(79,22,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(80,22,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(81,22,'เผ็ดมาก (พริกยกสวน)',0.00,1),(82,23,'ราดข้าว',0.00,1),(83,23,'กับข้าว (เพิ่มปริมาณ)',20.00,1),(84,24,'ไข่ดาวไม่สุก',10.00,1),(85,24,'ไข่ดาวสุก',10.00,1),(86,24,'ไข่เจียวหมูสับ',15.00,1),(87,24,'หมูกรอบพิเศษ',25.00,1),(88,24,'แคบหมูโบราณ',15.00,1),(89,25,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(90,25,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(91,25,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(92,25,'เผ็ดมาก (พริกยกสวน)',0.00,1),(93,26,'ราดข้าว',0.00,1),(94,26,'กับข้าว (เพิ่มปริมาณ)',20.00,1),(95,27,'ไข่ดาวไม่สุก',10.00,1),(96,27,'ไข่ดาวสุก',10.00,1),(97,27,'ไข่เจียวหมูสับ',15.00,1),(98,27,'หมูกรอบพิเศษ',25.00,1),(99,27,'แคบหมูโบราณ',15.00,1),(100,28,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(101,28,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(102,28,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(103,28,'เผ็ดมาก (พริกยกสวน)',0.00,1),(104,29,'ราดข้าว',0.00,1),(105,29,'กับข้าว (เพิ่มปริมาณ)',20.00,1),(106,30,'ไข่ดาวไม่สุก',10.00,1),(107,30,'ไข่ดาวสุก',10.00,1),(108,30,'ไข่เจียวหมูสับ',15.00,1),(109,30,'หมูกรอบพิเศษ',25.00,1),(110,30,'แคบหมูโบราณ',15.00,1),(111,31,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(112,31,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(113,31,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(114,31,'เผ็ดมาก (พริกยกสวน)',0.00,1),(115,32,'ราดข้าว',0.00,1),(116,32,'กับข้าว (เพิ่มปริมาณ)',20.00,1),(117,33,'ไข่ดาวไม่สุก',10.00,1),(118,33,'ไข่ดาวสุก',10.00,1),(119,33,'ไข่เจียวหมูสับ',15.00,1),(120,33,'หมูกรอบพิเศษ',25.00,1),(121,33,'แคบหมูโบราณ',15.00,1),(122,34,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(123,34,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(124,34,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(125,34,'เผ็ดมาก (พริกยกสวน)',0.00,1),(126,35,'ราดข้าว',0.00,1),(127,35,'กับข้าว (เพิ่มปริมาณ)',20.00,1),(128,36,'ไข่ดาวไม่สุก',10.00,1),(129,36,'ไข่ดาวสุก',10.00,1),(130,36,'ไข่เจียวหมูสับ',15.00,1),(131,36,'หมูกรอบพิเศษ',25.00,1),(132,36,'แคบหมูโบราณ',15.00,1),(133,37,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(134,37,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(135,37,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(136,37,'เผ็ดมาก (พริกยกสวน)',0.00,1),(137,38,'แคบหมูโบราณ (ห่อ)',15.00,1),(138,38,'ไข่เค็ม (1 ฟอง)',15.00,1),(139,38,'ขนมจีนเส้นสด',10.00,1),(140,38,'หมูยอทอดชิ้นโต',20.00,1),(141,39,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(142,39,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(143,39,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(144,39,'เผ็ดมาก (พริกยกสวน)',0.00,1),(145,40,'แคบหมูโบราณ (ห่อ)',15.00,1),(146,40,'ไข่เค็ม (1 ฟอง)',15.00,1),(147,40,'ขนมจีนเส้นสด',10.00,1),(148,40,'หมูยอทอดชิ้นโต',20.00,1),(149,41,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(150,41,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(151,41,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(152,41,'เผ็ดมาก (พริกยกสวน)',0.00,1),(153,42,'แคบหมูโบราณ (ห่อ)',15.00,1),(154,42,'ไข่เค็ม (1 ฟอง)',15.00,1),(155,42,'ขนมจีนเส้นสด',10.00,1),(156,42,'หมูยอทอดชิ้นโต',20.00,1),(157,43,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(158,43,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(159,43,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(160,43,'เผ็ดมาก (พริกยกสวน)',0.00,1),(161,44,'แคบหมูโบราณ (ห่อ)',15.00,1),(162,44,'ไข่เค็ม (1 ฟอง)',15.00,1),(163,44,'ขนมจีนเส้นสด',10.00,1),(164,44,'หมูยอทอดชิ้นโต',20.00,1),(165,45,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(166,45,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(167,45,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(168,45,'เผ็ดมาก (พริกยกสวน)',0.00,1),(169,46,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(170,46,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(171,46,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(172,46,'เผ็ดมาก (พริกยกสวน)',0.00,1),(173,47,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(174,47,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(175,47,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(176,47,'เผ็ดมาก (พริกยกสวน)',0.00,1),(177,48,'ราดข้าว',0.00,1),(178,48,'กับข้าว (เพิ่มปริมาณ)',20.00,1),(179,49,'ไข่ดาวไม่สุก',10.00,1),(180,49,'ไข่ดาวสุก',10.00,1),(181,49,'ไข่เจียวหมูสับ',15.00,1),(182,49,'หมูกรอบพิเศษ',25.00,1),(183,49,'แคบหมูโบราณ',15.00,1),(184,50,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(185,50,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(186,50,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(187,50,'เผ็ดมาก (พริกยกสวน)',0.00,1),(188,51,'แคบหมูโบราณ (ห่อ)',15.00,1),(189,51,'ไข่เค็ม (1 ฟอง)',15.00,1),(190,51,'ขนมจีนเส้นสด',10.00,1),(191,51,'หมูยอทอดชิ้นโต',20.00,1),(192,52,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(193,52,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(194,52,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(195,52,'เผ็ดมาก (พริกยกสวน)',0.00,1),(196,53,'ราดข้าว',0.00,1),(197,53,'กับข้าว (เพิ่มปริมาณ)',20.00,1),(198,54,'ไข่ดาวไม่สุก',10.00,1),(199,54,'ไข่ดาวสุก',10.00,1),(200,54,'ไข่เจียวหมูสับ',15.00,1),(201,54,'หมูกรอบพิเศษ',25.00,1),(202,54,'แคบหมูโบราณ',15.00,1),(203,55,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(204,55,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(205,55,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(206,55,'เผ็ดมาก (พริกยกสวน)',0.00,1),(207,56,'ราดข้าว',0.00,1),(208,56,'กับข้าว (เพิ่มปริมาณ)',20.00,1),(209,57,'ไข่ดาวไม่สุก',10.00,1),(210,57,'ไข่ดาวสุก',10.00,1),(211,57,'ไข่เจียวหมูสับ',15.00,1),(212,57,'หมูกรอบพิเศษ',25.00,1),(213,57,'แคบหมูโบราณ',15.00,1),(214,58,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(215,58,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(216,58,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(217,58,'เผ็ดมาก (พริกยกสวน)',0.00,1),(218,59,'ราดข้าว',0.00,1),(219,59,'กับข้าว (เพิ่มปริมาณ)',20.00,1),(220,60,'ไข่ดาวไม่สุก',10.00,1),(221,60,'ไข่ดาวสุก',10.00,1),(222,60,'ไข่เจียวหมูสับ',15.00,1),(223,60,'หมูกรอบพิเศษ',25.00,1),(224,60,'แคบหมูโบราณ',15.00,1),(225,61,'ไม่เผ็ด (ไม่ใส่พริก)',0.00,1),(226,61,'เผ็ดน้อย (พริก 1-2 เม็ด)',0.00,1),(227,61,'เผ็ดกลาง (มาตรฐาน)',0.00,1),(228,61,'เผ็ดมาก (พริกยกสวน)',0.00,1),(229,62,'แคบหมูโบราณ (ห่อ)',15.00,1),(230,62,'ไข่เค็ม (1 ฟอง)',15.00,1),(231,62,'ขนมจีนเส้นสด',10.00,1),(232,62,'หมูยอทอดชิ้นโต',20.00,1);
+/*!40000 ALTER TABLE `MENU_OPTIONS` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `MENU_OPTION_GROUPS`
+--
+
+DROP TABLE IF EXISTS `MENU_OPTION_GROUPS`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `MENU_OPTION_GROUPS` (
+  `group_id` int NOT NULL AUTO_INCREMENT,
+  `menu_id` int NOT NULL,
+  `group_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `is_required` tinyint(1) NOT NULL DEFAULT '0',
+  `min_select` int NOT NULL DEFAULT '0',
+  `max_select` int NOT NULL DEFAULT '1',
+  PRIMARY KEY (`group_id`),
+  KEY `MENU_OPTION_GROUPS_menu_id_idx` (`menu_id`),
+  CONSTRAINT `MENU_OPTION_GROUPS_menu_id_fkey` FOREIGN KEY (`menu_id`) REFERENCES `MENUS` (`menu_id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=63 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `MENU_OPTION_GROUPS`
+--
+
+LOCK TABLES `MENU_OPTION_GROUPS` WRITE;
+/*!40000 ALTER TABLE `MENU_OPTION_GROUPS` DISABLE KEYS */;
+INSERT INTO `MENU_OPTION_GROUPS` VALUES (1,1,'ระดับความเผ็ด',1,1,1),(2,1,'รูปแบบอาหาร',0,0,1),(3,1,'ท็อปปิ้งเพิ่มเติม',0,0,3),(4,2,'ระดับความเผ็ด',1,1,1),(5,2,'รูปแบบอาหาร',0,0,1),(6,2,'ท็อปปิ้งเพิ่มเติม',0,0,3),(7,3,'ระดับความเผ็ด',1,1,1),(8,3,'รูปแบบอาหาร',0,0,1),(9,3,'ท็อปปิ้งเพิ่มเติม',0,0,3),(10,4,'ระดับความเผ็ด',1,1,1),(11,4,'รูปแบบอาหาร',0,0,1),(12,4,'ท็อปปิ้งเพิ่มเติม',0,0,3),(13,5,'ระดับความเผ็ด',1,1,1),(14,5,'รูปแบบอาหาร',0,0,1),(15,5,'ท็อปปิ้งเพิ่มเติม',0,0,3),(16,6,'ระดับความเผ็ด',1,1,1),(17,6,'รูปแบบอาหาร',0,0,1),(18,6,'ท็อปปิ้งเพิ่มเติม',0,0,3),(19,7,'ระดับความเผ็ด',1,1,1),(20,7,'รูปแบบอาหาร',0,0,1),(21,7,'ท็อปปิ้งเพิ่มเติม',0,0,3),(22,8,'ระดับความเผ็ด',1,1,1),(23,8,'รูปแบบอาหาร',0,0,1),(24,8,'ท็อปปิ้งเพิ่มเติม',0,0,3),(25,9,'ระดับความเผ็ด',1,1,1),(26,9,'รูปแบบอาหาร',0,0,1),(27,9,'ท็อปปิ้งเพิ่มเติม',0,0,3),(28,10,'ระดับความเผ็ด',1,1,1),(29,10,'รูปแบบอาหาร',0,0,1),(30,10,'ท็อปปิ้งเพิ่มเติม',0,0,3),(31,11,'ระดับความเผ็ด',1,1,1),(32,11,'รูปแบบอาหาร',0,0,1),(33,11,'ท็อปปิ้งเพิ่มเติม',0,0,3),(34,12,'ระดับความเผ็ด',1,1,1),(35,12,'รูปแบบอาหาร',0,0,1),(36,12,'ท็อปปิ้งเพิ่มเติม',0,0,3),(37,13,'ระดับความเผ็ด',1,1,1),(38,13,'ท็อปปิ้งเครื่องเคียง',0,0,3),(39,14,'ระดับความเผ็ด',1,1,1),(40,14,'ท็อปปิ้งเครื่องเคียง',0,0,3),(41,15,'ระดับความเผ็ด',1,1,1),(42,15,'ท็อปปิ้งเครื่องเคียง',0,0,3),(43,16,'ระดับความเผ็ด',1,1,1),(44,16,'ท็อปปิ้งเครื่องเคียง',0,0,3),(45,17,'ระดับความเผ็ด',1,1,1),(46,18,'ระดับความเผ็ด',1,1,1),(47,23,'ระดับความเผ็ด',1,1,1),(48,23,'รูปแบบอาหาร',0,0,1),(49,23,'ท็อปปิ้งเพิ่มเติม',0,0,3),(50,24,'ระดับความเผ็ด',1,1,1),(51,24,'ท็อปปิ้งเครื่องเคียง',0,0,3),(52,25,'ระดับความเผ็ด',1,1,1),(53,25,'รูปแบบอาหาร',0,0,1),(54,25,'ท็อปปิ้งเพิ่มเติม',0,0,3),(55,26,'ระดับความเผ็ด',1,1,1),(56,26,'รูปแบบอาหาร',0,0,1),(57,26,'ท็อปปิ้งเพิ่มเติม',0,0,3),(58,27,'ระดับความเผ็ด',1,1,1),(59,27,'รูปแบบอาหาร',0,0,1),(60,27,'ท็อปปิ้งเพิ่มเติม',0,0,3),(61,30,'ระดับความเผ็ด',1,1,1),(62,30,'ท็อปปิ้งเครื่องเคียง',0,0,3);
+/*!40000 ALTER TABLE `MENU_OPTION_GROUPS` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `ORDERS`
+--
+
+DROP TABLE IF EXISTS `ORDERS`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ORDERS` (
+  `order_id` int NOT NULL AUTO_INCREMENT,
+  `user_id` int DEFAULT NULL,
+  `table_id` int DEFAULT NULL,
+  `promo_id` int DEFAULT NULL,
+  `order_type` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `total_price` decimal(10,2) NOT NULL,
+  `created_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updated_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `delivery_address` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `delivery_fee` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `delivery_phone` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `discount_amount` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `order_notes` text COLLATE utf8mb4_unicode_ci,
+  `subtotal` decimal(10,2) NOT NULL DEFAULT '0.00',
+  PRIMARY KEY (`order_id`),
+  KEY `ORDERS_user_id_idx` (`user_id`),
+  KEY `ORDERS_table_id_idx` (`table_id`),
+  KEY `ORDERS_promo_id_fkey` (`promo_id`),
+  KEY `ORDERS_status_idx` (`status`),
+  KEY `ORDERS_created_at_idx` (`created_at`),
+  CONSTRAINT `ORDERS_promo_id_fkey` FOREIGN KEY (`promo_id`) REFERENCES `PROMOTIONS` (`promo_id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `ORDERS_table_id_fkey` FOREIGN KEY (`table_id`) REFERENCES `TABLES` (`table_id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `ORDERS_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `USERS` (`user_id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=35 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `ORDERS`
+--
+
+LOCK TABLES `ORDERS` WRITE;
+/*!40000 ALTER TABLE `ORDERS` DISABLE KEYS */;
+INSERT INTO `ORDERS` VALUES (1,3,5,NULL,'In-store','PAID',80.00,'2026-09-05 08:18:10.703','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(2,NULL,2,NULL,'DINE_IN','PAID',40.00,'2026-09-16 08:34:26.113','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(3,NULL,NULL,NULL,'DINE_IN','SERVED',70.00,'2026-09-21 16:33:56.183','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(4,NULL,NULL,NULL,'DINE_IN','PAID',140.00,'2026-09-21 16:33:56.237','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(5,NULL,3,NULL,'DINE_IN','PAID',140.00,'2026-09-16 08:52:44.209','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(6,NULL,2,NULL,'DINE_IN','PAID',40.00,'2026-09-16 09:04:38.902','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(7,NULL,3,NULL,'DINE_IN','PAID',40.00,'2026-09-16 10:34:31.162','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(8,NULL,1,NULL,'DINE_IN','PAID',40.00,'2026-09-16 11:06:39.563','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(9,NULL,1,NULL,'DINE_IN','PAID',130.00,'2026-09-16 11:07:03.249','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(10,NULL,NULL,NULL,'DELIVERY','SERVED',50.00,'2026-09-17 04:26:57.901','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(11,NULL,NULL,NULL,'DELIVERY','SERVED',50.00,'2026-09-17 04:26:58.205','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(12,NULL,NULL,NULL,'DELIVERY','SERVED',50.00,'2026-09-17 04:31:03.001','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(13,NULL,NULL,NULL,'DELIVERY','SERVED',80.00,'2026-09-17 04:38:36.896','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(14,9,NULL,NULL,'DELIVERY','SERVED',100.00,'2026-09-17 05:25:27.000','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(15,6,NULL,NULL,'DELIVERY','COMPLETED',50.00,'2026-09-17 06:26:39.973','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(16,4,2,NULL,'DINE_IN','COMPLETED',40.00,'2026-09-20 12:31:27.491','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(17,NULL,1,NULL,'DINE_IN','COMPLETED',40.00,'2026-09-20 12:32:54.014','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(18,NULL,1,NULL,'DINE_IN','COMPLETED',40.00,'2026-09-20 13:05:31.168','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(19,1,NULL,NULL,'DELIVERY','COMPLETED',40.00,'2026-09-20 13:53:39.650','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(20,8,NULL,NULL,'DELIVERY','SERVED',320.00,'2026-09-20 13:58:01.707','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(21,7,NULL,NULL,'DELIVERY','COMPLETED',50.00,'2026-09-20 13:59:06.082','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(22,NULL,4,NULL,'DINE_IN','COMPLETED',200.00,'2026-09-20 14:01:51.376','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(23,NULL,4,NULL,'DINE_IN','PAID',40.00,'2026-09-20 14:02:32.629','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(24,1,NULL,NULL,'DELIVERY','SERVED',40.00,'2026-09-20 14:08:21.773','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(25,6,NULL,NULL,'DELIVERY','SERVED',40.00,'2026-09-20 14:15:05.445','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(26,1,NULL,NULL,'DELIVERY','SERVED',40.00,'2026-09-21 16:26:26.301','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(27,NULL,NULL,NULL,'DINE_IN','CANCELLED',40.00,'2026-09-21 16:39:48.243','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(28,5,NULL,NULL,'DELIVERY','COMPLETED',40.00,'2026-09-22 12:12:23.883','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(29,8,NULL,NULL,'DELIVERY','COMPLETED',40.00,'2026-09-22 12:16:59.410','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(30,5,1,NULL,'DINE_IN','PAID',40.00,'2026-09-22 12:44:35.333','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(31,7,NULL,NULL,'DELIVERY','COMPLETED',35.00,'2026-09-22 13:05:13.804','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(32,6,NULL,NULL,'DELIVERY','COMPLETED',35.00,'2026-09-22 13:06:21.980','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(33,1,NULL,NULL,'DELIVERY','COMPLETED',70.00,'2026-09-22 16:32:37.213','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00),(34,1,NULL,1,'DELIVERY','COMPLETED',260.00,'2026-09-22 16:34:19.874','2026-10-10 07:11:06.669',NULL,0.00,NULL,0.00,NULL,0.00);
+/*!40000 ALTER TABLE `ORDERS` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `ORDER_ITEMS`
+--
+
+DROP TABLE IF EXISTS `ORDER_ITEMS`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ORDER_ITEMS` (
+  `order_item_id` int NOT NULL AUTO_INCREMENT,
+  `order_id` int NOT NULL,
+  `menu_id` int NOT NULL,
+  `quantity` int NOT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `unit_price` double NOT NULL DEFAULT '0',
+  PRIMARY KEY (`order_item_id`),
+  KEY `ORDER_ITEMS_order_id_idx` (`order_id`),
+  KEY `ORDER_ITEMS_menu_id_idx` (`menu_id`),
+  CONSTRAINT `ORDER_ITEMS_menu_id_fkey` FOREIGN KEY (`menu_id`) REFERENCES `MENUS` (`menu_id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `ORDER_ITEMS_order_id_fkey` FOREIGN KEY (`order_id`) REFERENCES `ORDERS` (`order_id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=49 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `ORDER_ITEMS`
+--
+
+LOCK TABLES `ORDER_ITEMS` WRITE;
+/*!40000 ALTER TABLE `ORDER_ITEMS` DISABLE KEYS */;
+INSERT INTO `ORDER_ITEMS` VALUES (1,1,14,1,NULL,'2026-09-21 16:33:01.910',40),(2,1,18,1,NULL,'2026-09-21 16:33:01.910',40),(3,1,2,1,'เผ็ดกลาง | ไข่ดาวไม่สุก','2026-09-21 16:33:01.910',40),(4,3,25,1,'รูปแบบ: กับข้าว','2026-09-21 16:33:56.183',40),(5,4,25,1,'รูปแบบ: ราดข้าว','2026-09-21 16:33:56.237',40),(6,32,2,1,'เผ็ดกลาง | ไข่ดาวไม่สุก','2026-09-22 13:06:21.980',40),(7,33,9,1,'เผ็ดมาก | เฉพาะหมึก','2026-09-22 16:32:37.213',70),(8,34,9,1,'เผ็ดมาก | เฉพาะกุ้ง','2026-09-22 16:34:19.874',70),(9,34,5,1,'เฉพาะกุ้ง | ส่วนเสริม: ไข่ดาว','2026-09-22 16:34:19.874',60),(10,34,17,3,'ราดข้าว | รวม (หมึก+กุ้ง)','2026-09-22 16:34:19.874',60),(11,1,2,1,'เผ็ดกลาง','2026-09-23 05:44:59.782',40),(12,1,6,1,'พริก 2 เม็ด','2026-09-23 05:44:59.807',40),(13,2,2,1,'เผ็ดกลาง','2026-09-23 05:44:59.880',40),(14,3,9,1,'เผ็ดกลาง','2026-09-23 05:44:59.906',70),(15,4,9,1,'เผ็ดกลาง','2026-09-23 05:44:59.985',70),(16,4,2,1,'ราดข้าว','2026-09-23 05:44:59.993',40),(17,4,6,1,'รสเด็ด','2026-09-23 05:45:00.001',30),(18,5,9,1,'เผ็ดกลาง','2026-09-23 05:45:00.013',70),(19,5,2,1,'ราดข้าว','2026-09-23 05:45:00.085',40),(20,5,6,1,'รสเด็ด','2026-09-23 05:45:00.093',30),(21,6,2,1,'เผ็ดกลาง','2026-09-23 05:45:00.102',40),(22,7,2,1,'เผ็ดกลาง','2026-09-23 05:45:00.113',40),(23,8,2,1,'เผ็ดกลาง','2026-09-23 05:45:00.128',40),(24,9,9,1,'เผ็ดกลาง','2026-09-23 05:45:00.187',70),(25,9,2,1,'ราดข้าว','2026-09-23 05:45:00.197',40),(26,10,10,1,'กรอบอร่อย','2026-09-23 05:45:00.204',50),(27,11,10,1,'กรอบอร่อย','2026-09-23 05:45:00.213',50),(28,12,10,1,'กรอบอร่อย','2026-09-23 05:45:00.285',50),(29,13,2,1,'เผ็ดกลาง','2026-09-23 05:45:00.293',40),(30,13,6,1,'พริก 2 เม็ด','2026-09-23 05:45:00.302',40),(31,14,10,2,'เสิร์ฟพร้อมน้ำจิ้มแจ่ว','2026-09-23 05:45:00.380',50),(32,15,10,1,'กรอบอร่อย','2026-09-23 05:45:00.401',50),(33,16,2,1,'เผ็ดกลาง','2026-09-23 05:45:00.410',40),(34,17,2,1,'เผ็ดกลาง','2026-09-23 05:45:00.480',40),(35,18,2,1,'เผ็ดกลาง','2026-09-23 05:45:00.486',40),(36,19,2,1,'เผ็ดกลาง','2026-09-23 05:45:00.494',40),(37,20,4,2,'รวมมิตรทะเล','2026-09-23 05:45:00.502',60),(38,20,9,2,'เปรี้ยวเผ็ด','2026-09-23 05:45:00.511',70),(39,20,10,1,'สะโพกไก่ทอด','2026-09-23 05:45:00.517',50),(40,20,6,1,'ส้มตำไทย','2026-09-23 05:45:00.524',40),(41,21,10,1,'กรอบอร่อย','2026-09-23 05:45:00.585',50),(42,22,4,2,'กุ้งสด','2026-09-23 05:45:00.592',60),(43,22,9,1,'เผ็ดกลาง','2026-09-23 05:45:00.604',70),(44,22,2,1,'ข้าวเปล่า','2026-09-23 05:45:00.612',10),(45,23,2,1,'เผ็ดกลาง','2026-09-23 05:45:00.628',40),(46,24,2,1,'เผ็ดกลาง','2026-09-23 05:45:00.686',40),(47,25,2,1,'เผ็ดกลาง','2026-09-23 05:45:00.693',40),(48,26,2,1,'เผ็ดกลาง','2026-09-23 05:45:00.701',40);
+/*!40000 ALTER TABLE `ORDER_ITEMS` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `ORDER_ITEM_OPTIONS`
+--
+
+DROP TABLE IF EXISTS `ORDER_ITEM_OPTIONS`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ORDER_ITEM_OPTIONS` (
+  `item_option_id` int NOT NULL AUTO_INCREMENT,
+  `order_item_id` int NOT NULL,
+  `option_id` int DEFAULT NULL,
+  `option_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `price` decimal(10,2) NOT NULL DEFAULT '0.00',
+  PRIMARY KEY (`item_option_id`),
+  KEY `ORDER_ITEM_OPTIONS_order_item_id_idx` (`order_item_id`),
+  KEY `ORDER_ITEM_OPTIONS_option_id_idx` (`option_id`),
+  CONSTRAINT `ORDER_ITEM_OPTIONS_option_id_fkey` FOREIGN KEY (`option_id`) REFERENCES `MENU_OPTIONS` (`option_id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `ORDER_ITEM_OPTIONS_order_item_id_fkey` FOREIGN KEY (`order_item_id`) REFERENCES `ORDER_ITEMS` (`order_item_id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `ORDER_ITEM_OPTIONS`
+--
+
+LOCK TABLES `ORDER_ITEM_OPTIONS` WRITE;
+/*!40000 ALTER TABLE `ORDER_ITEM_OPTIONS` DISABLE KEYS */;
+/*!40000 ALTER TABLE `ORDER_ITEM_OPTIONS` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Temporary view structure for view `ORDER_SUMMARIES_VIEW`
+--
+
+DROP TABLE IF EXISTS `ORDER_SUMMARIES_VIEW`;
+/*!50001 DROP VIEW IF EXISTS `ORDER_SUMMARIES_VIEW`*/;
+SET @saved_cs_client     = @@character_set_client;
+/*!50503 SET character_set_client = utf8mb4 */;
+/*!50001 CREATE VIEW `ORDER_SUMMARIES_VIEW` AS SELECT 
+ 1 AS `order_id`,
+ 1 AS `table_number`,
+ 1 AS `total_price`,
+ 1 AS `status`,
+ 1 AS `order_date`*/;
+SET character_set_client = @saved_cs_client;
+
+--
+-- Table structure for table `PROMOTIONS`
+--
+
+DROP TABLE IF EXISTS `PROMOTIONS`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `PROMOTIONS` (
+  `promo_id` int NOT NULL AUTO_INCREMENT,
+  `code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `discount_type` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `discount_value` decimal(10,2) NOT NULL,
+  `min_order_price` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `expiry_date` datetime(3) NOT NULL,
+  `created_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`promo_id`),
+  UNIQUE KEY `PROMOTIONS_code_key` (`code`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `PROMOTIONS`
+--
+
+LOCK TABLES `PROMOTIONS` WRITE;
+/*!40000 ALTER TABLE `PROMOTIONS` DISABLE KEYS */;
+INSERT INTO `PROMOTIONS` VALUES (1,'WELCOME20','Percentage',20.00,300.00,'2026-12-31 23:59:59.000','2026-09-21 16:33:01.939'),(2,'ZING50','Fixed',50.00,300.00,'2026-10-31 23:59:59.000','2026-09-23 09:32:28.018'),(3,'SEP10','Percentage',10.00,200.00,'2026-09-30 23:59:59.000','2026-09-23 09:32:28.018'),(4,'WELCOME100','Fixed',100.00,500.00,'2026-12-31 23:59:59.000','2026-09-23 09:32:28.018'),(5,'FREESHIP','Fixed',30.00,250.00,'2026-12-31 23:59:59.000','2026-09-23 09:32:28.018');
+/*!40000 ALTER TABLE `PROMOTIONS` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `STORE_SETTINGS`
+--
+
+DROP TABLE IF EXISTS `STORE_SETTINGS`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `STORE_SETTINGS` (
+  `id` int NOT NULL DEFAULT '1',
+  `store_name` varchar(150) NOT NULL DEFAULT 'ร้านตำครกซิ่ง (Tum Krok Zing)',
+  `tagline` varchar(255) DEFAULT 'แซ่บนัว ถึงใจ อาหารอีสานแท้รสเด็ด',
+  `promptpay_number` varchar(50) DEFAULT '081-234-5678',
+  `promptpay_name` varchar(150) DEFAULT 'นายธีรวัฒน์ แสนคำเฮียง (ตำครกซิ่ง)',
+  `tax_id` varchar(50) DEFAULT '0105566099881',
+  `address` varchar(255) DEFAULT '123/45 ถนนแจ้งวัฒนะ แขวงทุ่งสองห้อง เขตหลักสี่ กรุงเทพมหานคร 10210',
+  `phone` varchar(100) DEFAULT '02-987-6543, 081-234-5678',
+  `open_time` varchar(20) DEFAULT '10:30',
+  `close_time` varchar(20) DEFAULT '22:00',
+  `is_open` tinyint(1) NOT NULL DEFAULT '1',
+  `vat_rate` decimal(5,2) DEFAULT '7.00',
+  `updated_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `base_delivery_fee` decimal(10,2) NOT NULL DEFAULT '20.00',
+  `base_rider_fee` decimal(10,2) NOT NULL DEFAULT '40.00',
+  `delivery_fee_per_km` decimal(10,2) NOT NULL DEFAULT '10.00',
+  `max_delivery_km` decimal(5,2) NOT NULL DEFAULT '15.00',
+  `min_order_delivery` decimal(10,2) NOT NULL DEFAULT '100.00',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `STORE_SETTINGS`
+--
+
+LOCK TABLES `STORE_SETTINGS` WRITE;
+/*!40000 ALTER TABLE `STORE_SETTINGS` DISABLE KEYS */;
+INSERT INTO `STORE_SETTINGS` VALUES (1,'ร้านตำครกซิ่ง (Tum Krok Zing)','แซ่บนัว ถึงใจ อาหารอีสานแท้รสเด็ด','081-234-5678','นายธีรวัฒน์ แสนคำเฮียง (ตำครกซิ่ง)','0105566099881','123/45 ถนนแจ้งวัฒนะ แขวงทุ่งสองห้อง เขตหลักสี่ กรุงเทพมหานคร 10210','02-987-6543, 081-234-5678','10:30','22:00',1,7.00,'2026-10-10 07:20:58.729',20.00,40.00,10.00,15.00,100.00);
+/*!40000 ALTER TABLE `STORE_SETTINGS` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `TABLES`
+--
+
+DROP TABLE IF EXISTS `TABLES`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `TABLES` (
+  `table_id` int NOT NULL AUTO_INCREMENT,
+  `table_number` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `capacity` int NOT NULL,
+  `status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'AVAILABLE',
+  PRIMARY KEY (`table_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `TABLES`
+--
+
+LOCK TABLES `TABLES` WRITE;
+/*!40000 ALTER TABLE `TABLES` DISABLE KEYS */;
+INSERT INTO `TABLES` VALUES (1,'T-01',2,'AVAILABLE'),(2,'T-02',4,'AVAILABLE'),(3,'T-03',4,'AVAILABLE'),(4,'T-04',6,'AVAILABLE'),(5,'T-05',8,'AVAILABLE');
+/*!40000 ALTER TABLE `TABLES` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Temporary view structure for view `TOP_SELLING_MENUS_VIEW`
+--
+
+DROP TABLE IF EXISTS `TOP_SELLING_MENUS_VIEW`;
+/*!50001 DROP VIEW IF EXISTS `TOP_SELLING_MENUS_VIEW`*/;
+SET @saved_cs_client     = @@character_set_client;
+/*!50503 SET character_set_client = utf8mb4 */;
+/*!50001 CREATE VIEW `TOP_SELLING_MENUS_VIEW` AS SELECT 
+ 1 AS `menu_id`,
+ 1 AS `menu_name`,
+ 1 AS `category_name`,
+ 1 AS `total_sold`,
+ 1 AS `total_revenue`*/;
+SET character_set_client = @saved_cs_client;
+
+--
+-- Table structure for table `TRANSACTIONS`
+--
+
+DROP TABLE IF EXISTS `TRANSACTIONS`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `TRANSACTIONS` (
+  `transaction_id` int NOT NULL AUTO_INCREMENT,
+  `order_id` int NOT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `payment_method` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `payment_status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`transaction_id`),
+  KEY `TRANSACTIONS_order_id_idx` (`order_id`),
+  KEY `TRANSACTIONS_payment_status_idx` (`payment_status`),
+  CONSTRAINT `TRANSACTIONS_order_id_fkey` FOREIGN KEY (`order_id`) REFERENCES `ORDERS` (`order_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `TRANSACTIONS`
+--
+
+LOCK TABLES `TRANSACTIONS` WRITE;
+/*!40000 ALTER TABLE `TRANSACTIONS` DISABLE KEYS */;
+INSERT INTO `TRANSACTIONS` VALUES (1,1,150.00,'PromptPay','COMPLETED'),(2,5,140.00,'STRIPE','COMPLETED'),(3,1,80.00,'STRIPE','COMPLETED'),(4,6,40.00,'STRIPE','COMPLETED'),(5,6,40.00,'STRIPE','COMPLETED'),(6,5,140.00,'STRIPE','COMPLETED'),(7,1,80.00,'STRIPE','COMPLETED'),(8,5,140.00,'STRIPE','COMPLETED'),(9,5,140.00,'STRIPE','COMPLETED'),(10,6,40.00,'STRIPE','COMPLETED'),(11,7,40.00,'STRIPE','COMPLETED'),(12,6,40.00,'STRIPE','COMPLETED'),(13,1,80.00,'STRIPE','COMPLETED'),(14,8,40.00,'STRIPE','COMPLETED'),(15,9,130.00,'STRIPE','COMPLETED'),(16,9,130.00,'STRIPE','COMPLETED'),(17,9,130.00,'STRIPE','COMPLETED'),(18,17,40.00,'STRIPE','PENDING'),(19,17,40.00,'STRIPE','PENDING'),(20,17,40.00,'STRIPE','PENDING'),(21,17,40.00,'STRIPE','PENDING'),(22,17,40.00,'STRIPE','PENDING'),(23,17,40.00,'STRIPE','PENDING'),(24,18,40.00,'STRIPE','PENDING'),(25,30,40.00,'STRIPE','PENDING'),(26,30,40.00,'STRIPE','PENDING'),(27,30,40.00,'STRIPE','PENDING'),(28,30,40.00,'STRIPE','PENDING');
+/*!40000 ALTER TABLE `TRANSACTIONS` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Temporary view structure for view `TRANSACTION_RECEIPTS_VIEW`
+--
+
+DROP TABLE IF EXISTS `TRANSACTION_RECEIPTS_VIEW`;
+/*!50001 DROP VIEW IF EXISTS `TRANSACTION_RECEIPTS_VIEW`*/;
+SET @saved_cs_client     = @@character_set_client;
+/*!50503 SET character_set_client = utf8mb4 */;
+/*!50001 CREATE VIEW `TRANSACTION_RECEIPTS_VIEW` AS SELECT 
+ 1 AS `transaction_id`,
+ 1 AS `order_id`,
+ 1 AS `customer_name`,
+ 1 AS `total_amount`,
+ 1 AS `payment_method`,
+ 1 AS `payment_status`,
+ 1 AS `payment_date`*/;
+SET character_set_client = @saved_cs_client;
+
+--
+-- Table structure for table `USERS`
+--
+
+DROP TABLE IF EXISTS `USERS`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `USERS` (
+  `user_id` int NOT NULL AUTO_INCREMENT,
+  `username` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `password` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `phone_number` varchar(15) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `address` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `role` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Customer',
+  PRIMARY KEY (`user_id`),
+  UNIQUE KEY `USERS_username_key` (`username`)
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `USERS`
+--
+
+LOCK TABLES `USERS` WRITE;
+/*!40000 ALTER TABLE `USERS` DISABLE KEYS */;
+INSERT INTO `USERS` VALUES (1,'admin_tumkrok','hashed_password','admin@tumkrokzing.com','0800000001',NULL,'Admin'),(2,'staff_kitchen','hashed_password','staff@tumkrokzing.com','0800000002',NULL,'Staff'),(3,'sirichok_k','hashed_password','sirichok@gmail.com','0812345678',NULL,'Customer'),(5,'test003','$2b$10$GmprtufiOLIz5.RHfEOD2uN2/Xl.ovm/.hu7LteT1Ch0z2sgf2xJC','test@gmail.com','0123456789','313/221','Customer'),(6,'admin','$2b$10$FugQm0/R2Kp.Dr0TJNw.uu3uYuCzoSH1Ta/2uoAqteENM17.cTYHy','admin@tumkrokzing.com','0812345678',NULL,'ADMIN'),(7,'kitchen','$2b$10$t.eKUzkd4zaptMnB/PvV8OkQvXKSp20uIyAdrlezT3L4ZGocHin9W','kitchen@tumkrokzing.com','0899998888',NULL,'KITCHEN'),(8,'somchai','$2b$10$CKuRb.sYoEzvvhjrDpxfw.ut5PSXxaacsumAeAQUK1DQLSK.QFSgy','somchai@example.com','0811112222','ตลาดปากเกร็ด นนทบุรี','CUSTOMER'),(9,'rider','$2b$10$.5hKu./Ew4rt9qY1kgpXjuLakXtSFWzciRmMEpgA5GtFl4cBcBf/W','rider@tumkrokzing.com','0877776666','ประจำร้านตำครกซิ่ง','RIDER');
+/*!40000 ALTER TABLE `USERS` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `_prisma_migrations`
+--
+
+DROP TABLE IF EXISTS `_prisma_migrations`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `_prisma_migrations` (
+  `id` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `checksum` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `finished_at` datetime(3) DEFAULT NULL,
+  `migration_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `logs` text COLLATE utf8mb4_unicode_ci,
+  `rolled_back_at` datetime(3) DEFAULT NULL,
+  `started_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `applied_steps_count` int unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `_prisma_migrations`
+--
+
+LOCK TABLES `_prisma_migrations` WRITE;
+/*!40000 ALTER TABLE `_prisma_migrations` DISABLE KEYS */;
+INSERT INTO `_prisma_migrations` VALUES ('6f64eff6-006c-4e84-b22b-1d0d1c8ee140','d169f681718458b7f62399ec973e7bd6f07635de04b1f9ff8369c04a295499f4','2026-09-05 08:18:07.621','20260820142003_init_all_tables',NULL,NULL,'2026-09-05 08:18:06.514',1),('a11fb4ea-391b-49c9-a752-bb8c28318fe0','7b5fba44c3b9bae8a5df15922365f28085dd9247282c6c27d69685be4140422b','2026-09-05 08:18:09.425','20260903114343_create_views',NULL,NULL,'2026-09-05 08:18:09.374',1),('baa2452e-5a14-4455-a232-a5a0e222dab0','1269b53fffa149a8566cb13e7808ee695d6083153e339b99282104b976e8199a','2026-09-05 08:18:09.087','20260820143440_init_data_dictionary',NULL,NULL,'2026-09-05 08:18:07.636',1),('d2d7126d-85ea-4c88-a478-2a2d00d924c7','b593e06aefce3615d98c2d5aba0703190a93a8fa88e8fa4910ad8d46de967a53','2026-09-05 08:18:09.361','20260903114252_update_schema',NULL,NULL,'2026-09-05 08:18:09.102',1);
+/*!40000 ALTER TABLE `_prisma_migrations` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Final view structure for view `LIVE_TABLE_STATUS_VIEW`
+--
+
+/*!50001 DROP VIEW IF EXISTS `LIVE_TABLE_STATUS_VIEW`*/;
+/*!50001 SET @saved_cs_client          = @@character_set_client */;
+/*!50001 SET @saved_cs_results         = @@character_set_results */;
+/*!50001 SET @saved_col_connection     = @@collation_connection */;
+/*!50001 SET character_set_client      = utf8mb4 */;
+/*!50001 SET character_set_results     = utf8mb4 */;
+/*!50001 SET collation_connection      = utf8mb4_general_ci */;
+/*!50001 CREATE ALGORITHM=UNDEFINED */
+/*!50013 DEFINER=`root`@`%` SQL SECURITY DEFINER */
+/*!50001 VIEW `LIVE_TABLE_STATUS_VIEW` AS select `t`.`table_id` AS `table_id`,`t`.`table_number` AS `table_number`,`t`.`capacity` AS `capacity`,`t`.`status` AS `current_status`,`o`.`order_id` AS `current_order_id`,`o`.`total_price` AS `current_total` from (`TABLES` `t` left join `ORDERS` `o` on(((`t`.`table_id` = `o`.`table_id`) and (`o`.`status` in ('PENDING','PREPARING','SERVED'))))) */;
+/*!50001 SET character_set_client      = @saved_cs_client */;
+/*!50001 SET character_set_results     = @saved_cs_results */;
+/*!50001 SET collation_connection      = @saved_col_connection */;
+
+--
+-- Final view structure for view `LOW_STOCK_ALERTS_VIEW`
+--
+
+/*!50001 DROP VIEW IF EXISTS `LOW_STOCK_ALERTS_VIEW`*/;
+/*!50001 SET @saved_cs_client          = @@character_set_client */;
+/*!50001 SET @saved_cs_results         = @@character_set_results */;
+/*!50001 SET @saved_col_connection     = @@collation_connection */;
+/*!50001 SET character_set_client      = utf8mb4 */;
+/*!50001 SET character_set_results     = utf8mb4 */;
+/*!50001 SET collation_connection      = utf8mb4_general_ci */;
+/*!50001 CREATE ALGORITHM=UNDEFINED */
+/*!50013 DEFINER=`root`@`%` SQL SECURITY DEFINER */
+/*!50001 VIEW `LOW_STOCK_ALERTS_VIEW` AS select `i`.`ingredient_id` AS `ingredient_id`,`i`.`ingredient_name` AS `ingredient_name`,`i`.`quantity_in_stock` AS `quantity_in_stock`,`i`.`reorder_level` AS `reorder_level`,`i`.`unit` AS `unit` from `INGREDIENTS` `i` where (`i`.`quantity_in_stock` <= `i`.`reorder_level`) */;
+/*!50001 SET character_set_client      = @saved_cs_client */;
+/*!50001 SET character_set_results     = @saved_cs_results */;
+/*!50001 SET collation_connection      = @saved_col_connection */;
+
+--
+-- Final view structure for view `ORDER_SUMMARIES_VIEW`
+--
+
+/*!50001 DROP VIEW IF EXISTS `ORDER_SUMMARIES_VIEW`*/;
+/*!50001 SET @saved_cs_client          = @@character_set_client */;
+/*!50001 SET @saved_cs_results         = @@character_set_results */;
+/*!50001 SET @saved_col_connection     = @@collation_connection */;
+/*!50001 SET character_set_client      = utf8mb4 */;
+/*!50001 SET character_set_results     = utf8mb4 */;
+/*!50001 SET collation_connection      = utf8mb4_general_ci */;
+/*!50001 CREATE ALGORITHM=UNDEFINED */
+/*!50013 DEFINER=`root`@`%` SQL SECURITY DEFINER */
+/*!50001 VIEW `ORDER_SUMMARIES_VIEW` AS select `o`.`order_id` AS `order_id`,`t`.`table_number` AS `table_number`,`o`.`total_price` AS `total_price`,`o`.`status` AS `status`,`o`.`created_at` AS `order_date` from (`ORDERS` `o` left join `TABLES` `t` on((`o`.`table_id` = `t`.`table_id`))) */;
+/*!50001 SET character_set_client      = @saved_cs_client */;
+/*!50001 SET character_set_results     = @saved_cs_results */;
+/*!50001 SET collation_connection      = @saved_col_connection */;
+
+--
+-- Final view structure for view `TOP_SELLING_MENUS_VIEW`
+--
+
+/*!50001 DROP VIEW IF EXISTS `TOP_SELLING_MENUS_VIEW`*/;
+/*!50001 SET @saved_cs_client          = @@character_set_client */;
+/*!50001 SET @saved_cs_results         = @@character_set_results */;
+/*!50001 SET @saved_col_connection     = @@collation_connection */;
+/*!50001 SET character_set_client      = utf8mb4 */;
+/*!50001 SET character_set_results     = utf8mb4 */;
+/*!50001 SET collation_connection      = utf8mb4_general_ci */;
+/*!50001 CREATE ALGORITHM=UNDEFINED */
+/*!50013 DEFINER=`root`@`%` SQL SECURITY DEFINER */
+/*!50001 VIEW `TOP_SELLING_MENUS_VIEW` AS select `m`.`menu_id` AS `menu_id`,`m`.`menu_name` AS `menu_name`,coalesce(`c`.`category_name`,'ทั่วไป') AS `category_name`,cast(coalesce(sum(`oi`.`quantity`),0) as signed) AS `total_sold`,cast(coalesce(sum((`oi`.`quantity` * `oi`.`unit_price`)),0) as decimal(10,2)) AS `total_revenue` from ((`MENUS` `m` left join `CATEGORIES` `c` on((`m`.`category_id` = `c`.`category_id`))) left join `ORDER_ITEMS` `oi` on((`m`.`menu_id` = `oi`.`menu_id`))) group by `m`.`menu_id`,`m`.`menu_name`,`c`.`category_name` */;
+/*!50001 SET character_set_client      = @saved_cs_client */;
+/*!50001 SET character_set_results     = @saved_cs_results */;
+/*!50001 SET collation_connection      = @saved_col_connection */;
+
+--
+-- Final view structure for view `TRANSACTION_RECEIPTS_VIEW`
+--
+
+/*!50001 DROP VIEW IF EXISTS `TRANSACTION_RECEIPTS_VIEW`*/;
+/*!50001 SET @saved_cs_client          = @@character_set_client */;
+/*!50001 SET @saved_cs_results         = @@character_set_results */;
+/*!50001 SET @saved_col_connection     = @@collation_connection */;
+/*!50001 SET character_set_client      = utf8mb4 */;
+/*!50001 SET character_set_results     = utf8mb4 */;
+/*!50001 SET collation_connection      = utf8mb4_general_ci */;
+/*!50001 CREATE ALGORITHM=UNDEFINED */
+/*!50013 DEFINER=`root`@`%` SQL SECURITY DEFINER */
+/*!50001 VIEW `TRANSACTION_RECEIPTS_VIEW` AS select `tr`.`transaction_id` AS `transaction_id`,`tr`.`order_id` AS `order_id`,coalesce(`u`.`username`,'ลูกค้าทั่วไป') AS `customer_name`,`tr`.`amount` AS `total_amount`,`tr`.`payment_method` AS `payment_method`,`tr`.`payment_status` AS `payment_status`,`o`.`created_at` AS `payment_date` from ((`TRANSACTIONS` `tr` left join `ORDERS` `o` on((`tr`.`order_id` = `o`.`order_id`))) left join `USERS` `u` on((`o`.`user_id` = `u`.`user_id`))) */;
+/*!50001 SET character_set_client      = @saved_cs_client */;
+/*!50001 SET character_set_results     = @saved_cs_results */;
+/*!50001 SET collation_connection      = @saved_col_connection */;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2026-10-10  7:35:12
