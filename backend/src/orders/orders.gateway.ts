@@ -1,0 +1,124 @@
+import {
+  WebSocketGateway,
+  WebSocketServer,
+  SubscribeMessage,
+  OnGatewayInit,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  ConnectedSocket,
+  MessageBody,
+} from '@nestjs/websockets';
+import { Logger } from '@nestjs/common';
+import { Server, Socket } from 'socket.io';
+
+@WebSocketGateway({
+  cors: {
+    origin: '*',
+    credentials: true,
+  },
+})
+export class OrdersGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
+  @WebSocketServer()
+  server: Server;
+
+  private readonly logger = new Logger('OrdersGateway');
+
+  afterInit(server: Server) {
+    this.logger.log('🚀 WebSocket Gateway initialized สำหรับระบบออเดอร์เรียลไทม์');
+  }
+
+  handleConnection(client: Socket) {
+    this.logger.log(`🔌 Client เชื่อมต่อสำเร็จ: ${client.id}`);
+  }
+
+  handleDisconnect(client: Socket) {
+    this.logger.log(`❌ Client ตัดการเชื่อมต่อ: ${client.id}`);
+  }
+
+  /**
+   * ฟังก์ชันส่งสัญญาณแจ้งเตือนออเดอร์ใหม่ (new_order) ไปยังหน้าจอครัว (KDS) และทุก Client ที่เชื่อมต่ออยู่
+   * @param order ข้อมูลออเดอร์ที่ถูกบันทึกลงฐานข้อมูลแล้ว
+   */
+  sendNewOrder(order: any) {
+    this.logger.log(`📢 กระจายสัญญาณ new_order: #${order?.order_id || order?.id}`);
+    try {
+      this.server?.emit('new_order', order);
+    } catch (e: any) {
+      this.logger.warn('ไม่สามารถกระจายสัญญาณ new_order:', e.message);
+    }
+  }
+
+  /**
+   * ฟังก์ชันส่งสัญญาณเมื่อสถานะออเดอร์มีการเปลี่ยนแปลง (เช่น จาก PENDING -> COOKING -> READY -> COMPLETED)
+   * @param order ข้อมูลออเดอร์หลังอัปเดตสถานะ
+   */
+  sendOrderStatusUpdated(order: any) {
+    this.logger.log(`📢 กระจายสัญญาณ order_status_updated: #${order?.order_id || order?.id} -> ${order?.status}`);
+    try {
+      this.server?.emit('order_status_updated', order);
+    } catch (e: any) {
+      this.logger.warn('ไม่สามารถกระจายสัญญาณ order_status_updated:', e.message);
+    }
+  }
+
+  /**
+   * รองรับการรับสัญญาณ place_order หรือ new_order จากฝั่ง Frontend (ถ้ามี)
+   */
+  @SubscribeMessage('place_order')
+  handlePlaceOrder(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: any,
+  ) {
+    this.logger.log(`📥 ได้รับสัญญาณ place_order จาก Client: ${client.id}`);
+    if (payload) {
+      try {
+        this.server?.emit('new_order', payload);
+      } catch (e: any) {
+        this.logger.warn('ไม่สามารถกระจายสัญญาณ place_order:', e.message);
+      }
+    }
+    return { status: 'acknowledged', receivedAt: new Date().toISOString() };
+  }
+
+  /**
+   * ฟังก์ชันส่งสัญญาณเมื่อข้อมูลเมนูหรือสารก่อภูมิแพ้มีการเปลี่ยนแปลง
+   * @param menu ข้อมูลเมนูที่อัปเดตแล้ว
+   */
+  sendMenuUpdated(menu: any) {
+    this.logger.log(`📢 กระจายสัญญาณ menu_updated: #${menu?.menu_id || menu?.id}`);
+    try {
+      this.server?.emit('menu_updated', menu);
+    } catch (e: any) {
+      this.logger.warn('ไม่สามารถกระจายสัญญาณ menu_updated:', e.message);
+    }
+  }
+
+  /**
+   * รองรับการรับสัญญาณ menu_updated จากฝั่ง Frontend แล้วบรอดแคสต์ต่อไปยังทุกหน้าจอ
+   */
+  @SubscribeMessage('menu_updated')
+  handleMenuUpdated(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: any,
+  ) {
+    this.logger.log(`📥 ได้รับสัญญาณ menu_updated จาก Client: ${client.id}`);
+    if (payload) {
+      try {
+        this.server?.emit('menu_updated', payload);
+      } catch (e: any) {
+        this.logger.warn('ไม่สามารถกระจายสัญญาณ menu_updated:', e.message);
+      }
+    }
+    return { status: 'acknowledged', receivedAt: new Date().toISOString() };
+  }
+
+  /**
+   * ตรวจสอบสถานะการเชื่อมต่อ (Ping-Pong)
+   */
+  @SubscribeMessage('ping')
+  handlePing(@ConnectedSocket() client: Socket) {
+    return { event: 'pong', time: new Date().toISOString() };
+  }
+}
