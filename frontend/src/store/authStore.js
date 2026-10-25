@@ -124,11 +124,13 @@ export const authStore = reactive({
         const data = await res.json().catch(() => ({}));
         const errDetail = data.message || '';
         this.stopSessionMonitor();
-        this.handleSessionTerminated(
-          errDetail.includes('SESSION_TERMINATED')
-            ? '⚠️ บัญชีของคุณถูกเข้าสู่ระบบจากอุปกรณ์อื่นแล้ว ระบบได้ทำการออกจากระบบโดยอัตโนมัติ เพื่อความปลอดภัย'
-            : undefined
-        );
+        if (typeof errDetail === 'string' && errDetail.includes('SESSION_TERMINATED')) {
+          this.handleSessionTerminated(
+            '⚠️ บัญชีของคุณถูกเข้าสู่ระบบจากอุปกรณ์อื่นแล้ว ระบบได้ทำการออกจากระบบโดยอัตโนมัติ เพื่อความปลอดภัย'
+          );
+        } else {
+          this.logout(false);
+        }
       }
     } catch (err) {
       // หากเกิดปัญหาชั่วคราวทางเครือข่าย ให้ข้ามไปรอบถัดไป

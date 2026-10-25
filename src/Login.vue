@@ -65,6 +65,7 @@ export default {
     }
   },
   mounted() {
+    authStore.isSessionTerminatedModalOpen = false;
     if (this.$route.query.kicked === 'duplicate_session') {
       this.errorMessage = 'บัญชีของคุณถูกเข้าสู่ระบบจากอุปกรณ์อื่นแล้ว ระบบได้ทำการออกจากระบบโดยอัตโนมัติ';
     }

@@ -27,7 +27,7 @@ function handleAcknowledgeKick() {
 
     <!-- 🛑 Modal แจ้งเตือนเมื่อตรวจพบการเข้าสู่ระบบจากเครื่องอื่นแบบ Real-time -->
     <div 
-      v-if="authStore.isSessionTerminatedModalOpen" 
+      v-if="authStore.isSessionTerminatedModalOpen && route.path !== '/login' && route.path !== '/register'" 
       class="fixed inset-0 z-[99999] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fade-in"
     >
       <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-red-200 text-center space-y-5 animate-scale-up">
