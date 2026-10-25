@@ -7,14 +7,17 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { FacebookStrategy } from './strategies/facebook.strategy';
 import { LineStrategy } from './strategies/line.strategy';
+import { GoogleAuthGuard } from './guards/google-auth.guard';
+import { FacebookAuthGuard } from './guards/facebook-auth.guard';
+import { LineAuthGuard } from './guards/line-auth.guard';
 import { PrismaService } from '../prisma.service';
 
 @Module({
   imports: [
-    PassportModule.register({ defaultStrategy: 'jwt' }),
+    PassportModule.register({ defaultStrategy: 'jwt', session: false }),
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'tumkrokzing_secret_key_2026',
-      signOptions: { expiresIn: '7d' },
+      secret: process.env.JWT_SECRET || 'secretKey',
+      signOptions: { expiresIn: '1d' },
     }),
   ],
   controllers: [AuthController],
@@ -24,6 +27,9 @@ import { PrismaService } from '../prisma.service';
     GoogleStrategy,
     FacebookStrategy,
     LineStrategy,
+    GoogleAuthGuard,
+    FacebookAuthGuard,
+    LineAuthGuard,
     PrismaService,
   ],
   exports: [AuthService, JwtModule, PassportModule],

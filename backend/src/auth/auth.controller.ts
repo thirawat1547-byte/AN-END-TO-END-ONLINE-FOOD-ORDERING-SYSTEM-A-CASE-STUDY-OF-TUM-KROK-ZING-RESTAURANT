@@ -128,12 +128,14 @@ export class AuthController {
     return this.authService.updateProfile(Number(userId), updateDto);
   }
 
-  // --- Google OAuth ---
+  // =======================================================
+  // Google OAuth
+  // =======================================================
   @Get('google')
   @UseGuards(GoogleAuthGuard)
   @ApiOperation({ summary: 'เข้าสู่ระบบด้วย Google' })
   googleAuth() {
-    // Passport redirects to Google consent screen
+    // Passport redirects to Google OAuth screen automatically
   }
 
   @Get('google/callback')
@@ -143,12 +145,14 @@ export class AuthController {
     return this.handleOAuthSuccess(req.user, res);
   }
 
-  // --- Facebook OAuth ---
+  // =======================================================
+  // Facebook OAuth
+  // =======================================================
   @Get('facebook')
   @UseGuards(FacebookAuthGuard)
   @ApiOperation({ summary: 'เข้าสู่ระบบด้วย Facebook' })
   facebookAuth() {
-    // Passport redirects to Facebook OAuth screen
+    // Passport redirects to Facebook OAuth screen automatically
   }
 
   @Get('facebook/callback')
@@ -158,12 +162,14 @@ export class AuthController {
     return this.handleOAuthSuccess(req.user, res);
   }
 
-  // --- LINE OAuth ---
+  // =======================================================
+  // LINE OAuth
+  // =======================================================
   @Get('line')
   @UseGuards(LineAuthGuard)
   @ApiOperation({ summary: 'เข้าสู่ระบบด้วย LINE' })
   lineAuth() {
-    // Passport redirects to LINE Login screen
+    // Passport redirects to LINE OAuth screen automatically
   }
 
   @Get('line/callback')
@@ -173,9 +179,9 @@ export class AuthController {
     return this.handleOAuthSuccess(req.user, res);
   }
 
-  // Helper สำหรับจัดการผลลัพธ์ OAuth และส่ง Token กลับไปยัง Frontend
-  // ⚠️ ตรวจสอบ res.headersSent ก่อนทุกครั้ง เพราะ Passport บางตัว (เช่น passport-line-auth)
-  //    อาจเรียก callback ซ้ำหลายครั้ง ทำให้เกิด ERR_HTTP_HEADERS_SENT
+  // =======================================================
+  // Helper: จัดการผลลัพธ์ OAuth และส่ง Token กลับไปยัง Frontend
+  // =======================================================
   private async handleOAuthSuccess(userProfile: any, res: Response) {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     try {
@@ -183,7 +189,7 @@ export class AuthController {
         console.warn('OAuth: No user profile received from guard');
         if (!res.headersSent) {
           return res.redirect(
-            `${frontendUrl}/login?error=${encodeURIComponent('ไม่สามารถดึงข้อมูลผู้ใช้งานได้')}`,
+            `${frontendUrl}/login?error=${encodeURIComponent('ไม่สามารถดึงข้อมูลผู้ใช้งานจาก Social Account ได้')}`,
           );
         }
         return;
@@ -208,7 +214,7 @@ export class AuthController {
       console.error('OAuth Callback processing error:', err?.message || err);
       if (!res.headersSent) {
         const msg = encodeURIComponent(
-          err?.message || 'การเข้าสู่ระบบผ่าน Social Account ขัดข้อง',
+          err?.message || 'การเข้าสู่ระบบผ่าน Social Account ขัดข้อง กรุณาลองใหม่',
         );
         return res.redirect(`${frontendUrl}/login?error=${msg}`);
       }

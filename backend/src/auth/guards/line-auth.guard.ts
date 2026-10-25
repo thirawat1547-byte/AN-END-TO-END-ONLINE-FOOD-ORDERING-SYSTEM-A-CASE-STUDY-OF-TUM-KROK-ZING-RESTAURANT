@@ -1,13 +1,47 @@
 import { Injectable, ExecutionContext, Logger } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Response } from 'express';
+import { isOAuthConfigured } from '../oauth.util';
 
 @Injectable()
 export class LineAuthGuard extends AuthGuard('line') {
   private readonly logger = new Logger('LineAuthGuard');
 
   canActivate(context: ExecutionContext) {
+    if (!isOAuthConfigured('line')) {
+      const res = context.switchToHttp().getResponse<Response>();
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      this.logger.warn('LINE OAuth is not configured in .env. Redirecting to login.');
+      if (!res.headersSent) {
+        res.redirect(`${frontendUrl}/login?error=${encodeURIComponent('ระบบ LINE Login ยังไม่ได้ตั้งค่า กรุณาแจ้งผู้ดูแลระบบ')}`);
+      }
+      return false;
+    }
+
     this.logger.log('LINE OAuth flow initiated');
-    return super.canActivate(context);
+    try {
+      const result = super.canActivate(context);
+      if (result instanceof Promise) {
+        return result.catch((err) => {
+          this.logger.error('LINE OAuth error:', err?.message || err);
+          const res = context.switchToHttp().getResponse<Response>();
+          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+          if (!res.headersSent) {
+            res.redirect(`${frontendUrl}/login?error=${encodeURIComponent('ไม่สามารถเข้าสู่ระบบด้วย LINE ได้ในขณะนี้')}`);
+          }
+          return false;
+        });
+      }
+      return result;
+    } catch (err: any) {
+      this.logger.error('LINE OAuth sync error:', err?.message || err);
+      const res = context.switchToHttp().getResponse<Response>();
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      if (!res.headersSent) {
+        res.redirect(`${frontendUrl}/login?error=${encodeURIComponent('ไม่สามารถเข้าสู่ระบบด้วย LINE ได้ในขณะนี้')}`);
+      }
+      return false;
+    }
   }
 
   handleRequest(err: any, user: any, info: any, context: ExecutionContext) {
@@ -24,7 +58,6 @@ export class LineAuthGuard extends AuthGuard('line') {
 
     if (user) {
       this.logger.log(`LINE Auth SUCCESS - Provider ID: ${user.providerId}, Email: ${user.email}`);
-      // เก็บ user ไว้ใน request เผื่อ handleRequest ถูกเรียกซ้ำ
       req._oauthUser = user;
       return user;
     }
@@ -35,7 +68,6 @@ export class LineAuthGuard extends AuthGuard('line') {
       return req._oauthUser;
     }
 
-    // ไม่มี user จริงๆ (เช่น กรณี redirect ไป LINE ครั้งแรก)
     return null;
   }
 }
