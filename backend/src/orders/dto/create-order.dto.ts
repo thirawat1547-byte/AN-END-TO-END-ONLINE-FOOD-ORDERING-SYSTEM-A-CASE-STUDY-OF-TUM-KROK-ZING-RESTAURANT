@@ -5,6 +5,7 @@ import {
   IsArray,
   IsInt,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
   Min,
@@ -119,6 +120,16 @@ export class CreateOrderDto {
   @IsString()
   @IsOptional()
   delivery_phone?: string;
+
+  @ApiPropertyOptional({ example: 13.87613, description: 'ละติจูดจุดส่งอาหาร (GPS)' })
+  @IsNumber()
+  @IsOptional()
+  delivery_lat?: number;
+
+  @ApiPropertyOptional({ example: 100.59630, description: 'ลองจิจูดจุดส่งอาหาร (GPS)' })
+  @IsNumber()
+  @IsOptional()
+  delivery_lng?: number;
 
   @ApiPropertyOptional({ example: 'ฝากไว้ที่ล็อบบี้ชั้น 1', description: 'หมายเหตุเพิ่มเติมของคำสั่งซื้อ' })
   @IsString()
