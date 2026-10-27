@@ -47,7 +47,12 @@
                 <h3 class="font-bold text-sm tracking-wide">น้องส้มตำ AI</h3>
                 <span class="text-[9px] bg-emerald-400/20 text-emerald-200 border border-emerald-400/30 px-1.5 py-0.2 rounded font-medium">BOT</span>
               </div>
-              <p class="text-[11px] text-emerald-100/80">ผู้ช่วยร้านตำครกซิ่ง • ตอบทันใจ</p>
+              <p class="text-[11px] text-emerald-100/80">
+                ผู้ช่วยร้านตำครกซิ่ง •
+                <span :class="geminiReady ? 'text-emerald-300' : 'text-yellow-300'">
+                  {{ geminiReady ? '✨ Gemini AI' : '⚡ ตอบทันใจ' }}
+                </span>
+              </p>
             </div>
           </div>
 
@@ -124,16 +129,16 @@
           </div>
 
           <!-- Quick Suggestion Pills -->
-          <div v-if="messages.length <= 3 && !isTyping" class="pt-2">
+          <div v-if="currentSuggestions.length > 0 && !isTyping" class="pt-2">
             <div class="text-[10px] text-slate-400 mb-1.5 font-medium px-1">คำถามยอดนิยม:</div>
             <div class="flex flex-wrap gap-1.5">
               <button 
-                v-for="(pill, idx) in suggestionPills" 
+                v-for="(pill, idx) in currentSuggestions" 
                 :key="idx"
-                @click="sendQuickPrompt(pill)"
+                @click="sendSuggestion(pill)"
                 class="text-[11px] bg-white hover:bg-emerald-50 text-slate-700 hover:text-[#3f634b] border border-slate-200 hover:border-emerald-300 px-2.5 py-1.5 rounded-xl transition shadow-xs text-left"
               >
-                {{ pill.label }}
+                {{ pill }}
               </button>
             </div>
           </div>
@@ -160,7 +165,9 @@
 
         <!-- Micro Footer branding -->
         <div class="bg-slate-50 py-1 text-center border-t border-slate-100/60">
-          <span class="text-[9px] text-slate-400 font-medium">⚡ ขับเคลื่อนโดย TumKrokZing AI Assistant</span>
+          <span class="text-[9px] text-slate-400 font-medium">
+            {{ geminiReady ? '✨ ขับเคลื่อนโดย Google Gemini AI' : '⚡ ขับเคลื่อนโดย TumKrokZing AI Assistant' }}
+          </span>
         </div>
       </div>
     </transition>
@@ -168,48 +175,197 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { API_BASE } from '../config/api.js'
+
+const route = useRoute()
+const CHATBOT_API = `${API_BASE}/chatbot`
 
 const isOpen = ref(false)
 const inputMessage = ref('')
 const isTyping = ref(false)
 const messagesContainer = ref(null)
+const geminiReady = ref(false)
+const chatHistory = ref([])
+
+const defaultSuggestions = [
+  'เมนูขายดีแนะนำ',
+  'ร้านเปิดกี่โมง?',
+  'มีโปรค่าจัดส่งไหม?',
+  'ร้านตั้งอยู่ที่ไหน?',
+]
+const currentSuggestions = ref(defaultSuggestions)
+
+const DELIVERY_CHAT_STORAGE_KEY = 'tumkrokzing_delivery_chat'
+
+const getTodayDateString = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
 const getTimeString = () => {
   const d = new Date()
   return d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
 }
 
-const messages = ref([
+const getDefaultMessages = () => [
   {
     sender: 'bot',
-    text: 'สวัสดีครับคุณลูกค้า! ยินดีต้อนรับสู่ร้านตำครกซิ่งครับ 🌶️✨<br>ผมคือผู้ช่วยอัจฉริยะประจำร้าน มีอะไรให้ผมช่วยแนะนำเมนู หรือสอบถามข้อมูลร้านได้เลยครับ',
+    text: 'สวัสดีค่ะ! ยินดีต้อนรับสู่ร้านตำครกซิ่งค่ะ 🌶️✨<br>หนูคือน้องส้มตำ AI ผู้ช่วยประจำร้าน มีอะไรให้ช่วยแนะนำเมนูหรือสอบถามข้อมูลร้านได้เลยนะคะ',
     time: getTimeString()
   }
-])
-
-const suggestionPills = [
-  { label: '🔥 เมนูขายดีแนะนำ', reply: 'เมนูยอดนิยมของร้านตำครกซิ่ง ได้แก่:<br>1. ส้มตำปูปลาร้าพริกแห้ง (แซ่บนัวถึงใจ)<br>2. ข้าวกะเพราหมูสับกระทะร้อน<br>3. ปีกไก่ทอดสมุนไพรกรอบ<br>4. ยำวุ้นเส้นรวมมิตรทะเลครับ 🌶️' },
-  { label: '🕒 ร้านเปิดกี่โมง?', reply: 'ร้านตำครกซิ่งเปิดบริการทุกวันเวลา <b>10:00 - 21:00 น.</b> ครับ สามารถสั่งทานที่ร้านหรือสั่งเดลิเวอรีได้ตลอดเวลาทำการเลยครับ 🍽️' },
-  { label: '🛵 มีโปรค่าจัดส่งไหม?', reply: 'ตอนนี้ทางร้านมีโปรโมชั่นพิเศษ <b>ส่งฟรีเมื่อสั่งครบ ฿300 ขึ้นไป</b> ครับ และยังมีคูปองส่วนลดในแท็บโปรโมชั่นให้กดเก็บได้เลยครับ 🎉' },
-  { label: '📍 ร้านตั้งอยู่ที่ไหน?', reply: 'ร้านตั้งอยู่ที่ ถ.แจ้งวัฒนะ ตลาดปากเกร็ด นนทบุรี ครับ ลูกค้าสามารถสั่งเดลิเวอรีให้ไรเดอร์ไปส่งถึงบ้านได้เลยครับ 🛵' }
 ]
+
+const messages = ref(getDefaultMessages())
+
+// โหลดประวัติการแชทประจำวัน (ถ้าวันเดิมยังคงอยู่ ถ้าเปลี่ยนวันจะล้างออก)
+const loadDailyChat = () => {
+  try {
+    const raw = localStorage.getItem(DELIVERY_CHAT_STORAGE_KEY)
+    if (!raw) return false
+
+    const data = JSON.parse(raw)
+    const today = getTodayDateString()
+
+    if (data && data.date === today && Array.isArray(data.messages) && data.messages.length > 0) {
+      messages.value = data.messages
+      chatHistory.value = Array.isArray(data.chatHistory) ? data.chatHistory : []
+      return true
+    } else {
+      // เมื่อเปลี่ยนวัน ให้ล้างประวัติการแชทออกไป
+      localStorage.removeItem(DELIVERY_CHAT_STORAGE_KEY)
+      chatHistory.value = []
+      messages.value = getDefaultMessages()
+      return false
+    }
+  } catch (err) {
+    localStorage.removeItem(DELIVERY_CHAT_STORAGE_KEY)
+    return false
+  }
+}
+
+// บันทึกประวัติการแชทประจำวัน
+const saveDailyChat = () => {
+  try {
+    const today = getTodayDateString()
+    const payload = {
+      date: today,
+      messages: messages.value,
+      chatHistory: chatHistory.value
+    }
+    localStorage.setItem(DELIVERY_CHAT_STORAGE_KEY, JSON.stringify(payload))
+  } catch (err) {
+    console.error('Error saving delivery chat:', err)
+  }
+}
+
+// ตรวจสอบวันปัจจุบันเมื่อเปิดแชท หากเปลี่ยนวันแล้วจะล้างประวัติ
+const checkAndCleanNewDay = () => {
+  try {
+    const raw = localStorage.getItem(DELIVERY_CHAT_STORAGE_KEY)
+    if (!raw) return
+    const data = JSON.parse(raw)
+    const today = getTodayDateString()
+    if (data && data.date !== today) {
+      localStorage.removeItem(DELIVERY_CHAT_STORAGE_KEY)
+      chatHistory.value = []
+      messages.value = getDefaultMessages()
+    }
+  } catch {
+    localStorage.removeItem(DELIVERY_CHAT_STORAGE_KEY)
+  }
+}
+
+// ปิดหน้าต่างแชท (ไม่ค้างอยู่บนหน้าจอเมื่อออกจากระบบ) แต่เก็บประวัติของวันนั้นไว้
+const closeChatPopup = () => {
+  isOpen.value = false
+  inputMessage.value = ''
+  isTyping.value = false
+}
+
+const handleLogoutEvent = () => {
+  closeChatPopup()
+}
+
+onMounted(async () => {
+  loadDailyChat()
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('app:logout', handleLogoutEvent)
+  }
+
+  try {
+    const res = await fetch(`${CHATBOT_API}/health`)
+    if (res.ok) {
+      const data = await res.json()
+      geminiReady.value = data.geminiConfigured && data.aiClientReady
+    }
+  } catch {
+    geminiReady.value = false
+  }
+
+  try {
+    const res = await fetch(`${CHATBOT_API}/suggested-questions`)
+    if (res.ok) {
+      const data = await res.json()
+      if (data.questions && data.questions.length > 0) {
+        currentSuggestions.value = data.questions
+      }
+    }
+  } catch {
+    currentSuggestions.value = defaultSuggestions
+  }
+})
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('app:logout', handleLogoutEvent)
+  }
+})
+
+// บันทึกประวัติการแชทของวันนั้นโดยอัตโนมัติเมื่อมีการเปลี่ยนแปลง
+watch(
+  [messages, chatHistory],
+  () => {
+    saveDailyChat()
+  },
+  { deep: true }
+)
+
+if (route) {
+  watch(
+    () => route.path,
+    (newPath) => {
+      if (newPath === '/login' || newPath === '/register' || (newPath && newPath.startsWith('/auth'))) {
+        closeChatPopup()
+      }
+    }
+  )
+}
 
 const toggleChat = () => {
   isOpen.value = !isOpen.value
   if (isOpen.value) {
+    checkAndCleanNewDay()
     scrollToBottom()
   }
 }
 
 const clearChat = () => {
+  chatHistory.value = []
+  currentSuggestions.value = defaultSuggestions
   messages.value = [
     {
       sender: 'bot',
-      text: 'ล้างการสนทนาเรียบร้อยครับ มีข้อสงสัยเรื่องเมนูหรือการสั่งอาหาร สอบถามน้องส้มตำได้เลยครับ! 🌶️',
+      text: 'ล้างการสนทนาเรียบร้อยแล้วค่ะ มีอะไรสอบถามเรื่องเมนูหรือบริการของร้านได้เลยนะคะ! 🌶️',
       time: getTimeString()
     }
   ]
+  saveDailyChat()
 }
 
 const scrollToBottom = () => {
@@ -221,65 +377,90 @@ const scrollToBottom = () => {
 }
 
 const formatMessage = (text) => {
-  return text.replace(/\n/g, '<br>')
+  return text
+    // Headers ### → bold+underline style
+    .replace(/^###\s*(.+)$/gm, '<div class="font-semibold text-[#3f634b] mt-2 mb-0.5">$1</div>')
+    .replace(/^##\s*(.+)$/gm, '<div class="font-bold text-[#2e4d3a] mt-2 mb-1">$1</div>')
+    // **bold**
+    .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+    // * bullet → รายการ
+    .replace(/^\*\s+(.+)$/gm, '<div class="flex gap-1 my-0.5"><span class="text-[#557c61] shrink-0">•</span><span>$1</span></div>')
+    // --- ขีดคั่น
+    .replace(/^---+$/gm, '<hr class="border-slate-200 my-1">')
+    // newline
+    .replace(/\n/g, '<br>')
 }
 
-const sendQuickPrompt = (pill) => {
-  messages.value.push({
-    sender: 'user',
-    text: pill.label,
-    time: getTimeString()
-  })
-  scrollToBottom()
-
-  isTyping.value = true
-  setTimeout(() => {
-    isTyping.value = false
-    messages.value.push({
-      sender: 'bot',
-      text: pill.reply,
-      time: getTimeString()
+const sendToGemini = async (userMessage) => {
+  try {
+    const body = {
+      message: userMessage,
+      history: chatHistory.value,
+    }
+    const res = await fetch(`${CHATBOT_API}/ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
     })
-    scrollToBottom()
-  }, 600)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = await res.json()
+
+    chatHistory.value.push(
+      { role: 'user', text: userMessage },
+      { role: 'model', text: data.reply }  // Backend DTO ใช้ 'model' ไม่ใช่ 'bot'
+    )
+    if (chatHistory.value.length > 20) {
+      chatHistory.value = chatHistory.value.slice(-20)
+    }
+    if (data.suggestedQuestions && data.suggestedQuestions.length > 0) {
+      currentSuggestions.value = data.suggestedQuestions
+    }
+    return data.reply
+  } catch (err) {
+    console.error('Chatbot API error:', err)
+    return getFallbackReply(userMessage)
+  }
 }
 
-const handleSendMessage = () => {
-  const query = inputMessage.value.trim()
+const getFallbackReply = (query) => {
+  const lower = query.toLowerCase()
+  if (lower.includes('เมนู') || lower.includes('แนะนำ') || lower.includes('ขายดี')) {
+    return 'เมนูแนะนำของร้าน ได้แก่ ส้มตำปูปลาร้า, คอหมูย่าง, ไก่ย่าง และต้มแซ่บค่ะ 🌶️'
+  }
+  if (lower.includes('เวลา') || lower.includes('เปิด') || lower.includes('ปิด')) {
+    return 'ร้านตำครกซิ่งเปิดทุกวัน 10:00 - 21:30 น. ค่ะ'
+  }
+  if (lower.includes('ส่ง') || lower.includes('เดลิ') || lower.includes('โปร')) {
+    return 'มีโปรโมชั่นพิเศษดูได้ที่แท็บโปรโมชั่นเลยค่ะ 🎉'
+  }
+  return 'ขออภัยด้วยนะคะ น้องส้มตำ AI ช่วยได้แค่เรื่องเมนูและบริการของร้านตำครกซิ่งเท่านั้นค่ะ มีเมนูไหนสนใจไหมคะ? 🌶️'
+}
+
+const sendSuggestion = async (text) => {
+  await sendMessage(text)
+}
+
+const sendMessage = async (text) => {
+  const query = text.trim()
   if (!query) return
 
-  messages.value.push({
-    sender: 'user',
-    text: query,
-    time: getTimeString()
-  })
-  inputMessage.value = ''
+  messages.value.push({ sender: 'user', text: query, time: getTimeString() })
   scrollToBottom()
-
-  // จำลองคำตอบอัตโนมัติของแชทบอท (Smart Mock Bot Reply)
   isTyping.value = true
-  setTimeout(() => {
-    isTyping.value = false
-    let botReply = 'ขอบคุณสำหรับข้อความครับ! ขณะนี้ระบบแชทบอทอยู่ในโหมดสาธิต หากต้องการสั่งอาหารสามารถเลือกดูเมนูและกดเพิ่มลงตะกร้าได้เลยครับ 🌶️'
+  currentSuggestions.value = []
 
-    const lower = query.toLowerCase()
-    if (lower.includes('เมนู') || lower.includes('แนะนำ') || lower.includes('ขายดี') || lower.includes('อร่อย')) {
-      botReply = 'เมนูแนะนำยอดฮิตประจำสัปดาห์นี้คือ <b>ส้มตำปูปลาร้า</b> รสแซ่บนัว และ <b>ข้าวกะเพราหมูสับราดข้าว</b> ครับ ลองสั่งดูนะครับ! 😋'
-    } else if (lower.includes('เวลา') || lower.includes('เปิด') || lower.includes('ปิด') || lower.includes('กี่โมง')) {
-      botReply = 'ร้านตำครกซิ่งเปิดทุกวัน <b>10:00 - 21:00 น.</b> ครับ ตอนนี้ร้านเปิดให้บริการอยู่ สามารถสั่งได้เลยครับ!'
-    } else if (lower.includes('ส่ง') || lower.includes('เดลิ') || lower.includes('ค่าส่ง')) {
-      botReply = 'ระบบเดลิเวอรีของเราจัดส่งรวดเร็วโดยไรเดอร์ประจำร้านครับ และมีโปรโมชั่น <b>สั่งครบ ฿300 ส่งฟรี</b> ครับ 🛵💨'
-    } else if (lower.includes('สวัสดี') || lower.includes('หวัดดี') || lower.includes('hello')) {
-      botReply = 'สวัสดีครับ! ยินดีให้บริการครับ วันนี้รับเมนูแซ่บๆ สักจานไหมครับ 😊'
-    }
+  const botReply = await sendToGemini(query)
 
-    messages.value.push({
-      sender: 'bot',
-      text: botReply,
-      time: getTimeString()
-    })
-    scrollToBottom()
-  }, 700)
+  isTyping.value = false
+  messages.value.push({ sender: 'bot', text: botReply, time: getTimeString() })
+  scrollToBottom()
+}
+
+const handleSendMessage = async () => {
+  const query = inputMessage.value.trim()
+  if (!query) return
+  inputMessage.value = ''
+  await sendMessage(query)
 }
 </script>
 

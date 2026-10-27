@@ -175,9 +175,11 @@
 </template>
 
 <script setup>
-import { ref, nextTick, onMounted } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { API_BASE } from '../config/api.js'
 
+const route = useRoute()
 const CHATBOT_API = `${API_BASE}/chatbot`
 
 const isOpen = ref(false)
@@ -195,20 +197,107 @@ const defaultSuggestions = [
 ]
 const currentSuggestions = ref(defaultSuggestions)
 
+const DELIVERY_CHAT_STORAGE_KEY = 'tumkrokzing_delivery_chat'
+
+const getTodayDateString = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 const getTimeString = () => {
   const d = new Date()
   return d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
 }
 
-const messages = ref([
+const getDefaultMessages = () => [
   {
     sender: 'bot',
     text: 'สวัสดีค่ะ! ยินดีต้อนรับสู่ร้านตำครกซิ่งค่ะ 🌶️✨<br>หนูคือน้องส้มตำ AI ผู้ช่วยประจำร้าน มีอะไรให้ช่วยแนะนำเมนูหรือสอบถามข้อมูลร้านได้เลยนะคะ',
     time: getTimeString()
   }
-])
+]
+
+const messages = ref(getDefaultMessages())
+
+// โหลดประวัติการแชทประจำวัน (ถ้าวันเดิมยังคงอยู่ ถ้าเปลี่ยนวันจะล้างออก)
+const loadDailyChat = () => {
+  try {
+    const raw = localStorage.getItem(DELIVERY_CHAT_STORAGE_KEY)
+    if (!raw) return false
+
+    const data = JSON.parse(raw)
+    const today = getTodayDateString()
+
+    if (data && data.date === today && Array.isArray(data.messages) && data.messages.length > 0) {
+      messages.value = data.messages
+      chatHistory.value = Array.isArray(data.chatHistory) ? data.chatHistory : []
+      return true
+    } else {
+      // เมื่อเปลี่ยนวัน ให้ล้างประวัติการแชทออกไป
+      localStorage.removeItem(DELIVERY_CHAT_STORAGE_KEY)
+      chatHistory.value = []
+      messages.value = getDefaultMessages()
+      return false
+    }
+  } catch (err) {
+    localStorage.removeItem(DELIVERY_CHAT_STORAGE_KEY)
+    return false
+  }
+}
+
+// บันทึกประวัติการแชทประจำวัน
+const saveDailyChat = () => {
+  try {
+    const today = getTodayDateString()
+    const payload = {
+      date: today,
+      messages: messages.value,
+      chatHistory: chatHistory.value
+    }
+    localStorage.setItem(DELIVERY_CHAT_STORAGE_KEY, JSON.stringify(payload))
+  } catch (err) {
+    console.error('Error saving delivery chat:', err)
+  }
+}
+
+// ตรวจสอบวันปัจจุบันเมื่อเปิดแชท หากเปลี่ยนวันแล้วจะล้างประวัติ
+const checkAndCleanNewDay = () => {
+  try {
+    const raw = localStorage.getItem(DELIVERY_CHAT_STORAGE_KEY)
+    if (!raw) return
+    const data = JSON.parse(raw)
+    const today = getTodayDateString()
+    if (data && data.date !== today) {
+      localStorage.removeItem(DELIVERY_CHAT_STORAGE_KEY)
+      chatHistory.value = []
+      messages.value = getDefaultMessages()
+    }
+  } catch {
+    localStorage.removeItem(DELIVERY_CHAT_STORAGE_KEY)
+  }
+}
+
+// ปิดหน้าต่างแชท (ไม่ค้างอยู่บนหน้าจอเมื่อออกจากระบบ) แต่เก็บประวัติของวันนั้นไว้
+const closeChatPopup = () => {
+  isOpen.value = false
+  inputMessage.value = ''
+  isTyping.value = false
+}
+
+const handleLogoutEvent = () => {
+  closeChatPopup()
+}
 
 onMounted(async () => {
+  loadDailyChat()
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('app:logout', handleLogoutEvent)
+  }
+
   try {
     const res = await fetch(`${CHATBOT_API}/health`)
     if (res.ok) {
@@ -232,9 +321,38 @@ onMounted(async () => {
   }
 })
 
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('app:logout', handleLogoutEvent)
+  }
+})
+
+// บันทึกประวัติการแชทของวันนั้นโดยอัตโนมัติเมื่อมีการเปลี่ยนแปลง
+watch(
+  [messages, chatHistory],
+  () => {
+    saveDailyChat()
+  },
+  { deep: true }
+)
+
+if (route) {
+  watch(
+    () => route.path,
+    (newPath) => {
+      if (newPath === '/login' || newPath === '/register' || (newPath && newPath.startsWith('/auth'))) {
+        closeChatPopup()
+      }
+    }
+  )
+}
+
 const toggleChat = () => {
   isOpen.value = !isOpen.value
-  if (isOpen.value) scrollToBottom()
+  if (isOpen.value) {
+    checkAndCleanNewDay()
+    scrollToBottom()
+  }
 }
 
 const clearChat = () => {
@@ -247,6 +365,7 @@ const clearChat = () => {
       time: getTimeString()
     }
   ]
+  saveDailyChat()
 }
 
 const scrollToBottom = () => {

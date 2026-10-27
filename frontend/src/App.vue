@@ -9,7 +9,14 @@ const route = useRoute()
 
 const showChatbotWidget = computed(() => {
   const p = route.path || ''
-  return !p.startsWith('/admin') && !p.startsWith('/kitchen') && !p.startsWith('/rider')
+  return (
+    !p.startsWith('/admin') &&
+    !p.startsWith('/kitchen') &&
+    !p.startsWith('/rider') &&
+    p !== '/login' &&
+    p !== '/register' &&
+    !p.startsWith('/auth')
+  )
 })
 
 function handleAcknowledgeKick() {

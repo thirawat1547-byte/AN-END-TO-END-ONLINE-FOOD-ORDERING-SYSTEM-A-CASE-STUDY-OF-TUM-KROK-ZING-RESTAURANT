@@ -167,6 +167,11 @@ export const authStore = reactive({
     this.isLoggedIn = false;
     this.userProfile = {};
     this.sessionId = null;
+
+    // แจ้งเตือนเมื่อออกจากระบบ (เช่น ให้แชทบอทปิดหน้าต่างและล้างประวัติการคุย)
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('app:logout'));
+    }
   }
 });
 
