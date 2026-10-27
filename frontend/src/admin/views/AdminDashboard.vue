@@ -202,6 +202,14 @@ const topMenusAllTime = computed(() => {
 })
 
 // คำสั่งซื้อประจำวันที่เลือก (แสดง 5 รายการล่าสุดของวันนั้น)
+// สถานะและการเปิด/ปิดระบบตอบกลับอัตโนมัติของแชทบอท
+const botEnabled = ref(localStorage.getItem('tumkrokzing_bot_enabled') !== 'false')
+
+function toggleBotStatus() {
+  botEnabled.value = !botEnabled.value
+  localStorage.setItem('tumkrokzing_bot_enabled', String(botEnabled.value))
+}
+
 const dayRecentOrders = computed(() => {
   const sorted = [...dayOrders.value].sort((a, b) => {
     const tA = new Date(a.created_at).getTime() || 0
@@ -1159,6 +1167,112 @@ const avgPrepTimeMinutes = computed(() => {
               <p class="text-[10px] text-slate-400">{{ formatTime(order.created_at) }} น. ({{ order.payment_method || '-' }})</p>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+    <!-- สถิติ & สรุปผลแชทบอท AI (น้องส้มตำ AI) -->
+    <div class="space-y-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <span class="text-xl">🤖</span>
+          <div>
+            <h2 class="text-base font-bold text-slate-800">สถิติ & สรุปผลการตอบกลับของแชทบอท AI (น้องส้มตำ)</h2>
+            <p class="text-xs text-slate-500">ข้อมูลการตอบคำถามลูกค้า ความพึงพอใจ และการเปิด-ปิดระบบอัตโนมัติประจำวัน</p>
+          </div>
+        </div>
+        <router-link 
+          to="/admin/chatbot" 
+          class="text-xs text-[#2d5a43] hover:text-[#183324] font-semibold flex items-center gap-1 hover:underline"
+        >
+          <span>ไปที่ห้องแชทบอท AI</span>
+          <span>➔</span>
+        </router-link>
+      </div>
+
+      <!-- 4 Stats Cards (เหมือนในภาพ) -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Card 1: ข้อความตอบกลับวันนี้ -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+          <div>
+            <p class="text-xs font-medium text-slate-500">ข้อความตอบกลับวันนี้</p>
+            <h3 class="text-2xl font-bold text-slate-800 mt-1">168 <span class="text-xs font-normal text-slate-400">ข้อความ</span></h3>
+            <span class="inline-flex items-center text-[11px] text-emerald-600 font-medium mt-1">
+              ↑ +24% เทียบกับเมื่อวาน
+            </span>
+          </div>
+          <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl">
+            💬
+          </div>
+        </div>
+
+        <!-- Card 2: ความเร็วตอบกลับเฉลี่ย -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+          <div>
+            <p class="text-xs font-medium text-slate-500">ความเร็วตอบกลับเฉลี่ย</p>
+            <h3 class="text-2xl font-bold text-slate-800 mt-1">0.6 <span class="text-xs font-normal text-slate-400">วินาที</span></h3>
+            <span class="inline-flex items-center text-[11px] text-amber-600 font-medium mt-1">
+              ⚡ รวดเร็วทันใจ
+            </span>
+          </div>
+          <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl">
+            ⏱️
+          </div>
+        </div>
+
+        <!-- Card 3: ความพึงพอใจลูกค้า -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+          <div>
+            <p class="text-xs font-medium text-slate-500">ความพึงพอใจลูกค้า</p>
+            <h3 class="text-2xl font-bold text-slate-800 mt-1">98.5%</h3>
+            <span class="inline-flex items-center text-[11px] text-amber-500 font-medium mt-1">
+              ⭐ เรตติ้ง 4.9/5
+            </span>
+          </div>
+          <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center text-xl">
+            ⭐
+          </div>
+        </div>
+
+        <!-- Card 4: คำถามที่ตอบแทนแอดมิน -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+          <div>
+            <p class="text-xs font-medium text-slate-500">คำถามที่ตอบแทนแอดมิน</p>
+            <h3 class="text-2xl font-bold text-slate-800 mt-1">91.2%</h3>
+            <span class="inline-flex items-center text-[11px] text-red-500 font-medium mt-1">
+              🎯 ลดภาระแอดมิน
+            </span>
+          </div>
+          <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
+            🛡️
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Toggle Bot Status Card (เหมือนในภาพ) -->
+      <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 class="text-sm font-bold text-slate-800">เปิด/ปิดระบบตอบกลับอัตโนมัติของร้าน</h3>
+          <p class="text-xs text-slate-500 mt-0.5">เมื่อปิดชั่วคราว บอทจะไม่ส่งข้อความตอบลูกค้าในหน้าเดลิเวอรี่</p>
+        </div>
+
+        <div class="flex items-center gap-3 bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl shrink-0">
+          <button 
+            @click="toggleBotStatus"
+            :class="[
+              'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
+              botEnabled ? 'bg-[#2d5a43]' : 'bg-slate-300'
+            ]"
+          >
+            <span 
+              :class="[
+                'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out',
+                botEnabled ? 'translate-x-5' : 'translate-x-0'
+              ]"
+            />
+          </button>
+          <span class="text-xs font-bold" :class="botEnabled ? 'text-emerald-700' : 'text-slate-500'">
+            {{ botEnabled ? 'เปิดทำงาน' : 'ปิดชั่วคราว' }}
+          </span>
         </div>
       </div>
     </div>

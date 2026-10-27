@@ -20,135 +20,83 @@
       </div>
     </transition>
 
-    <!-- Top Gemini Navigation Bar (White Theme) -->
-    <header class="bg-white border border-slate-200/80 rounded-2xl px-5 py-3 flex flex-wrap items-center justify-between gap-3 shadow-xs">
-      <!-- Left: Gemini Brand & Model Selector -->
-      <div class="flex items-center gap-3">
-        <!-- Gemini 4-Point Star Gradient Icon -->
-        <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-500 via-indigo-500 to-emerald-500 p-[1.5px] flex items-center justify-center shadow-xs">
-          <div class="w-full h-full bg-white rounded-full flex items-center justify-center">
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2C12 7.52 7.52 12 2 12C7.52 12 12 16.48 12 22C12 16.48 16.48 12 22 12C16.48 12 12 7.52 12 2Z" fill="url(#geminiGrad)" />
-              <defs>
-                <linearGradient id="geminiGrad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-                  <stop stop-color="#4285F4" />
-                  <stop offset="0.5" stop-color="#9B72CF" />
-                  <stop offset="1" stop-color="#2D5A43" />
-                </linearGradient>
-              </defs>
-            </svg>
+    <!-- NONG SOMTUM AI CHAT CANVAS (WHITE THEME) -->
+    <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm relative flex flex-col overflow-hidden min-h-[calc(100vh-140px)] somtum-canvas">
+      
+      <!-- Top Subtle Control Bar inside Canvas -->
+      <div class="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between z-20 bg-white/70 backdrop-blur-xs">
+        <!-- Left: น้องส้มตำ AI Brand & Live Status -->
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-[#2d5a43] via-[#3f634b] to-[#557c61] text-white flex items-center justify-center text-lg shadow-sm">
+            🤖
+          </div>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <h1 class="text-sm font-bold text-slate-800 tracking-tight">น้องส้มตำ AI</h1>
+              <span class="text-[9px] bg-emerald-100 text-emerald-800 border border-emerald-300/80 px-1.5 py-0.5 rounded font-bold">BOT</span>
+              <span class="text-[10px] text-emerald-600 font-medium hidden sm:inline">• ✨ Gemini AI</span>
+            </div>
+            <p class="text-[11px] text-slate-400">ผู้ช่วยอัจฉริยะประจำร้านตำครกซิ่ง ตอบทันใจ 24 ชม.</p>
           </div>
         </div>
 
-        <div>
-          <div class="flex items-center gap-2">
-            <h1 class="text-base font-semibold text-slate-900 tracking-tight">Gemini</h1>
-            <span class="text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
-              ผู้ช่วยร้านตำครกซิ่ง AI
-            </span>
-          </div>
-        </div>
-
-        <!-- Model Dropdown Pill -->
-        <div class="relative hidden sm:block">
+        <!-- Right: Actions (FAQ Knowledge Base modal & Reset chat) -->
+        <div class="flex items-center gap-2">
+          <!-- Button: Open FAQ Knowledge Base -->
           <button 
-            @click="showModelMenu = !showModelMenu"
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200/80 text-xs font-medium text-slate-700 transition"
+            @click="showKnowledgeModal = true"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-emerald-50 text-slate-700 hover:text-[#2d5a43] border border-slate-200 hover:border-emerald-200 text-xs font-medium transition shadow-2xs"
+            title="จัดการคลังคำตอบ FAQ และบุคลิกบอท"
           >
-            <span>{{ selectedModel }}</span>
-            <span class="text-[10px] text-slate-500">▼</span>
+            <span>📚</span>
+            <span class="hidden sm:inline">คลังคำตอบ FAQ</span>
           </button>
 
-          <div 
-            v-if="showModelMenu"
-            @click="showModelMenu = false"
-            class="absolute top-full left-0 mt-1.5 w-52 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 z-50 text-xs"
+          <!-- Button: Clear/Reset Chat -->
+          <button 
+            v-if="hasUserStartedChat"
+            @click="resetChat"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-800 border border-slate-200 text-xs font-medium transition shadow-2xs"
+            title="เริ่มบทสนทนาใหม่"
           >
-            <button 
-              v-for="model in availableModels" 
-              :key="model.id"
-              @click="selectedModel = model.name"
-              class="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center justify-between"
-              :class="selectedModel === model.name ? 'text-blue-600 font-semibold bg-blue-50/50' : 'text-slate-700'"
-            >
-              <span>{{ model.name }}</span>
-              <span v-if="selectedModel === model.name">✓</span>
-            </button>
-          </div>
+            <span>🔄</span>
+            <span class="hidden sm:inline">เริ่มคุยใหม่</span>
+          </button>
         </div>
       </div>
 
-      <!-- Center: Switcher Tabs -->
-      <div class="flex items-center p-1 bg-slate-100/90 rounded-2xl border border-slate-200/60">
-        <button 
-          @click="activeTab = 'chat'"
-          class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition"
-          :class="activeTab === 'chat' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'"
-        >
-          <span>✨</span>
-          <span>แชท Gemini AI</span>
-        </button>
-
-        <button 
-          @click="activeTab = 'knowledge'"
-          class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition"
-          :class="activeTab === 'knowledge' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'"
-        >
-          <span>📚</span>
-          <span>คลังคำตอบ FAQ</span>
-        </button>
-
-        <button 
-          @click="activeTab = 'stats'"
-          class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition"
-          :class="activeTab === 'stats' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'"
-        >
-          <span>📊</span>
-          <span>สถิติ & สรุป</span>
-        </button>
-      </div>
-
-      <!-- Right: Gemini Action Buttons (matching screenshot) -->
-      <div class="flex items-center gap-2">
-        <!-- Download App / Export Chat Button -->
-        <button 
-          @click="exportConversation"
-          class="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-medium transition"
-          title="ส่งออกบทสนทนา"
-        >
-          <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          <span>ดาวน์โหลดแอป/แชท</span>
-        </button>
-
-        
-      </div>
-    </header>
-
-    <!-- TAB 1: GEMINI AI CHAT CANVAS (White Theme) -->
-    <div 
-      v-show="activeTab === 'chat'" 
-      class="bg-white rounded-3xl border border-slate-200/80 shadow-sm relative flex flex-col overflow-hidden min-h-[calc(100vh-230px)] gemini-canvas"
-    >
       <!-- STATE A: EMPTY / INITIAL VIEW ("เราจะเริ่มจากตรงไหนก่อนดี") -->
       <div 
         v-if="!hasUserStartedChat" 
-        class="flex-1 flex flex-col items-center justify-center px-4 py-10 relative z-10"
+        class="flex-1 flex flex-col items-center justify-center px-4 py-12 relative z-10"
       >
-        <!-- Center Gemini Heading -->
-        <h2 class="text-3xl sm:text-4xl md:text-5xl font-medium text-slate-800 tracking-tight text-center mb-8 select-none">
+        <!-- Center Bot Avatar -->
+        <div class="relative mb-4">
+          <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-tr from-[#2d5a43] via-[#3f634b] to-[#557c61] text-white flex items-center justify-center text-3xl sm:text-4xl shadow-xl border-2 border-white">
+            🤖
+          </div>
+          <span class="absolute bottom-1 right-1 w-4 h-4 bg-emerald-400 border-2 border-white rounded-full"></span>
+        </div>
+
+        <!-- Center Heading (Gemini style) -->
+        <h2 class="text-3xl sm:text-4xl md:text-5xl font-semibold text-slate-800 tracking-tight text-center mb-2 select-none">
           เราจะเริ่มจากตรงไหนก่อนดี
         </h2>
 
-        <!-- Center Iconic Gemini Pill Input Bar -->
-        <div class="w-full max-w-2xl bg-white rounded-full shadow-[0_4px_24px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.04)] border border-slate-200 hover:border-slate-300 focus-within:border-slate-400 focus-within:shadow-[0_8px_30px_rgba(0,0,0,0.09)] px-3.5 py-2.5 flex items-center gap-2.5 transition-all duration-200">
+        <!-- Subtitle -->
+        <p class="text-xs sm:text-sm text-slate-500 text-center mb-8 flex items-center justify-center gap-1.5">
+          <span>ถามข้อมูลร้าน เมนูอาหาร ยอดขาย หรือปรึกษาน้องส้มตำ AI ได้เลยค่ะ 🌶️</span>
+          <span class="text-emerald-700 font-semibold">• ✨ ขับเคลื่อนโดย Gemini AI</span>
+        </p>
+
+        <!-- Center Iconic Pill Input Bar (น้องส้มตำ AI Theme) -->
+        <div class="w-full max-w-2xl bg-white rounded-full shadow-[0_4px_24px_rgba(45,90,67,0.08),0_1px_3px_rgba(0,0,0,0.04)] border border-slate-200 hover:border-emerald-300 focus-within:border-[#2d5a43] focus-within:shadow-[0_8px_30px_rgba(45,90,67,0.12)] px-3.5 py-2.5 flex items-center gap-2.5 transition-all duration-200">
           <!-- Plus (+) Icon Button -->
           <button 
             type="button" 
             @click="triggerSuggestionDropdown"
-            class="w-9 h-9 rounded-full hover:bg-slate-100 text-slate-500 flex items-center justify-center text-xl font-light transition shrink-0"
-            title="เพิ่มหัวข้อหรือคำถามด่วน"
+            class="w-9 h-9 rounded-full hover:bg-emerald-50 text-[#2d5a43] flex items-center justify-center text-xl font-light transition shrink-0"
+            title="สุ่มคำถามยอดนิยม"
           >
             +
           </button>
@@ -158,22 +106,17 @@
             v-model="simInput"
             @keydown.enter.prevent="simSubmit"
             type="text" 
-            placeholder="ถาม Gemini"
+            placeholder="พิมพ์ถามน้องส้มตำ AI..."
             class="flex-1 bg-transparent text-sm sm:text-base text-slate-800 placeholder-slate-400 outline-none min-w-0"
             :disabled="simIsTyping"
           />
 
           <!-- Right Controls inside Pill -->
           <div class="flex items-center gap-1.5 shrink-0">
-            <!-- Model badge inside pill -->
-            <button 
-              type="button"
-              @click="showModelMenu = !showModelMenu"
-              class="flex items-center gap-1 text-[11px] sm:text-xs text-slate-700 bg-slate-100/90 hover:bg-slate-200/90 px-3 py-1.5 rounded-full font-medium transition"
-            >
-              <span>Gemini อัตโนมัติ</span>
-              <span class="text-[9px] text-slate-400">▼</span>
-            </button>
+            <!-- Bot Pill Badge -->
+            <div class="flex items-center gap-1 text-[11px] sm:text-xs text-[#2d5a43] bg-emerald-50 border border-emerald-200/80 px-3 py-1.5 rounded-full font-medium">
+              <span>🤖 น้องส้มตำ AI</span>
+            </div>
 
             <!-- Microphone Button -->
             <button 
@@ -194,7 +137,7 @@
               type="button"
               @click="simSubmit"
               :disabled="!simInput.trim() || simIsTyping"
-              class="w-9 h-9 rounded-full bg-[#1e4d35] hover:bg-[#163a28] disabled:bg-slate-100 disabled:text-slate-300 text-white flex items-center justify-center transition text-sm shadow-xs"
+              class="w-9 h-9 rounded-full bg-[#2d5a43] hover:bg-[#183324] disabled:bg-slate-100 disabled:text-slate-300 text-white flex items-center justify-center transition text-sm shadow-xs active:scale-95"
             >
               ➔
             </button>
@@ -207,7 +150,7 @@
             v-for="chip in quickChips" 
             :key="chip.text"
             @click="simSendPrompt(chip.text)"
-            class="text-xs bg-white/90 hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-200/90 hover:border-slate-300 px-3.5 py-2 rounded-2xl shadow-xs transition flex items-center gap-1.5"
+            class="text-xs bg-white/95 hover:bg-emerald-50 text-slate-700 hover:text-[#2d5a43] border border-slate-200/90 hover:border-emerald-300 px-3.5 py-2 rounded-2xl shadow-xs transition flex items-center gap-1.5"
           >
             <span>{{ chip.icon }}</span>
             <span>{{ chip.text }}</span>
@@ -231,43 +174,32 @@
             >
               <!-- User Message: Right-Aligned Bubble -->
               <div v-if="msg.sender === 'user'" class="flex justify-end">
-                <div class="max-w-[85%] sm:max-w-[75%] bg-[#f0f4f9] text-slate-800 px-5 py-3.5 rounded-3xl text-sm leading-relaxed shadow-xs">
+                <div class="max-w-[85%] sm:max-w-[75%] bg-[#f0f4f9] text-slate-800 px-5 py-3.5 rounded-3xl text-sm leading-relaxed shadow-xs border border-slate-200/60">
                   <div class="whitespace-pre-wrap">{{ msg.text }}</div>
                   <div class="text-[10px] text-slate-400 text-right mt-1">{{ msg.time }}</div>
                 </div>
               </div>
 
-              <!-- Gemini Bot Message: Left-Aligned with Sparkle Logo -->
+              <!-- Bot Message: Left-Aligned with Cute 🤖 Avatar -->
               <div v-else class="flex items-start gap-3.5">
-                <!-- Gemini 4-Point Sparkle Icon -->
-                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 via-indigo-500 to-emerald-500 p-[1.5px] shrink-0 mt-0.5 shadow-xs">
-                  <div class="w-full h-full bg-white rounded-full flex items-center justify-center">
-                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
-                      <path d="M12 2C12 7.52 7.52 12 2 12C7.52 12 12 16.48 12 22C12 16.48 16.48 12 22 12C16.48 12 12 7.52 12 2Z" fill="url(#geminiGradMsg)" />
-                      <defs>
-                        <linearGradient id="geminiGradMsg" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-                          <stop stop-color="#4285F4" />
-                          <stop offset="0.5" stop-color="#9B72CF" />
-                          <stop offset="1" stop-color="#2D5A43" />
-                        </linearGradient>
-                      </defs>
-                    </svg>
-                  </div>
+                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-[#2d5a43] via-[#3f634b] to-[#557c61] text-white flex items-center justify-center text-sm shrink-0 mt-0.5 shadow-sm border border-emerald-200">
+                  🤖
                 </div>
 
                 <!-- Bot Response Body -->
                 <div class="flex-1 space-y-2 max-w-[90%]">
                   <div class="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
                     <span>น้องส้มตำ AI</span>
+                    <span class="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold">BOT</span>
                     <span class="text-[10px] font-normal text-slate-400">• {{ msg.time }}</span>
                   </div>
 
                   <div 
-                    class="text-sm text-slate-800 leading-relaxed space-y-1.5 gemini-text"
+                    class="text-sm text-slate-800 leading-relaxed space-y-1.5 somtum-text"
                     v-html="formatMessage(msg.text)"
                   ></div>
 
-                  <!-- Bot Actions Footer (Copy, Read Aloud, Regenerate) -->
+                  <!-- Bot Actions Footer (Copy, Read Aloud, Helpful) -->
                   <div class="flex items-center gap-1 pt-1 text-slate-400">
                     <button 
                       @click="copyMessage(msg.text)" 
@@ -290,7 +222,7 @@
                     </button>
 
                     <button 
-                      @click="showToast('คำตอบถูกต้อง', 'ขอบคุณสำหรับข้อเสนอแนะในการปรับปรุงโมเดลครับ', 'success')" 
+                      @click="showToast('คำตอบถูกต้อง', 'ขอบคุณสำหรับข้อเสนอแนะในการปรับปรุงคำตอบค่ะ', 'success')" 
                       title="คำตอบมีประโยชน์"
                       class="p-1.5 rounded-lg hover:bg-slate-100 hover:text-slate-600 transition text-xs"
                     >
@@ -301,32 +233,30 @@
               </div>
             </div>
 
-            <!-- Typing Indicator (Gemini Shimmer) -->
+            <!-- Typing Indicator (น้องส้มตำ AI Thinking) -->
             <div v-if="simIsTyping" class="flex items-start gap-3.5 animate-pulse">
-              <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 via-indigo-500 to-emerald-500 p-[1.5px] shrink-0">
-                <div class="w-full h-full bg-white rounded-full flex items-center justify-center">
-                  <span class="text-xs animate-spin">✦</span>
-                </div>
+              <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-sm shrink-0 border border-emerald-300">
+                🤖
               </div>
-              <div class="bg-slate-100/90 rounded-2xl px-4 py-3 flex items-center gap-1.5 text-xs text-slate-500">
-                <span class="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"></span>
-                <span class="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:0.2s]"></span>
-                <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:0.4s]"></span>
-                <span class="ml-1 text-slate-400 font-medium">Gemini กำลังคิดคำตอบ...</span>
+              <div class="bg-slate-100 rounded-2xl px-4 py-3 flex items-center gap-1.5 text-xs text-slate-500">
+                <span class="w-1.5 h-1.5 bg-[#2d5a43] rounded-full animate-bounce"></span>
+                <span class="w-1.5 h-1.5 bg-[#3f634b] rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+                <span class="ml-1 text-slate-500 font-medium">น้องส้มตำ AI กำลังค้นหาคำตอบ...</span>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Docked Bottom Input Bar (matching screenshot) -->
-        <div class="p-4 bg-gradient-to-t from-white via-white to-transparent pt-6 border-t border-slate-100/80">
+        <!-- Docked Bottom Input Bar -->
+        <div class="p-4 bg-gradient-to-t from-white via-white to-transparent pt-6 border-t border-slate-100">
           <div class="max-w-3xl mx-auto space-y-2">
-            <div class="w-full bg-white rounded-full shadow-[0_4px_24px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.04)] border border-slate-200 hover:border-slate-300 focus-within:border-slate-400 focus-within:shadow-[0_8px_30px_rgba(0,0,0,0.09)] px-3.5 py-2.5 flex items-center gap-2.5 transition-all duration-200">
+            <div class="w-full bg-white rounded-full shadow-[0_4px_24px_rgba(45,90,67,0.08),0_1px_3px_rgba(0,0,0,0.04)] border border-slate-200 hover:border-emerald-300 focus-within:border-[#2d5a43] focus-within:shadow-[0_8px_30px_rgba(45,90,67,0.12)] px-3.5 py-2.5 flex items-center gap-2.5 transition-all duration-200">
               <!-- Plus (+) Icon Button -->
               <button 
                 type="button" 
                 @click="triggerSuggestionDropdown"
-                class="w-9 h-9 rounded-full hover:bg-slate-100 text-slate-500 flex items-center justify-center text-xl font-light transition shrink-0"
+                class="w-9 h-9 rounded-full hover:bg-emerald-50 text-[#2d5a43] flex items-center justify-center text-xl font-light transition shrink-0"
                 title="เลือกคำถามด่วน"
               >
                 +
@@ -337,22 +267,16 @@
                 v-model="simInput"
                 @keydown.enter.prevent="simSubmit"
                 type="text" 
-                placeholder="ถาม Gemini"
+                placeholder="พิมพ์ถามน้องส้มตำ AI..."
                 class="flex-1 bg-transparent text-sm sm:text-base text-slate-800 placeholder-slate-400 outline-none min-w-0"
                 :disabled="simIsTyping"
               />
 
               <!-- Right Controls inside Pill -->
               <div class="flex items-center gap-1.5 shrink-0">
-                <!-- Model badge inside pill -->
-                <button 
-                  type="button"
-                  @click="showModelMenu = !showModelMenu"
-                  class="flex items-center gap-1 text-[11px] sm:text-xs text-slate-700 bg-slate-100/90 hover:bg-slate-200/90 px-3 py-1.5 rounded-full font-medium transition"
-                >
-                  <span>Gemini อัตโนมัติ</span>
-                  <span class="text-[9px] text-slate-400">▼</span>
-                </button>
+                <div class="flex items-center gap-1 text-[11px] sm:text-xs text-[#2d5a43] bg-emerald-50 border border-emerald-200/80 px-3 py-1.5 rounded-full font-medium">
+                  <span>🤖 น้องส้มตำ AI</span>
+                </div>
 
                 <!-- Microphone Button -->
                 <button 
@@ -373,7 +297,7 @@
                   type="button"
                   @click="simSubmit"
                   :disabled="!simInput.trim() || simIsTyping"
-                  class="w-9 h-9 rounded-full bg-[#1e4d35] hover:bg-[#163a28] disabled:bg-slate-100 disabled:text-slate-300 text-white flex items-center justify-center transition text-sm shadow-xs"
+                  class="w-9 h-9 rounded-full bg-[#2d5a43] hover:bg-[#183324] disabled:bg-slate-100 disabled:text-slate-300 text-white flex items-center justify-center transition text-sm shadow-xs active:scale-95"
                 >
                   ➔
                 </button>
@@ -382,100 +306,69 @@
 
             <!-- Disclaimer Notice -->
             <p class="text-[11px] text-center text-slate-400">
-              Gemini อาจแสดงข้อมูลที่ไม่ถูกต้อง รวมถึงข้อมูลเกี่ยวกับร้านค้า โปรดตรวจสอบความถูกต้องอีกครั้ง
+              ⚡ น้องส้มตำ AI ขับเคลื่อนโดย Google Gemini AI • ข้อมูลและคำตอบอิงจากร้านตำครกซิ่ง
             </p>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- TAB 2: FAQ KNOWLEDGE BASE & BOT PERSONA -->
-    <div v-show="activeTab === 'knowledge'" class="space-y-6">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <!-- Persona Setting (5 cols) -->
-        <div class="lg:col-span-5 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-            <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <span>🎭</span> บุคลิกภาพและข้อมูลบอท (Bot Persona)
-            </h2>
-            <button @click="savePersona" class="text-xs bg-[#2d5a43] hover:bg-[#183324] text-white px-3 py-1.5 rounded-lg transition font-medium">
-              บันทึกการตั้งค่า
-            </button>
+    <!-- MODAL: KNOWLEDGE BASE & FAQ MANAGEMENT -->
+    <div 
+      v-if="showKnowledgeModal" 
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in"
+    >
+      <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+        <!-- Modal Header -->
+        <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+          <div class="flex items-center gap-2.5">
+            <span class="text-xl">📚</span>
+            <div>
+              <h3 class="text-sm font-bold text-slate-800">คลังคำตอบอัตโนมัติ & บุคลิกบอท (Knowledge Base)</h3>
+              <p class="text-xs text-slate-500">จัดการคำตอบที่น้องส้มตำ AI จะใช้ตอบลูกค้าโดยอัตโนมัติ</p>
+            </div>
           </div>
+          <button @click="showKnowledgeModal = false" class="text-slate-400 hover:text-slate-600 text-lg w-8 h-8 rounded-full hover:bg-slate-200 flex items-center justify-center transition">
+            ✕
+          </button>
+        </div>
 
-          <div class="space-y-3">
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">ชื่อที่แสดงของบอท</label>
-              <input 
-                type="text" 
-                v-model="botPersona.name" 
-                class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl focus:border-[#2d5a43] outline-none" 
-              />
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">ตำแหน่ง / สโลแกน</label>
-              <input 
-                type="text" 
-                v-model="botPersona.title" 
-                class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl focus:border-[#2d5a43] outline-none" 
-              />
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">ข้อความทักทายแรกเมื่อลูกค้าเปิดแชท</label>
-              <textarea 
-                v-model="botPersona.greeting" 
-                rows="3" 
-                class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl focus:border-[#2d5a43] outline-none leading-relaxed"
-              ></textarea>
-            </div>
-
-            <div>
-              <span class="block text-xs font-semibold text-slate-600 mb-1.5">สไตล์การพูด:</span>
-              <div class="flex flex-wrap gap-2">
-                <button 
-                  v-for="tone in tones" 
-                  :key="tone.id"
-                  @click="botPersona.tone = tone.id"
-                  :class="[
-                    'text-xs px-3 py-1.5 rounded-xl border transition',
-                    botPersona.tone === tone.id 
-                      ? 'bg-[#2d5a43] text-white border-[#2d5a43] font-medium' 
-                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                  ]"
-                >
-                  {{ tone.label }}
-                </button>
+        <!-- Modal Content: Persona + FAQ List -->
+        <div class="p-6 overflow-y-auto space-y-6 flex-1">
+          <!-- Persona Config -->
+          <div class="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-100 space-y-3">
+            <h4 class="text-xs font-bold text-[#2d5a43] flex items-center gap-1.5">
+              <span>🎭</span> บุคลิกภาพน้องส้มตำ AI
+            </h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">ชื่อที่แสดง</label>
+                <input v-model="botPersona.name" type="text" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl bg-white outline-none" />
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">สโลแกน</label>
+                <input v-model="botPersona.title" type="text" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl bg-white outline-none" />
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- FAQ Auto Reply Rules List (7 cols) -->
-        <div class="lg:col-span-7 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-            <div>
-              <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <span>📚</span> คลังคำตอบอัตโนมัติ (FAQ Knowledge Base)
-              </h2>
-              <p class="text-xs text-slate-400 mt-0.5">บอทจะเลือกคำตอบเหล่านี้โดยอัตโนมัติเมื่อพบคีย์เวิร์ดของลูกค้า</p>
-            </div>
-
+          <!-- FAQ List Header -->
+          <div class="flex items-center justify-between">
+            <h4 class="text-xs font-bold text-slate-800">รายการคำถามที่พบบ่อย ({{ faqList.length }} ข้อ)</h4>
             <button 
               @click="openAddFaqModal"
-              class="text-xs bg-emerald-50 hover:bg-emerald-100 text-[#2d5a43] font-semibold px-3 py-1.5 rounded-xl border border-emerald-200 transition flex items-center gap-1.5"
+              class="text-xs bg-[#2d5a43] hover:bg-[#183324] text-white px-3 py-1.5 rounded-xl font-medium transition flex items-center gap-1"
             >
               <span>➕</span> เพิ่มคำถาม-คำตอบ
             </button>
           </div>
 
-          <!-- FAQ Items -->
-          <div class="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
+          <!-- FAQ Cards -->
+          <div class="space-y-2.5">
             <div 
               v-for="(faq, idx) in faqList" 
               :key="idx"
-              class="p-4 rounded-xl border border-slate-200/80 hover:border-emerald-300 transition bg-slate-50/50 space-y-2"
+              class="p-3.5 rounded-xl border border-slate-200/80 hover:border-emerald-300 transition bg-white space-y-2"
             >
               <div class="flex items-start justify-between gap-3">
                 <div class="flex items-center gap-2">
@@ -483,132 +376,46 @@
                     Q{{ idx + 1 }}
                   </span>
                   <span class="text-xs font-bold text-slate-800">{{ faq.question }}</span>
-                  <span class="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-md font-medium">
+                  <span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-medium">
                     {{ faq.category }}
                   </span>
                 </div>
-                <div class="flex items-center gap-1">
-                  <button @click="testFaqInChat(faq)" title="ส่งทดสอบในแชท Gemini" class="text-xs text-slate-400 hover:text-[#2d5a43] p-1">
-                    ▶️
-                  </button>
-                  <button @click="removeFaq(idx)" title="ลบ" class="text-xs text-slate-400 hover:text-red-500 p-1">
-                    🗑️
-                  </button>
-                </div>
+                <button @click="removeFaq(idx)" title="ลบ" class="text-xs text-slate-400 hover:text-red-500 p-1">
+                  🗑️
+                </button>
               </div>
 
-              <!-- Keyword pills -->
-              <div class="flex flex-wrap items-center gap-1.5">
-                <span class="text-[10px] text-slate-400">คีย์เวิร์ดตรวจจับ:</span>
+              <div class="flex flex-wrap items-center gap-1">
+                <span class="text-[10px] text-slate-400">คีย์เวิร์ด:</span>
                 <span 
                   v-for="kw in faq.keywords" 
                   :key="kw"
-                  class="text-[10px] bg-white border border-slate-200 text-slate-600 px-2 py-0.5 rounded-md font-medium"
+                  class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono"
                 >
                   #{{ kw }}
                 </span>
               </div>
 
-              <!-- Reply snippet -->
-              <p class="text-xs text-slate-600 bg-white p-2.5 rounded-lg border border-slate-200/70 leading-relaxed">
+              <p class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100 leading-relaxed">
                 <span class="font-semibold text-emerald-800">ตอบ:</span> {{ faq.answer }}
               </p>
             </div>
           </div>
         </div>
-      </div>
-    </div>
 
-    <!-- TAB 3: STATS & OVERVIEW -->
-    <div v-show="activeTab === 'stats'" class="space-y-6">
-      <!-- Stats Overview Cards -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <p class="text-xs font-medium text-slate-500">ข้อความตอบกลับวันนี้</p>
-            <h3 class="text-2xl font-bold text-slate-800 mt-1">168 <span class="text-xs font-normal text-slate-400">ข้อความ</span></h3>
-            <span class="inline-flex items-center text-[11px] text-emerald-600 font-medium mt-1">
-              ↑ +24% เทียบกับเมื่อวาน
-            </span>
-          </div>
-          <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-xl">
-            💬
-          </div>
-        </div>
-
-        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <p class="text-xs font-medium text-slate-500">ความเร็วตอบกลับเฉลี่ย</p>
-            <h3 class="text-2xl font-bold text-slate-800 mt-1">0.6 <span class="text-xs font-normal text-slate-400">วินาที</span></h3>
-            <span class="inline-flex items-center text-[11px] text-emerald-600 font-medium mt-1">
-              ⚡ รวดเร็วทันใจ
-            </span>
-          </div>
-          <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-xl">
-            ⏱️
-          </div>
-        </div>
-
-        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <p class="text-xs font-medium text-slate-500">ความพึงพอใจลูกค้า</p>
-            <h3 class="text-2xl font-bold text-slate-800 mt-1">98.5%</h3>
-            <span class="inline-flex items-center text-[11px] text-emerald-600 font-medium mt-1">
-              ⭐ เรตติ้ง 4.9/5
-            </span>
-          </div>
-          <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center text-xl">
-            ⭐
-          </div>
-        </div>
-
-        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <p class="text-xs font-medium text-slate-500">คำถามที่ตอบแทนแอดมิน</p>
-            <h3 class="text-2xl font-bold text-slate-800 mt-1">91.2%</h3>
-            <span class="inline-flex items-center text-[11px] text-emerald-600 font-medium mt-1">
-              🎯 ลดภาระแอดมิน
-            </span>
-          </div>
-          <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center text-xl">
-            🛡️
-          </div>
-        </div>
-      </div>
-
-      <!-- Quick Toggle Bot Status Card -->
-      <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-        <div>
-          <h3 class="text-sm font-bold text-slate-800">เปิด/ปิดระบบตอบกลับอัตโนมัติของร้าน</h3>
-          <p class="text-xs text-slate-500 mt-0.5">เมื่อปิดชั่วคราว บอทจะไม่ส่งข้อความตอบลูกค้าในหน้าเดลิเวอรี่</p>
-        </div>
-
-        <div class="flex items-center gap-3 bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl">
-          <button 
-            @click="toggleBotStatus"
-            :class="[
-              'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
-              botEnabled ? 'bg-[#2d5a43]' : 'bg-slate-300'
-            ]"
-          >
-            <span 
-              :class="[
-                'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out',
-                botEnabled ? 'translate-x-5' : 'translate-x-0'
-              ]"
-            />
+        <!-- Modal Footer -->
+        <div class="p-4 border-t border-slate-100 flex justify-end bg-slate-50">
+          <button @click="showKnowledgeModal = false" class="px-5 py-2 rounded-xl text-xs font-semibold bg-[#2d5a43] hover:bg-[#183324] text-white transition">
+            เสร็จสิ้น
           </button>
-          <span class="text-xs font-bold" :class="botEnabled ? 'text-emerald-700' : 'text-slate-500'">
-            {{ botEnabled ? 'เปิดทำงาน' : 'ปิดชั่วคราว' }}
-          </span>
         </div>
       </div>
     </div>
 
-    <!-- Modal: Add New FAQ -->
+    <!-- SUB-MODAL: ADD NEW FAQ -->
     <div 
       v-if="showModal"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in"
+      class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in"
     >
       <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
         <div class="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -676,19 +483,9 @@
 import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import { API_BASE } from '../../config/api.js'
 
-const activeTab = ref('chat') // 'chat' | 'knowledge' | 'stats'
-const botEnabled = ref(true)
+const showKnowledgeModal = ref(false)
 const showModal = ref(false)
-const showModelMenu = ref(false)
-const selectedModel = ref('Gemini 3.8 Flash')
 const isListening = ref(false)
-
-const availableModels = [
-  { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash (แนะนำ)' },
-  { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite' },
-  { id: 'gemini-auto', name: 'Gemini อัตโนมัติ' }
-]
-
 const simInput = ref('')
 const simIsTyping = ref(false)
 const simContainer = ref(null)
@@ -706,12 +503,6 @@ const showToast = (title, message = '', type = 'success') => {
     toast.value.show = false
   }, 2800)
 }
-
-const tones = [
-  { id: 'friendly', label: '😊 เป็นกันเอง สนุกสนาน' },
-  { id: 'polite', label: '👔 สุภาพ ทางการ' },
-  { id: 'spicy', label: '🌶️ แซ่บนัว สไตล์อีสาน' }
-]
 
 const botPersona = ref({
   name: 'น้องส้มตำ AI',
@@ -748,10 +539,10 @@ const faqList = ref([
 ])
 
 const quickChips = [
-  { icon: '💡', text: 'แนะนำเมนูขายดีประจำร้าน' },
-  { icon: '📊', text: 'สรุปยอดขายและคำสั่งซื้อวันนี้' },
-  { icon: '🛵', text: 'โปรโมชั่นเดลิเวอรี่และค่าจัดส่ง' },
-  { icon: '🕒', text: 'ร้านเปิดกี่โมงและปิดกี่โมง' }
+  { icon: '🌶️', text: 'เมนูขายดี & เมนูส้มตำยอดฮิต' },
+  { icon: '📊', text: 'รายงานยอดขายและคำสั่งซื้อวันนี้' },
+  { icon: '🛵', text: 'ข้อมูลค่าจัดส่งเดลิเวอรี่' },
+  { icon: '🕒', text: 'เวลาทำการ & เบอร์ติดต่อร้าน' }
 ]
 
 const newFaq = ref({
@@ -777,12 +568,12 @@ const getSimTime = () => {
 
 const simMessages = ref([])
 
-// ตรวจสอบว่าผู้ใช้เริ่มบทสนทนาแล้วหรือยัง (ถ้ายังไม่มีข้อความ หรือมีแต่บอททักทายแรก ให้โชว์หน้า "เราจะเริ่มจากตรงไหนก่อนดี")
+// ตรวจสอบว่ามีผู้ใช้เริ่มคุยแล้วหรือไม่ (ถ้ายังไม่มี ให้แสดงหน้าทักทาย "เราจะเริ่มจากตรงไหนก่อนดี")
 const hasUserStartedChat = computed(() => {
   return simMessages.value.some(m => m.sender === 'user')
 })
 
-// โหลดประวัติการแชทจำลองประจำวัน (ถ้าวันเดิมยังคงอยู่ ถ้าเปลี่ยนวันจะล้างออก)
+// โหลดประวัติประจำวัน
 const loadDailySimChat = () => {
   try {
     const raw = localStorage.getItem(ADMIN_CHAT_STORAGE_KEY)
@@ -806,7 +597,7 @@ const loadDailySimChat = () => {
   }
 }
 
-// บันทึกประวัติการแชทจำลองประจำวัน
+// บันทึกประวัติประจำวัน
 const saveDailySimChat = () => {
   try {
     const today = getTodayDateString()
@@ -824,7 +615,7 @@ onMounted(() => {
   loadDailySimChat()
 })
 
-// บันทึกประวัติการแชทของวันนั้นโดยอัตโนมัติเมื่อมีข้อความใหม่
+// บันทึกอัตโนมัติเมื่อมีข้อความใหม่
 watch(
   simMessages,
   () => {
@@ -833,17 +624,11 @@ watch(
   { deep: true }
 )
 
-const toggleBotStatus = () => {
-  botEnabled.value = !botEnabled.value
-  showToast(
-    botEnabled.value ? 'เปิดใช้งานแชทบอทแล้ว' : 'ปิดการทำงานชั่วคราวแล้ว',
-    botEnabled.value ? 'ลูกค้าในหน้าร้านสามารถแชทพูดคุยกับบอทได้ตามปกติ' : 'บอทจะไม่ตอบคำถามอัตโนมัติในหน้าร้าน',
-    botEnabled.value ? 'success' : 'warning'
-  )
-}
-
-const savePersona = () => {
-  showToast('บันทึกข้อมูลสำเร็จ', 'อัปเดตข้อมูลบุคลิกและข้อความทักทายของบอทเรียบร้อยแล้ว', 'success')
+const resetChat = () => {
+  simMessages.value = []
+  simInput.value = ''
+  saveDailySimChat()
+  showToast('เริ่มแชทใหม่', 'พร้อมสำหรับการสนทนากับน้องส้มตำ AI แล้วค่ะ', 'success')
 }
 
 const openAddFaqModal = () => {
@@ -874,7 +659,7 @@ const saveNewFaq = () => {
   })
 
   showModal.value = false
-  showToast('เพิ่มคำถามสำเร็จ', 'เพิ่มกฎการตอบคำถามอัตโนมัติเข้าสู่ Knowledge Base แล้ว', 'success')
+  showToast('เพิ่มคำถามสำเร็จ', 'บันทึกคำถาม-คำตอบเข้าสู่ Knowledge Base แล้วค่ะ', 'success')
 }
 
 const removeFaq = (idx) => {
@@ -890,19 +675,6 @@ const scrollSimToBottom = () => {
   })
 }
 
-// เริ่มต้นบทสนทนาใหม่
-const startNewChat = () => {
-  simMessages.value = []
-  simInput.value = ''
-  saveDailySimChat()
-  showToast('เริ่มแชทใหม่', 'พร้อมสำหรับการสนทนาใหม่แล้วครับ', 'success')
-}
-
-const testFaqInChat = (faq) => {
-  activeTab.value = 'chat'
-  simSendPrompt(faq.question)
-}
-
 const simSendPrompt = (prompt) => {
   simInput.value = prompt
   simSubmit()
@@ -910,16 +682,16 @@ const simSendPrompt = (prompt) => {
 
 const triggerSuggestionDropdown = () => {
   const suggestions = [
-    'เมนูแนะนำยอดฮิตประจำร้าน',
-    'ตรวจสอบโปรโมชั่นเดลิเวอรี่',
-    'อัตราค่าส่งและระยะทางบริการ',
-    'เปิดทำการกี่โมงถึงกี่โมง'
+    'เมนูขายดี & เมนูส้มตำยอดฮิตประจำร้าน',
+    'ตรวจสอบโปรโมชั่นเดลิเวอรี่วันนี้',
+    'ข้อมูลอัตราค่าจัดส่งเดลิเวอรี่',
+    'ร้านเปิดกี่โมงและปิดกี่โมง'
   ]
   const random = suggestions[Math.floor(Math.random() * suggestions.length)]
   simInput.value = random
 }
 
-// Speech Recognition (ไมโครโฟน)
+// ไมโครโฟน
 const toggleMic = () => {
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition
   if (!SpeechRec) {
@@ -939,7 +711,7 @@ const toggleMic = () => {
 
     recognition.onstart = () => {
       isListening.value = true
-      showToast('กำลังฟัง...', 'กรุณาพูดข้อความที่ต้องการถาม', 'success')
+      showToast('กำลังฟัง...', 'กรุณาพูดข้อความที่ต้องการถามน้องส้มตำ AI ได้เลยค่ะ', 'success')
     }
 
     recognition.onresult = (e) => {
@@ -962,14 +734,12 @@ const toggleMic = () => {
   }
 }
 
-// คัดลอกข้อความ
 const copyMessage = (text) => {
   const clean = text.replace(/<[^>]*>?/gm, '')
   navigator.clipboard?.writeText(clean)
-  showToast('คัดลอกสำเร็จ', 'คัดลอกข้อความลงในคลิปบอร์ดแล้ว', 'success')
+  showToast('คัดลอกสำเร็จ', 'คัดลอกข้อความลงในคลิปบอร์ดแล้วค่ะ', 'success')
 }
 
-// อ่านออกเสียง (TTS)
 const speakMessage = (text) => {
   if (!window.speechSynthesis) return
   window.speechSynthesis.cancel()
@@ -979,28 +749,6 @@ const speakMessage = (text) => {
   window.speechSynthesis.speak(utter)
 }
 
-// ส่งออกบทสนทนา
-const exportConversation = () => {
-  if (simMessages.value.length === 0) {
-    showToast('ไม่มีประวัติการแชท', 'ยังไม่มีข้อความสำหรับส่งออก', 'warning')
-    return
-  }
-
-  const exportText = simMessages.value
-    .map(m => `[${m.time}] ${m.sender === 'user' ? 'Admin' : 'Gemini AI'}: ${m.text.replace(/<[^>]*>?/gm, '')}`)
-    .join('\n\n')
-
-  const blob = new Blob([exportText], { type: 'text/plain;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `tumkrokzing-gemini-chat-${getTodayDateString()}.txt`
-  a.click()
-  URL.revokeObjectURL(url)
-  showToast('ส่งออกสำเร็จ', 'ดาวน์โหลดไฟล์บทสนทนาเรียบร้อยแล้ว', 'success')
-}
-
-// แปลง Markdown ให้สวยงาม
 const formatMessage = (text) => {
   if (!text) return ''
   return text
@@ -1012,7 +760,6 @@ const formatMessage = (text) => {
     .replace(/\n/g, '<br>')
 }
 
-// ส่งข้อความถาม Gemini AI
 const simSubmit = async () => {
   const q = simInput.value.trim()
   if (!q) return
@@ -1027,7 +774,6 @@ const simSubmit = async () => {
 
   simIsTyping.value = true
 
-  // 1. ลองเรียก Gemini Backend API
   let botReply = ''
   try {
     const historyPayload = simMessages.value.slice(-10).map(m => ({
@@ -1048,10 +794,9 @@ const simSubmit = async () => {
       }
     }
   } catch {
-    // หากเชื่อมต่อเครือข่ายไม่ได้ ให้ใช้ Fallback Rule
+    // fallback
   }
 
-  // 2. หากไม่มีคำตอบจาก API ให้ตรวจจับผ่าน Knowledge Base FAQ
   if (!botReply) {
     const lower = q.toLowerCase()
     const matchedFaq = faqList.value.find(f => 
@@ -1061,7 +806,7 @@ const simSubmit = async () => {
     if (matchedFaq) {
       botReply = matchedFaq.answer
     } else if (lower.includes('สวัสดี') || lower.includes('หวัดดี') || lower.includes('hello')) {
-      botReply = 'สวัสดีค่ะ! มีอะไรให้น้องส้มตำ AI ช่วยดูแลหรือสอบถามข้อมูลร้านตำครกซิ่งได้เลยนะคะ 😊'
+      botReply = 'สวัสดีค่ะ! หนูคือน้องส้มตำ AI มีอะไรให้ช่วยแนะนำเมนูหรือสอบถามข้อมูลร้านตำครกซิ่งได้เลยนะคะ 😊🌶️'
     } else if (lower.includes('เมนู') || lower.includes('แนะนำ')) {
       botReply = 'เมนูแนะนำยอดฮิตของร้านตำครกซิ่ง ได้แก่: <br>1. <b>ส้มตำปูปลาร้าพริกแห้ง</b> (แซ่บนัวถึงใจ)<br>2. <b>ข้าวกะเพราหมูสับกระทะร้อน</b><br>3. <b>ปีกไก่ทอดสมุนไพรกรอบ</b><br>4. <b>ยำวุ้นเส้นรวมมิตรทะเล</b> ค่ะ 🌶️'
     } else if (lower.includes('ยอดขาย') || lower.includes('ขายดี')) {
@@ -1084,12 +829,12 @@ const simSubmit = async () => {
 </script>
 
 <style scoped>
-/* Gemini Canvas White Ambient Aura (Light Theme) */
-.gemini-canvas {
-  background: radial-gradient(ellipse 65% 55% at 50% 48%, rgba(219, 234, 254, 0.42) 0%, rgba(220, 252, 231, 0.3) 40%, rgba(255, 255, 255, 0) 75%), #ffffff;
+/* น้องส้มตำ AI White Theme Canvas with Soft Mint/Emerald Ambient Aura */
+.somtum-canvas {
+  background: radial-gradient(ellipse 65% 55% at 50% 48%, rgba(220, 252, 231, 0.45) 0%, rgba(240, 253, 244, 0.28) 40%, #ffffff 75%);
 }
 
-.gemini-text :deep(b) {
+.somtum-text :deep(b) {
   color: #1e4d35;
   font-weight: 600;
 }
