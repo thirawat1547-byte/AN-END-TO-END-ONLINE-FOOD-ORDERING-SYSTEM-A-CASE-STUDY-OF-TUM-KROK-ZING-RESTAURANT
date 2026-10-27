@@ -11,7 +11,7 @@ export class ChatbotService {
 
   constructor(private readonly prisma: PrismaService) {
     const apiKey = process.env.GEMINI_API_KEY;
-    this.modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    this.modelName = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 
     if (apiKey && apiKey !== 'your_gemini_api_key_here' && apiKey.trim() !== '') {
       try {
