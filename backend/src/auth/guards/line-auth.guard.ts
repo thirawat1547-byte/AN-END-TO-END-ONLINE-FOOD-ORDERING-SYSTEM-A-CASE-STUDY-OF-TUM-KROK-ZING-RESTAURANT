@@ -1,19 +1,56 @@
-import { Injectable, ExecutionContext, Logger } from '@nestjs/common';
+import { Injectable, ExecutionContext, Logger, Inject, forwardRef } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Response } from 'express';
 import { isOAuthConfigured } from '../oauth.util';
+import { AuthService } from '../auth.service';
 
 @Injectable()
 export class LineAuthGuard extends AuthGuard('line') {
   private readonly logger = new Logger('LineAuthGuard');
 
-  canActivate(context: ExecutionContext) {
+  constructor(
+    @Inject(forwardRef(() => AuthService))
+    private readonly authService: AuthService,
+  ) {
+    super();
+  }
+
+  canActivate(context: ExecutionContext): any {
     if (!isOAuthConfigured('line')) {
       const res = context.switchToHttp().getResponse<Response>();
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
+
+      if (process.env.ALLOW_MOCK_OAUTH === 'true') {
+        this.logger.log('LINE OAuth not configured in .env -> Using Mock Dev Login');
+        return this.authService.validateOAuthUser({
+          provider: 'LINE',
+          providerId: 'demo_user_line_1',
+          email: 'customer.line@tumkrokzing.local',
+          displayName: 'ลูกค้า LINE (Demo)',
+          avatarUrl: 'https://profile.line-scdn.net/0h1demo',
+        }).then((result) => {
+          const query = new URLSearchParams({
+            token: result.access_token,
+            name: result.user.username || 'ลูกค้า LINE (Demo)',
+            avatar: 'https://profile.line-scdn.net/0h1demo',
+            email: result.user.email || 'customer.line@tumkrokzing.local',
+          });
+          if (!res.headersSent) {
+            res.redirect(`${frontendUrl}/auth/callback?${query.toString()}`);
+          }
+          return false;
+        }).catch((mockErr) => {
+          this.logger.error('Failed to create mock LINE user:', mockErr);
+          if (!res.headersSent) {
+            res.redirect(`${frontendUrl}/login?error=${encodeURIComponent('จำลองการเข้าสู่ระบบไม่สำเร็จ')}`);
+          }
+          return false;
+        });
+      }
+
       this.logger.warn('LINE OAuth is not configured in .env. Redirecting to login.');
       if (!res.headersSent) {
-        res.redirect(`${frontendUrl}/login?error=${encodeURIComponent('ระบบ LINE Login ยังไม่ได้ตั้งค่า กรุณาแจ้งผู้ดูแลระบบ')}`);
+        res.redirect(`${frontendUrl}/login?error=${encodeURIComponent('ระบบ LINE Login ยังไม่ได้ตั้งค่า กรุณากรอก LINE_CHANNEL_ID และ LINE_CHANNEL_SECRET ใน .env')}`);
       }
       return false;
     }

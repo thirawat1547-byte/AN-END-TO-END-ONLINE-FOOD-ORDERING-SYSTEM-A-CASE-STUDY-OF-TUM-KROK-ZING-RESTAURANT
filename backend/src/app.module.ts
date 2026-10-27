@@ -9,6 +9,7 @@ import { IngredientsModule } from './ingredients/ingredients.module';
 import { PromotionsModule } from './promotions/promotions.module';
 import { ReportsModule } from './reports/reports.module';
 import { SettingsModule } from './settings/settings.module';
+import { ChatbotModule } from './chatbot/chatbot.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { SettingsModule } from './settings/settings.module';
     PromotionsModule,
     ReportsModule,
     SettingsModule,
+    ChatbotModule,
   ],
   providers: [PrismaService],
 })
