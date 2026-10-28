@@ -390,6 +390,402 @@ ${liveContext}
     };
   }
 
+  // ==========================================
+  // ส่วนงานสำหรับแอดมิน / ผู้จัดการร้าน (Admin Chatbot)
+  // ==========================================
+
+  private async getAdminLiveContext(): Promise<string> {
+    try {
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      const [
+        storeSetting,
+        menus,
+        promotions,
+        ingredients,
+        tables,
+        allOrders,
+        todayOrders,
+        activeKitchenOrders,
+        recentTransactions,
+      ] = await Promise.all([
+        this.prisma.storeSetting.findFirst().catch(() => null),
+        this.prisma.menu.findMany({
+          select: {
+            menu_id: true,
+            menu_name: true,
+            price: true,
+            is_available: true,
+            category: { select: { category_name: true } },
+          },
+        }),
+        this.prisma.promotion.findMany({
+          where: { expiry_date: { gte: now } },
+          select: { code: true, discount_type: true, discount_value: true, min_order_price: true },
+        }),
+        this.prisma.ingredient.findMany({
+          select: {
+            ingredient_id: true,
+            name: true,
+            quantity: true,
+            unit: true,
+            min_quantity: true,
+          },
+        }),
+        this.prisma.table.findMany({
+          select: {
+            table_id: true,
+            table_number: true,
+            capacity: true,
+            status: true,
+          },
+          orderBy: { table_number: 'asc' },
+        }),
+        this.prisma.order.findMany({
+          where: { status: { not: 'CANCELLED' } },
+          select: { order_id: true, total_price: true, status: true, created_at: true },
+        }),
+        this.prisma.order.findMany({
+          where: {
+            created_at: { gte: startOfDay },
+            status: { not: 'CANCELLED' },
+          },
+          select: { order_id: true, total_price: true, status: true, created_at: true },
+        }),
+        this.prisma.order.findMany({
+          where: {
+            status: { in: ['PENDING', 'COOKING', 'READY'] },
+          },
+          select: {
+            order_id: true,
+            table_id: true,
+            order_type: true,
+            status: true,
+            created_at: true,
+            order_items: {
+              select: { quantity: true, menu: { select: { menu_name: true } } },
+            },
+          },
+          take: 10,
+        }),
+        this.prisma.transaction.findMany({
+          take: 5,
+          orderBy: { transaction_id: 'desc' },
+          select: { transaction_id: true, amount: true, payment_method: true, payment_status: true },
+        }),
+      ]);
+
+      const totalAllRevenue = allOrders.reduce((sum, o) => sum + Number(o.total_price || 0), 0);
+      const totalTodayRevenue = todayOrders.reduce((sum, o) => sum + Number(o.total_price || 0), 0);
+
+      const lowStockIngredients = ingredients.filter(
+        (i) => Number(i.quantity) <= Number(i.min_quantity),
+      );
+
+      const occupiedTables = tables.filter((t) => t.status !== 'AVAILABLE');
+      const availableTables = tables.filter((t) => t.status === 'AVAILABLE');
+
+      const activeMenus = menus.filter((m) => m.is_available);
+      const inactiveMenus = menus.filter((m) => !m.is_available);
+
+      let context = '\n=== ข้อมูลสรุปการดำเนินงานร้านตำครกซิ่ง สำหรับแอดมิน/ผู้จัดการ ===\n';
+
+      context += '\n[1. สถานะร้านและการตั้งค่า]\n';
+      context += `- สถานะเปิด-ปิด: ${storeSetting?.is_open ? 'เปิดให้บริการ' : 'ปิดร้านชั่วคราว'}\n`;
+      context += `- เวลาเปิด-ปิด: ${storeSetting?.open_time || '10:30'} - ${storeSetting?.close_time || '22:00'} น.\n`;
+      context += `- เบอร์โทรร้าน: ${storeSetting?.phone || '02-987-6543'}\n`;
+      context += `- PromptPay: ${storeSetting?.promptpay_number || '-'} (${storeSetting?.promptpay_name || '-'})\n`;
+
+      context += '\n[2. ภาพรวมยอดขายและการเงิน]\n';
+      context += `- ยอดขายวันนี้: ${totalTodayRevenue.toLocaleString('th-TH')} บาท (จำนวน ${todayOrders.length} ออเดอร์)\n`;
+      context += `- ยอดขายสะสมทั้งหมด: ${totalAllRevenue.toLocaleString('th-TH')} บาท (จำนวน ${allOrders.length} ออเดอร์)\n`;
+      if (recentTransactions.length > 0) {
+        context += `- ธุรกรรมชำระเงินล่าสุด: ${recentTransactions.map((t) => `#${t.transaction_id} (฿${Number(t.amount)} ผ่าน ${t.payment_method})`).join(', ')}\n`;
+      }
+
+      context += '\n[3. คลังวัตถุดิบ & แจ้งเตือนสต็อก]\n';
+      context += `- วัตถุดิบทั้งหมดในระบบ: ${ingredients.length} รายการ\n`;
+      if (lowStockIngredients.length > 0) {
+        context += `- ⚠️ วัตถุดิบใกล้หมด/ต่ำกว่าเกณฑ์ (${lowStockIngredients.length} รายการ):\n`;
+        lowStockIngredients.forEach((i) => {
+          context += `  • ${i.name}: คงเหลือ ${Number(i.quantity)} ${i.unit} (เกณฑ์ขั้นต่ำ ${Number(i.min_quantity)} ${i.unit}) -> [ต้องสั่งซื้อเพิ่มทันที]\n`;
+        });
+      } else {
+        context += '- วัตถุดิบทุกรายการอยู่ในระดับปลอดภัย ยังไม่มีรายการต่ำกว่าเกณฑ์\n';
+      }
+
+      context += '\n[4. จอห้องครัว KDS & ออเดอร์ระหว่างปรุง]\n';
+      context += `- ออเดอร์ที่อยู่ในครัวตอนนี้: ${activeKitchenOrders.length} ออเดอร์\n`;
+      if (activeKitchenOrders.length > 0) {
+        activeKitchenOrders.forEach((o) => {
+          const itemsStr = o.order_items.map((i) => `${i.menu?.menu_name} x${i.quantity}`).join(', ');
+          context += `  • ออเดอร์ #${o.order_id} [สถานะ: ${o.status}] ประเภท: ${o.order_type} (${itemsStr})\n`;
+        });
+      } else {
+        context += '- ไม่มีออเดอร์ค้างในครัวขณะนี้ ทุกออเดอร์ปรุงและเสิร์ฟเสร็จสิ้นแล้ว\n';
+      }
+
+      context += '\n[5. ผังโต๊ะอาหาร (Table Status)]\n';
+      context += `- โต๊ะทั้งหมด: ${tables.length} โต๊ะ\n`;
+      context += `- โต๊ะว่าง: ${availableTables.length} โต๊ะ (${availableTables.map((t) => t.table_number).join(', ') || 'ไม่มี'})\n`;
+      context += `- โต๊ะมีลูกค้านั่ง: ${occupiedTables.length} โต๊ะ (${occupiedTables.map((t) => `${t.table_number} [${t.status}]`).join(', ') || 'ไม่มี'})\n`;
+
+      context += '\n[6. รายการเมนูอาหาร]\n';
+      context += `- จำนวนเมนูทั้งหมด: ${menus.length} รายการ (เปิดขาย: ${activeMenus.length}, ปิดขาย: ${inactiveMenus.length})\n`;
+      if (inactiveMenus.length > 0) {
+        context += `- เมนูที่ปิดขายชั่วคราว: ${inactiveMenus.map((m) => m.menu_name).join(', ')}\n`;
+      }
+
+      context += '\n[7. โปรโมชั่นและส่วนลด]\n';
+      context += `- โปรโมชั่นที่เปิดใช้งาน: ${promotions.length} รายการ\n`;
+      promotions.forEach((p) => {
+        context += `  • โค้ด '${p.code}': ลด ${Number(p.discount_value)} ${p.discount_type === 'PERCENT' ? '%' : 'บาท'} (ขั้นต่ำ ${Number(p.min_order_price)} บาท)\n`;
+      });
+
+      return context;
+    } catch (error) {
+      this.logger.error('Failed to get admin live context:', error);
+      return 'เกิดข้อผิดพลาดในการดึงข้อมูลสดของแอดมิน';
+    }
+  }
+
+  private buildAdminSystemInstruction(adminContext: string): string {
+    return `
+คุณคือ "น้องส้มตำ AI" ในบทบาท "ผู้ช่วยผู้จัดการร้านอัจฉริยะ" ประจำร้านอาหาร "ตำครกซิ่ง" (Tum Krok Zing Restaurant)
+คุณกำลังสนทนาและให้คำปรึกษากับ "เจ้าของร้าน / ผู้จัดการร้าน (Admin)" โดยตรง
+
+[หน้าที่และความรับผิดชอบของคุณ]
+1. รายงานและวิเคราะห์ข้อมูลการดำเนินงานของร้านตามข้อมูลจริงแบบเรียลไทม์ (ยอดขาย, คลังวัตถุดิบ, จอห้องครัว KDS, ผังโต๊ะอาหาร, เมนู, โปรโมชั่น, การเงิน)
+2. เมื่อแอดมินถามเรื่องยอดขาย: สรุปยอดขายวันนี้, จำนวนออเดอร์, ยอดสะสมรวม พร้อมให้มุมมองสรุปสั้นกระชับ
+3. เมื่อแอดมินถามเรื่องวัตถุดิบ/สต็อก: ตรวจสอบและระบุรายการวัตถุดิบที่ใกล้หมดหรือต่ำกว่าเกณฑ์ทันที พร้อมเตือนให้สั่งซื้อเพิ่ม
+4. เมื่อแอดมินถามเรื่องห้องครัว/KDS/ออเดอร์: สรุปออเดอร์ที่กำลังปรุง ออเดอร์รอทำในครัว
+5. เมื่อแอดมินถามเรื่องโต๊ะอาหาร: รายงานจำนวนโต๊ะว่าง โต๊ะที่มีลูกค้า
+6. สามารถให้คำแนะนำกลยุทธ์ร้าน เช่น การจัดโปรโมชั่น การบริหารวัตถุดิบ การเพิ่มยอดขาย
+
+[บุคลิกและสไตล์การพูด]
+- สุภาพ มั่นใจ กระตือรือร้น คล่องแคล่ว มีไหวพริบแบบผู้ช่วยผู้จัดการมือโปร
+- แฝงความน่ารัก เป็นกันเองในเอกลักษณ์ของ "น้องส้มตำ AI" (ลงท้ายด้วย "ค่ะ", "นะคะ", "จ้า", "เด้อจ้า")
+- จัดรูปแบบข้อความให้อ่านง่าย สบายตา โดยใช้ Markdown (หัวข้อ, ตัวหนา, bullet point, emoji ที่เหมาะสม)
+- เมื่อมีตัวเลข ให้ระบุหน่วยชัดเจน เช่น บาท, รายการ, กก., ตัว
+
+[ข้อมูลการดำเนินงานจริงของร้านตำครกซิ่งจากระบบล่าสุด]
+${adminContext}
+
+[กฎสำคัญ]
+1. อ้างอิงตัวเลขและข้อมูลจริงจากระบบที่ให้ไว้ด้านบนเท่านั้น ห้ามแต่งตัวเลขขึ้นเอง
+2. สามารถตอบคำถามเชิงวิเคราะห์ หรือให้คำแนะนำการบริหารร้านแก่แอดมินได้เต็มที่
+`.trim();
+  }
+
+  async adminAsk(dto: AskChatbotDto): Promise<ChatbotReplyDto> {
+    const userMessage = dto.message?.trim();
+    if (!userMessage) {
+      return {
+        reply: 'สวัสดีค่ะผู้จัดการ มีเรื่องยอดขาย สต็อก หรือออเดอร์ให้ตรวจสอบไหมคะ? 😊',
+        timestamp: new Date().toISOString(),
+      };
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!this.aiClient || !apiKey || apiKey === 'your_gemini_api_key_here' || apiKey.trim() === '') {
+      return await this.handleAdminFallbackReply(userMessage);
+    }
+
+    try {
+      const adminLiveContext = await this.getAdminLiveContext();
+      const systemInstruction = this.buildAdminSystemInstruction(adminLiveContext);
+
+      const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
+
+      if (dto.history && Array.isArray(dto.history)) {
+        for (const item of dto.history) {
+          if (item.text && item.role) {
+            contents.push({
+              role: item.role === ChatRole.USER ? 'user' : 'model',
+              parts: [{ text: item.text }],
+            });
+          }
+        }
+      }
+
+      contents.push({ role: 'user', parts: [{ text: userMessage }] });
+
+      const TIMEOUT_MS = 25000;
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('GEMINI_TIMEOUT')), TIMEOUT_MS),
+      );
+
+      const response = await Promise.race([
+        this.aiClient.models.generateContent({
+          model: this.modelName,
+          contents: contents,
+          config: { systemInstruction: systemInstruction },
+        }),
+        timeoutPromise,
+      ]);
+
+      const replyText =
+        response.text ||
+        'น้องส้มตำ AI (ผู้ช่วยผู้จัดการ) รับคำถามแล้วค่ะ ต้องการข้อมูลส่วนไหนเพิ่มเติมแจ้งได้เลยนะคะ 🌶️';
+
+      return {
+        reply: replyText,
+        suggestedQuestions: this.generateAdminSuggestions(userMessage),
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error('เกิดข้อผิดพลาดในการเรียก Gemini API (Admin):', error);
+
+      if (
+        error?.message?.includes('API_KEY_INVALID') ||
+        error?.message?.includes('API key not valid') ||
+        error?.status === 400
+      ) {
+        return {
+          reply: 'GEMINI_API_KEY ไม่ถูกต้อง กรุณาตรวจสอบในไฟล์ .env จ้า',
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      this.logger.warn(`Gemini API Admin ขัดข้อง (${error?.message?.slice(0, 50)}) — ใช้ Admin DB Fallback`);
+      return await this.handleAdminFallbackReply(userMessage);
+    }
+  }
+
+  private generateAdminSuggestions(userMessage: string): string[] {
+    const msg = userMessage.toLowerCase();
+    if (msg.includes('ยอดขาย') || msg.includes('เงิน') || msg.includes('รายได้')) {
+      return ['⚠️ เช็กวัตถุดิบที่ใกล้หมดสต็อก', '🍳 ดูออเดอร์ในครัว KDS', '🪑 ตรวจสอบผังโต๊ะอาหาร'];
+    }
+    if (msg.includes('วัตถุดิบ') || msg.includes('สต็อก') || msg.includes('หมด')) {
+      return ['📊 สรุปยอดขายวันนี้', '🍳 ดูออเดอร์ในครัว KDS', '🌶️ เมนูขายดีประจำร้าน'];
+    }
+    if (msg.includes('ครัว') || msg.includes('kds') || msg.includes('ออเดอร์')) {
+      return ['📊 สรุปยอดขายวันนี้', '⚠️ เช็กวัตถุดิบที่ใกล้หมดสต็อก', '🪑 ตรวจสอบผังโต๊ะอาหาร'];
+    }
+    return [
+      '📊 สรุปยอดขายวันนี้',
+      '⚠️ เช็กวัตถุดิบที่ใกล้หมดสต็อก',
+      '🍳 ดูออเดอร์ในครัว KDS',
+      '🪑 ตรวจสอบผังโต๊ะอาหาร',
+    ];
+  }
+
+  private async handleAdminFallbackReply(userMessage: string): Promise<ChatbotReplyDto> {
+    const msg = userMessage.toLowerCase();
+
+    try {
+      // 1. คำถามเรื่องยอดขาย / รายได้ / บิล
+      if (msg.includes('ยอดขาย') || msg.includes('รายได้') || msg.includes('เงิน') || msg.includes('บิล') || msg.includes('ขายได้')) {
+        const now = new Date();
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const [todayOrders, allOrders] = await Promise.all([
+          this.prisma.order.findMany({
+            where: { created_at: { gte: startOfDay }, status: { not: 'CANCELLED' } },
+            select: { total_price: true },
+          }),
+          this.prisma.order.findMany({
+            where: { status: { not: 'CANCELLED' } },
+            select: { total_price: true },
+          }),
+        ]);
+
+        const todaySum = todayOrders.reduce((s, o) => s + Number(o.total_price || 0), 0);
+        const allSum = allOrders.reduce((s, o) => s + Number(o.total_price || 0), 0);
+
+        let reply = `📊 **สรุปรายงานยอดขายร้านตำครกซิ่ง:**\n\n`;
+        reply += `• **ยอดขายวันนี้:** **${todaySum.toLocaleString('th-TH')} บาท** (รวม ${todayOrders.length} ออเดอร์)\n`;
+        reply += `• **ยอดขายสะสมทั้งหมด:** **${allSum.toLocaleString('th-TH')} บาท** (รวม ${allOrders.length} ออเดอร์)\n\n`;
+        reply += `_ต้องการดูรายงานวัตถุดิบ หรือสถานะห้องครัวเพิ่มเติมไหมคะผู้จัดการ?_ 😊`;
+
+        return { reply, suggestedQuestions: ['⚠️ เช็กวัตถุดิบที่ใกล้หมดสต็อก', '🍳 ดูออเดอร์ในครัว KDS'], timestamp: new Date().toISOString() };
+      }
+
+      // 2. คำถามเรื่องวัตถุดิบ / สต็อก / ใกล้หมด
+      if (msg.includes('วัตถุดิบ') || msg.includes('สต็อก') || msg.includes('หมด') || msg.includes('คลัง') || msg.includes('เหลือ')) {
+        const ingredients = await this.prisma.ingredient.findMany({
+          select: { name: true, quantity: true, unit: true, min_quantity: true },
+        });
+
+        const lowStock = ingredients.filter(i => Number(i.quantity) <= Number(i.min_quantity));
+
+        let reply = `📦 **รายงานคลังวัตถุดิบร้านตำครกซิ่ง:**\n\n`;
+        reply += `• รายการวัตถุดิบทั้งหมดในระบบ: **${ingredients.length} รายการ**\n`;
+
+        if (lowStock.length > 0) {
+          reply += `\n⚠️ **พบวัตถุดิบใกล้หมด/ต่ำกว่าเกณฑ์ (${lowStock.length} รายการ) ที่ต้องรีบสั่งเพิ่ม:**\n`;
+          lowStock.forEach(i => {
+            reply += `  • **${i.name}**: คงเหลือ **${Number(i.quantity)} ${i.unit}** (เกณฑ์ขั้นต่ำ ${Number(i.min_quantity)} ${i.unit})\n`;
+          });
+          reply += `\n_แนะนำให้สั่งซื้อวัตถุดิบเหล่านี้เติมด่วนนะคะเพื่อไม่ให้กระทบการทำอาหารค่ะ_ 🌶️`;
+        } else {
+          reply += `\n✅ วัตถุดิบทุกรายการอยู่ในระดับปลอดภัย ยังไม่มีรายการใดต่ำกว่าเกณฑ์ค่ะ`;
+        }
+
+        return { reply, suggestedQuestions: ['📊 สรุปยอดขายวันนี้', '🍳 ดูออเดอร์ในครัว KDS'], timestamp: new Date().toISOString() };
+      }
+
+      // 3. คำถามเรื่องโต๊ะอาหาร / ผังโต๊ะ
+      if (msg.includes('โต๊ะ') || msg.includes('ที่นั่ง') || msg.includes('ผัง')) {
+        const tables = await this.prisma.table.findMany({
+          select: { table_number: true, capacity: true, status: true },
+          orderBy: { table_number: 'asc' },
+        });
+
+        const occupied = tables.filter(t => t.status !== 'AVAILABLE');
+        const available = tables.filter(t => t.status === 'AVAILABLE');
+
+        let reply = `🪑 **รายงานผังโต๊ะอาหารร้านตำครกซิ่ง:**\n\n`;
+        reply += `• จำนวนโต๊ะทั้งหมด: **${tables.length} โต๊ะ**\n`;
+        reply += `• โต๊ะว่างพร้อมบริการ: **${available.length} โต๊ะ** (${available.map(t => t.table_number).join(', ') || 'ไม่มี'})\n`;
+        reply += `• โต๊ะที่มีลูกค้านั่ง: **${occupied.length} โต๊ะ** (${occupied.map(t => `${t.table_number}`).join(', ') || 'ไม่มี'})\n`;
+
+        return { reply, suggestedQuestions: ['📊 สรุปยอดขายวันนี้', '🍳 ดูออเดอร์ในครัว KDS'], timestamp: new Date().toISOString() };
+      }
+
+      // 4. คำถามเรื่องครัว KDS / ออเดอร์
+      if (msg.includes('ครัว') || msg.includes('kds') || msg.includes('ออเดอร์') || msg.includes('ปรุง')) {
+        const activeOrders = await this.prisma.order.findMany({
+          where: { status: { in: ['PENDING', 'COOKING', 'READY'] } },
+          select: {
+            order_id: true,
+            status: true,
+            order_type: true,
+            order_items: { select: { quantity: true, menu: { select: { menu_name: true } } } },
+          },
+        });
+
+        let reply = `🍳 **สถานะออเดอร์ในห้องครัว KDS ตอนนี้:**\n\n`;
+        if (activeOrders.length === 0) {
+          reply += `✅ ขณะนี้ไม่มีออเดอร์ค้างในห้องครัว ทุกออเดอร์ปรุงและเสิร์ฟเรียบร้อยแล้วค่ะ! ✨`;
+        } else {
+          reply += `มีออเดอร์ที่อยู่ในครัวทั้งหมด **${activeOrders.length} ออเดอร์**:\n`;
+          activeOrders.forEach(o => {
+            const items = o.order_items.map(i => `${i.menu?.menu_name} x${i.quantity}`).join(', ');
+            reply += `  • **#ORD-${o.order_id}** [${o.status}] ประเภท: ${o.order_type} (${items})\n`;
+          });
+        }
+
+        return { reply, suggestedQuestions: ['📊 สรุปยอดขายวันนี้', '⚠️ เช็กวัตถุดิบที่ใกล้หมดสต็อก'], timestamp: new Date().toISOString() };
+      }
+    } catch (err) {
+      this.logger.error('Admin fallback error:', err);
+    }
+
+    // Default executive summary
+    return {
+      reply: `สวัสดีค่ะผู้จัดการ! น้องส้มตำ AI พร้อมรายงานข้อมูลร้านตำครกซิ่งค่ะ 🌶️✨\n\nสามารถสอบถามเรื่อง:\n• 📊 **ยอดขาย & รายได้** (ยอดขายวันนี้, สรุปบิล)\n• 📦 **คลังวัตถุดิบ & สต็อก** (เช็กรายการที่ใกล้หมด)\n• 🍳 **จอครัว KDS & ออเดอร์** (เช็กคิวอาหารที่กำลังปรุง)\n• 🪑 **ผังโต๊ะอาหาร** (เช็กโต๊ะว่าง/ไม่ว่าง)\n\nมีข้อมูลส่วนไหนให้ช่วยตรวจสอบไหมคะ? 😊`,
+      suggestedQuestions: [
+        '📊 สรุปยอดขายวันนี้',
+        '⚠️ เช็กวัตถุดิบที่ใกล้หมดสต็อก',
+        '🍳 ดูออเดอร์ในครัว KDS',
+        '🪑 ตรวจสอบผังโต๊ะอาหาร',
+      ],
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   checkHealth() {
     const apiKey = process.env.GEMINI_API_KEY;
     const hasKey = Boolean(apiKey && apiKey !== 'your_gemini_api_key_here' && apiKey.trim() !== '');
@@ -404,4 +800,4 @@ ${liveContext}
         : 'ยังไม่ได้ระบุ GEMINI_API_KEY (Fallback Mode)',
     };
   }
-}
+}

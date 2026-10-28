@@ -24,6 +24,22 @@ export class ChatbotController {
     return this.chatbotService.ask(askDto);
   }
 
+  @Post('admin-ask')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'ส่งข้อความถาม-ตอบสำหรับแอดมิน/ผู้จัดการร้าน (น้องส้มตำ AI ผู้ช่วยผู้จัดการ)',
+    description:
+      'รับคำถามจากแอดมิน รายงานภาพรวมยอดขาย สต็อกวัตถุดิบ จอครัว KDS ผังโต๊ะอาหาร และการบริหารร้าน',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'ประมวลผลคำตอบสำหรับแอดมินสำเร็จ',
+    type: ChatbotReplyDto,
+  })
+  async adminAsk(@Body() askDto: AskChatbotDto): Promise<ChatbotReplyDto> {
+    return this.chatbotService.adminAsk(askDto);
+  }
+
   @Get('suggested-questions')
   @ApiOperation({
     summary: 'ดึงรายการคำถามแนะนำเริ่มต้นสำหรับลูกค้า',
