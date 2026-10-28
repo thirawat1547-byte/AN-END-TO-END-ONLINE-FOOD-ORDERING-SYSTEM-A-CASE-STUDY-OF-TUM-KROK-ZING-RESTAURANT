@@ -42,7 +42,7 @@ services:
       LINE_CALLBACK_URL: "https://tumkrokzing.duckdns.org/api/v1/auth/line/callback"
       # --- Gemini AI Chatbot ---
       GEMINI_API_KEY: "${GEMINI_API_KEY}"
-      GEMINI_MODEL: "${GEMINI_MODEL:-gemini-3.8-flash}"
+      GEMINI_MODEL: "${GEMINI_MODEL:-gemini-3.5-flash-lite}"
     depends_on:
       - mysql-db
     volumes:
