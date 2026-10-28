@@ -118,20 +118,6 @@
               <span>🤖 น้องส้มตำ AI</span>
             </div>
 
-            <!-- Microphone Button -->
-            <button 
-              type="button"
-              @click="toggleMic"
-              :class="isListening ? 'bg-red-50 text-red-500 animate-pulse' : 'hover:bg-slate-100 text-slate-500'"
-              class="w-9 h-9 rounded-full flex items-center justify-center transition"
-              title="พิมพ์ด้วยเสียง"
-            >
-              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-              </svg>
-            </button>
-
             <!-- Send Button -->
             <button 
               type="button"
@@ -277,20 +263,6 @@
                 <div class="flex items-center gap-1 text-[11px] sm:text-xs text-[#2d5a43] bg-emerald-50 border border-emerald-200/80 px-3 py-1.5 rounded-full font-medium">
                   <span>🤖 น้องส้มตำ AI</span>
                 </div>
-
-                <!-- Microphone Button -->
-                <button 
-                  type="button"
-                  @click="toggleMic"
-                  :class="isListening ? 'bg-red-50 text-red-500 animate-pulse' : 'hover:bg-slate-100 text-slate-500'"
-                  class="w-9 h-9 rounded-full flex items-center justify-center transition"
-                  title="พิมพ์ด้วยเสียง"
-                >
-                  <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-                  </svg>
-                </button>
 
                 <!-- Send Button -->
                 <button 
@@ -485,7 +457,6 @@ import { API_BASE } from '../../config/api.js'
 
 const showKnowledgeModal = ref(false)
 const showModal = ref(false)
-const isListening = ref(false)
 const simInput = ref('')
 const simIsTyping = ref(false)
 const simContainer = ref(null)
@@ -539,10 +510,10 @@ const faqList = ref([
 ])
 
 const quickChips = [
-  { icon: '🌶️', text: 'เมนูขายดี & เมนูส้มตำยอดฮิต' },
-  { icon: '📊', text: 'รายงานยอดขายและคำสั่งซื้อวันนี้' },
-  { icon: '🛵', text: 'ข้อมูลค่าจัดส่งเดลิเวอรี่' },
-  { icon: '🕒', text: 'เวลาทำการ & เบอร์ติดต่อร้าน' }
+  { icon: '📊', text: 'สรุปยอดขายและคำสั่งซื้อวันนี้' },
+  { icon: '⚠️', text: 'ตรวจสอบวัตถุดิบที่ใกล้หมดสต็อก' },
+  { icon: '🍳', text: 'ดูสถานะออเดอร์ในครัว KDS ตอนนี้' },
+  { icon: '🪑', text: 'ตรวจสอบผังโต๊ะอาหารว่ามีโต๊ะว่างกี่โต๊ะ' }
 ]
 
 const newFaq = ref({
@@ -682,56 +653,14 @@ const simSendPrompt = (prompt) => {
 
 const triggerSuggestionDropdown = () => {
   const suggestions = [
-    'เมนูขายดี & เมนูส้มตำยอดฮิตประจำร้าน',
-    'ตรวจสอบโปรโมชั่นเดลิเวอรี่วันนี้',
-    'ข้อมูลอัตราค่าจัดส่งเดลิเวอรี่',
-    'ร้านเปิดกี่โมงและปิดกี่โมง'
+    'สรุปยอดขายและคำสั่งซื้อวันนี้ให้หน่อย',
+    'มีวัตถุดิบตัวไหนใกล้หมดสต็อกบ้าง ต้องสั่งซื้อเพิ่มไหม',
+    'สถานะออเดอร์ในครัว KDS ตอนนี้มีค้างอยู่กี่ออเดอร์',
+    'ผังโต๊ะอาหารตอนนี้มีโต๊ะว่างกี่โต๊ะ',
+    'สรุปภาพรวมการดำเนินงานของร้านตอนนี้ให้หน่อย'
   ]
   const random = suggestions[Math.floor(Math.random() * suggestions.length)]
   simInput.value = random
-}
-
-// ไมโครโฟน
-const toggleMic = () => {
-  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition
-  if (!SpeechRec) {
-    showToast('เบราว์เซอร์ไม่รองรับ', 'เบราว์เซอร์นี้ไม่รองรับการพิมพ์ด้วยเสียง', 'warning')
-    return
-  }
-
-  if (isListening.value) {
-    isListening.value = false
-    return
-  }
-
-  try {
-    const recognition = new SpeechRec()
-    recognition.lang = 'th-TH'
-    recognition.interimResults = false
-
-    recognition.onstart = () => {
-      isListening.value = true
-      showToast('กำลังฟัง...', 'กรุณาพูดข้อความที่ต้องการถามน้องส้มตำ AI ได้เลยค่ะ', 'success')
-    }
-
-    recognition.onresult = (e) => {
-      const text = e.results[0][0].transcript
-      simInput.value = (simInput.value ? simInput.value + ' ' : '') + text
-      isListening.value = false
-    }
-
-    recognition.onerror = () => {
-      isListening.value = false
-    }
-
-    recognition.onend = () => {
-      isListening.value = false
-    }
-
-    recognition.start()
-  } catch {
-    isListening.value = false
-  }
 }
 
 const copyMessage = (text) => {
@@ -781,7 +710,7 @@ const simSubmit = async () => {
       text: m.text.replace(/<[^>]*>?/gm, '')
     }))
 
-    const res = await fetch(`${API_BASE}/chatbot/ask`, {
+    const res = await fetch(`${API_BASE}/chatbot/admin-ask`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: q, history: historyPayload })
@@ -805,14 +734,18 @@ const simSubmit = async () => {
 
     if (matchedFaq) {
       botReply = matchedFaq.answer
+    } else if (lower.includes('ยอดขาย') || lower.includes('ขายได้') || lower.includes('รายได้') || lower.includes('เงิน')) {
+      botReply = '📊 <b>สรุปยอดขายร้านตำครกซิ่ง:</b> ยอดขายสะสมทั้งหมด <b>฿2,510</b> (รวม 33 ออเดอร์) ระบบพร้อมเปิดรับออเดอร์ตลอดวันค่ะ 📈'
+    } else if (lower.includes('วัตถุดิบ') || lower.includes('สต็อก') || lower.includes('หมด')) {
+      botReply = '⚠️ <b>แจ้งเตือนสต็อกวัตถุดิบ:</b> ตรวจพบ <b>พริกป่น</b> คงเหลือ 1 กก. (ต่ำกว่าเกณฑ์ 1.5 กก.) แนะนำให้สั่งซื้อเพิ่มทันทีค่ะ 🌶️'
+    } else if (lower.includes('โต๊ะ') || lower.includes('ที่นั่ง') || lower.includes('ผัง')) {
+      botReply = '🪑 <b>ผังโต๊ะอาหาร:</b> ปัจจุบันมีโต๊ะว่างพร้อมให้บริการทั้งหมด 5 โต๊ะ (T-01 ถึง T-05) ค่ะ'
+    } else if (lower.includes('ครัว') || lower.includes('kds') || lower.includes('ออเดอร์') || lower.includes('ปรุง')) {
+      botReply = '🍳 <b>จอครัว KDS:</b> ขณะนี้ไม่มีออเดอร์ค้างในห้องครัว ทุกออเดอร์ปรุงและเสิร์ฟเรียบร้อยค่ะ ✨'
     } else if (lower.includes('สวัสดี') || lower.includes('หวัดดี') || lower.includes('hello')) {
-      botReply = 'สวัสดีค่ะ! หนูคือน้องส้มตำ AI มีอะไรให้ช่วยแนะนำเมนูหรือสอบถามข้อมูลร้านตำครกซิ่งได้เลยนะคะ 😊🌶️'
-    } else if (lower.includes('เมนู') || lower.includes('แนะนำ')) {
-      botReply = 'เมนูแนะนำยอดฮิตของร้านตำครกซิ่ง ได้แก่: <br>1. <b>ส้มตำปูปลาร้าพริกแห้ง</b> (แซ่บนัวถึงใจ)<br>2. <b>ข้าวกะเพราหมูสับกระทะร้อน</b><br>3. <b>ปีกไก่ทอดสมุนไพรกรอบ</b><br>4. <b>ยำวุ้นเส้นรวมมิตรทะเล</b> ค่ะ 🌶️'
-    } else if (lower.includes('ยอดขาย') || lower.includes('ขายดี')) {
-      botReply = 'สรุปยอดขายวันนี้เบื้องต้น: ยอดขายรวมประมาณ <b>฿14,250</b> (32 ออเดอร์) เมนูขายดีอันดับ 1 คือ <b>ส้มตำปูปลาร้า</b> ค่ะ 📈'
+      botReply = 'สวัสดีค่ะผู้จัดการ! หนูน้องส้มตำ AI พร้อมช่วยรายงานยอดขาย เช็กสต็อกวัตถุดิบ และดูสถานะร้านให้ค่ะ 😊🌶️'
     } else {
-      botReply = `น้องส้มตำเข้าใจว่าคุณถามเกี่ยวกับ "<b>${q}</b>" ตอนนี้ข้อมูลระบบพร้อมให้บริการ หรือสามารถสอบถามรายละเอียดโปรโมชั่นและเมนูเด็ดได้ตลอดเลยค่ะ 🌶️✨`
+      botReply = `น้องส้มตำ AI กำลังประมวลผลข้อมูลเกี่ยวกับ "<b>${q}</b>" ให้ผู้จัดการค่ะ สามารถสอบถามเรื่องยอดขาย สต็อก หรือออเดอร์ในครัวได้ตลอดเลยนะคะ 🌶️✨`
     }
   }
 

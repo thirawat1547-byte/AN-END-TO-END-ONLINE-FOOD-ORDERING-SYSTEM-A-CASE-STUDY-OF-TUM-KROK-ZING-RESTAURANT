@@ -23,7 +23,7 @@
           <div class="hero-text-box">
             <h1 class="hero-title">ส่งฟรีเมื่อสั่งเกิน<br>B300!</h1>
             <p class="hero-desc">เติมพลังให้วันของคุณด้วยอาหารออร์แกนิกสดใหม่จากฟาร์ม ส่ง<br>ตรงถึงหน้าประตูคุณ</p>
-            <button class="hero-btn">รับสิทธิ์</button>
+            <button class="hero-btn" @click="$router.push('/promotions')">รับสิทธิ์</button>
           </div>
         </div>
 

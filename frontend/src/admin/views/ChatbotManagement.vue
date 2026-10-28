@@ -118,20 +118,6 @@
               <span>🤖 น้องส้มตำ AI</span>
             </div>
 
-            <!-- Microphone Button -->
-            <button 
-              type="button"
-              @click="toggleMic"
-              :class="isListening ? 'bg-red-50 text-red-500 animate-pulse' : 'hover:bg-slate-100 text-slate-500'"
-              class="w-9 h-9 rounded-full flex items-center justify-center transition"
-              title="พิมพ์ด้วยเสียง"
-            >
-              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-              </svg>
-            </button>
-
             <!-- Send Button -->
             <button 
               type="button"
@@ -277,20 +263,6 @@
                 <div class="flex items-center gap-1 text-[11px] sm:text-xs text-[#2d5a43] bg-emerald-50 border border-emerald-200/80 px-3 py-1.5 rounded-full font-medium">
                   <span>🤖 น้องส้มตำ AI</span>
                 </div>
-
-                <!-- Microphone Button -->
-                <button 
-                  type="button"
-                  @click="toggleMic"
-                  :class="isListening ? 'bg-red-50 text-red-500 animate-pulse' : 'hover:bg-slate-100 text-slate-500'"
-                  class="w-9 h-9 rounded-full flex items-center justify-center transition"
-                  title="พิมพ์ด้วยเสียง"
-                >
-                  <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-                  </svg>
-                </button>
 
                 <!-- Send Button -->
                 <button 
@@ -485,7 +457,6 @@ import { API_BASE } from '../../config/api.js'
 
 const showKnowledgeModal = ref(false)
 const showModal = ref(false)
-const isListening = ref(false)
 const simInput = ref('')
 const simIsTyping = ref(false)
 const simContainer = ref(null)
@@ -690,49 +661,6 @@ const triggerSuggestionDropdown = () => {
   ]
   const random = suggestions[Math.floor(Math.random() * suggestions.length)]
   simInput.value = random
-}
-
-// ไมโครโฟน
-const toggleMic = () => {
-  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition
-  if (!SpeechRec) {
-    showToast('เบราว์เซอร์ไม่รองรับ', 'เบราว์เซอร์นี้ไม่รองรับการพิมพ์ด้วยเสียง', 'warning')
-    return
-  }
-
-  if (isListening.value) {
-    isListening.value = false
-    return
-  }
-
-  try {
-    const recognition = new SpeechRec()
-    recognition.lang = 'th-TH'
-    recognition.interimResults = false
-
-    recognition.onstart = () => {
-      isListening.value = true
-      showToast('กำลังฟัง...', 'กรุณาพูดข้อความที่ต้องการถามน้องส้มตำ AI ได้เลยค่ะ', 'success')
-    }
-
-    recognition.onresult = (e) => {
-      const text = e.results[0][0].transcript
-      simInput.value = (simInput.value ? simInput.value + ' ' : '') + text
-      isListening.value = false
-    }
-
-    recognition.onerror = () => {
-      isListening.value = false
-    }
-
-    recognition.onend = () => {
-      isListening.value = false
-    }
-
-    recognition.start()
-  } catch {
-    isListening.value = false
-  }
 }
 
 const copyMessage = (text) => {

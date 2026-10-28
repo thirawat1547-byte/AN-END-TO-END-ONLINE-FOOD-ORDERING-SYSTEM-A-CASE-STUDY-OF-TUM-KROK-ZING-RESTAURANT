@@ -1177,7 +1177,7 @@ const avgPrepTimeMinutes = computed(() => {
           <span class="text-xl">🤖</span>
           <div>
             <h2 class="text-base font-bold text-slate-800">สถิติ & สรุปผลการตอบกลับของแชทบอท AI (น้องส้มตำ)</h2>
-            <p class="text-xs text-slate-500">ข้อมูลการตอบคำถามลูกค้า ความพึงพอใจ และการเปิด-ปิดระบบอัตโนมัติประจำวัน</p>
+            <p class="text-xs text-slate-500">ข้อมูลการตอบคำถามลูกค้า และการเปิด-ปิดระบบอัตโนมัติประจำวัน</p>
           </div>
         </div>
         <router-link 
@@ -1189,8 +1189,8 @@ const avgPrepTimeMinutes = computed(() => {
         </router-link>
       </div>
 
-      <!-- 4 Stats Cards (เหมือนในภาพ) -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Stats Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <!-- Card 1: ข้อความตอบกลับวันนี้ -->
         <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
           <div>
@@ -1216,34 +1216,6 @@ const avgPrepTimeMinutes = computed(() => {
           </div>
           <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl">
             ⏱️
-          </div>
-        </div>
-
-        <!-- Card 3: ความพึงพอใจลูกค้า -->
-        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <p class="text-xs font-medium text-slate-500">ความพึงพอใจลูกค้า</p>
-            <h3 class="text-2xl font-bold text-slate-800 mt-1">98.5%</h3>
-            <span class="inline-flex items-center text-[11px] text-amber-500 font-medium mt-1">
-              ⭐ เรตติ้ง 4.9/5
-            </span>
-          </div>
-          <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center text-xl">
-            ⭐
-          </div>
-        </div>
-
-        <!-- Card 4: คำถามที่ตอบแทนแอดมิน -->
-        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <p class="text-xs font-medium text-slate-500">คำถามที่ตอบแทนแอดมิน</p>
-            <h3 class="text-2xl font-bold text-slate-800 mt-1">91.2%</h3>
-            <span class="inline-flex items-center text-[11px] text-red-500 font-medium mt-1">
-              🎯 ลดภาระแอดมิน
-            </span>
-          </div>
-          <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
-            🛡️
           </div>
         </div>
       </div>
