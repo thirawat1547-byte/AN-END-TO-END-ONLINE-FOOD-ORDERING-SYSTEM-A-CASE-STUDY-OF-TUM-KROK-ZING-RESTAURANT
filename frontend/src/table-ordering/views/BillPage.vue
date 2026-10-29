@@ -61,7 +61,7 @@
         </div>
         <img v-if="paymentQrUrl" :src="paymentQrUrl" alt="Payment QR" style="width: 170px; height: 170px; margin: 0 auto; display: block; border: 2px solid #003B70; border-radius: 12px; background: white; padding: 6px;" />
         <div style="font-size: 11px; color: #6B7280; margin-top: 8px; line-height: 1.4;">
-          ร้านตำครกซิ่ง | พร้อมเพย์: 081-234-5678<br/>
+          {{ promptpayName || 'ร้านตำครกซิ่ง' }} | พร้อมเพย์: {{ promptpayNumber || '-' }}<br/>
           (สามารถสแกนจ่ายผ่านแอปธนาคาร หรือแจ้งชำระที่เคาน์เตอร์ได้ครับ)
         </div>
       </div>
@@ -73,6 +73,8 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import QRCode from 'qrcode'
+import axios from 'axios'
+import { API_BASE } from '../../config/api'
 import OrderHeader from '../components/OrderHeader.vue'
 import { useCart } from '../composables/useCart'
 
@@ -82,6 +84,19 @@ const tableId = route.params.tableId || '1'
 
 const { placedOrders, billTotal, billTotalCalories, getItemCalories } = useCart()
 const paymentQrUrl = ref('')
+// ข้อมูลพร้อมเพย์ ดึงจากหน้าตั้งค่าร้าน (Admin Settings) ผ่าน GET /settings
+const promptpayNumber = ref('')
+const promptpayName = ref('')
+
+const loadPromptPaySettings = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/settings`)
+    promptpayNumber.value = res.data?.promptpay_number || ''
+    promptpayName.value = res.data?.promptpay_name || ''
+  } catch (e) {
+    console.error('โหลดข้อมูลพร้อมเพย์จากตั้งค่าร้านไม่สำเร็จ:', e)
+  }
+}
 
 function crc16(data) {
   let crc = 0xFFFF;
@@ -116,9 +131,12 @@ function generatePromptPayPayload(target, amount) {
 }
 
 const generatePaymentQr = async () => {
-  if (billTotal.value <= 0) return
+  if (billTotal.value <= 0 || !promptpayNumber.value) {
+    paymentQrUrl.value = ''
+    return
+  }
   try {
-    const payload = generatePromptPayPayload('081-234-5678', billTotal.value)
+    const payload = generatePromptPayPayload(promptpayNumber.value, billTotal.value)
     paymentQrUrl.value = await QRCode.toDataURL(payload, {
       width: 240,
       margin: 2,
@@ -129,7 +147,8 @@ const generatePaymentQr = async () => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await loadPromptPaySettings()
   generatePaymentQr()
 })
 

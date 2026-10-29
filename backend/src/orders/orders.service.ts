@@ -224,7 +224,8 @@ export class OrdersService implements OnModuleInit {
           discountAmount = Number(promo.discount_value);
         }
 
-        discountAmount = Math.min(discountAmount, totalAmount);
+        // ปัดเศษส่วนลดเป็นจำนวนเต็มบาท ให้ตรงกับหน้าชำระเงิน (Checkout.vue)
+        discountAmount = Math.min(Math.round(discountAmount), totalAmount);
         appliedPromoId = promo.promo_id;
 
         // บันทึกสถานะว่าผู้ใช้ใช้คูปองนี้แล้วในตาราง USER_CLAIMED_PROMOTIONS
@@ -255,8 +256,22 @@ export class OrdersService implements OnModuleInit {
           : Number(storeSetting?.base_delivery_fee || 20.00);
       }
 
-      // คำนวณยอดสุทธิ: total_price = subtotal - discount_amount + delivery_fee
-      const finalTotalPrice = Math.max(0, foodSubtotal - discountAmount + deliveryFee);
+      // ภาษีมูลค่าเพิ่ม (VAT) สำหรับออเดอร์เดลิเวอรี่ คิดจากยอดอาหารหลังหักส่วนลด (ไม่รวมค่าส่ง)
+      // ใช้สูตรเดียวกับหน้าชำระเงิน เพื่อให้ยอดใน QR พร้อมเพย์ตรงกับยอดออเดอร์ในระบบ
+      let vatAmount = 0;
+      if (createOrderDto.order_type === 'DELIVERY') {
+        const vatRate = Number(storeSetting?.vat_rate ?? 7);
+        const netFoodAmount = Math.max(0, foodSubtotal - discountAmount);
+        if (netFoodAmount > 0 && vatRate > 0) {
+          vatAmount = Math.round(netFoodAmount * (vatRate / 100) * 100) / 100;
+        }
+      }
+
+      // คำนวณยอดสุทธิ: total_price = subtotal - discount_amount + delivery_fee + VAT
+      const finalTotalPrice = Math.max(
+        0,
+        Math.round((foodSubtotal - discountAmount + deliveryFee + vatAmount) * 100) / 100,
+      );
 
       const order = await tx.order.create({
         data: {

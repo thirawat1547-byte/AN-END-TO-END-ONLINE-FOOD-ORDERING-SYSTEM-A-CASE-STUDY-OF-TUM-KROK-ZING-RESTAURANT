@@ -4,6 +4,7 @@ import axios from 'axios'
 import { API_BASE } from '../../config/api'
 import { socket } from '../../config/socket'
 import { useSocketStore } from '../../store/socketStore'
+import { showWarning } from '../../utils/swal'
 
 const socketStore = useSocketStore()
 const activeTab = ref('incoming')
@@ -80,6 +81,16 @@ const onNewOrderReceived = (order) => {
 
 const onOrderStatusChanged = (order) => {
   console.log('⚡ [KDS Real-time] สถานะออเดอร์เปลี่ยนแปลง:', order)
+  // ออเดอร์ที่ครัวกำลังรอทำ/กำลังทำ ถูกยกเลิก (เช่น แอดมินตรวจแล้วไม่พบยอดโอน) -> แจ้งให้หยุดทำทันที
+  const isCancelled = String(order?.status || '').toUpperCase() === 'CANCELLED'
+  const wasInKitchen = incomingOrders.value.some(o => String(o.order_id ?? o.id) === String(order?.order_id))
+  if (isCancelled && wasInKitchen) {
+    showWarning(
+      `ออเดอร์ #${order.order_id} ถูกยกเลิก`,
+      'ไม่ต้องทำอาหารออเดอร์นี้ต่อ (เช่น ร้านตรวจแล้วไม่พบยอดโอนเงิน)',
+      { confirmButtonText: 'รับทราบ' }
+    )
+  }
   fetchOrders()
 }
 

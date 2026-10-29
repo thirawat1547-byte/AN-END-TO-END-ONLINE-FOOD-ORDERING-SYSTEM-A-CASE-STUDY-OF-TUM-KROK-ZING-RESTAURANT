@@ -1,7 +1,75 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import axios from 'axios'
 import { adminStore } from '../store/adminData'
 import { API_BASE } from '../../config/api'
+import { showSuccess, showError, showConfirm } from '../../utils/swal'
+
+// ================= ตรวจสอบยอดโอนพร้อมเพย์ (แอดมินยืนยันเอง) =================
+const pendingPromptPay = ref([])
+const isLoadingPending = ref(false)
+const verifyingId = ref(null)
+let pendingTimer = null
+
+const authHeaders = () => {
+  const token = localStorage.getItem('access_token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+const fetchPendingPromptPay = async () => {
+  isLoadingPending.value = true
+  try {
+    const res = await axios.get(`${API_BASE}/transactions/promptpay/pending`, { headers: authHeaders() })
+    pendingPromptPay.value = Array.isArray(res.data) ? res.data : []
+  } catch (e) {
+    console.warn('โหลดรายการรอตรวจสอบยอดโอนไม่สำเร็จ:', e)
+  } finally {
+    isLoadingPending.value = false
+  }
+}
+
+const formatBaht = (v) => Number(v || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+const verifyTransfer = async (txn, approve) => {
+  const amount = formatBaht(txn.amount)
+  const title = approve ? 'ยืนยันว่าเงินเข้าแล้ว?' : 'ปฏิเสธรายการนี้?'
+  const text = approve
+    ? `ตรวจสอบในแอปธนาคารแล้วว่ามียอดโอน ฿${amount} ของออเดอร์ #${txn.order_id} เข้าบัญชีร้านจริง`
+    : `ไม่พบยอดโอน ฿${amount} ของออเดอร์ #${txn.order_id} ในบัญชีร้าน — ระบบจะยกเลิกออเดอร์นี้และแจ้งครัวให้หยุดทำอาหาร`
+  const result = await showConfirm(title, text)
+  if (!result?.isConfirmed) return
+
+  verifyingId.value = txn.transaction_id
+  try {
+    const res = await axios.patch(
+      `${API_BASE}/transactions/${txn.transaction_id}/verify`,
+      { approve },
+      { headers: authHeaders() }
+    )
+    const detail = approve
+      ? `ออเดอร์ #${txn.order_id}`
+      : (res.data?.order_cancelled
+          ? `ยกเลิกออเดอร์ #${txn.order_id} และแจ้งครัวแล้ว`
+          : `ออเดอร์ #${txn.order_id} (ออเดอร์นี้จบไปแล้ว จึงไม่ได้ยกเลิก)`)
+    await showSuccess(approve ? 'ยืนยันการชำระเงินแล้ว' : 'ปฏิเสธรายการแล้ว', detail)
+    await fetchPendingPromptPay()
+    if (typeof adminStore.fetchOrdersFromAPI === 'function') await adminStore.fetchOrdersFromAPI()
+    if (typeof adminStore.fetchReceiptsFromView === 'function') await adminStore.fetchReceiptsFromView()
+  } catch (e) {
+    const msg = e.response?.data?.message || 'ไม่สามารถบันทึกผลการตรวจสอบได้'
+    await showError('เกิดข้อผิดพลาด', Array.isArray(msg) ? msg.join(', ') : msg)
+  } finally {
+    verifyingId.value = null
+  }
+}
+
+onMounted(() => {
+  fetchPendingPromptPay()
+  pendingTimer = setInterval(fetchPendingPromptPay, 15000) // รีเฟรชทุก 15 วินาที
+})
+onUnmounted(() => {
+  if (pendingTimer) clearInterval(pendingTimer)
+})
 
 // ดึงข้อมูลออเดอร์และใบเสร็จจาก Database View ล่าสุดทันทีที่เปิดหน้าเว็บ
 onMounted(async () => {
@@ -25,9 +93,18 @@ const isCompletedOrder = (o) => {
   return pStatus === 'COMPLETED' || pStatus === 'PAID' || status === 'COMPLETED' || status === 'PAID' || rawStatus === 'PAID' || rawStatus === 'COMPLETED'
 }
 
-const isPendingOrder = (o) => {
-  return !isCompletedOrder(o)
+// แอดมินกด "ไม่พบยอด" (รายการโอนถูกปฏิเสธ) และยังไม่มีการชำระสำเร็จ
+const isRejectedOrder = (o) => {
+  return !isCompletedOrder(o) && (o.payment_status || '').toUpperCase() === 'REJECTED'
 }
+
+const isPendingOrder = (o) => {
+  return !isCompletedOrder(o) && !isRejectedOrder(o)
+}
+
+const rejectedCount = computed(() => {
+  return adminStore.orders.filter(o => isRejectedOrder(o)).length
+})
 
 const completedCount = computed(() => {
   return adminStore.orders.filter(o => isCompletedOrder(o)).length
@@ -45,6 +122,8 @@ const filteredOrders = computed(() => {
       matchStatus = isCompletedOrder(o)
     } else if (selectedStatus.value === 'Pending') {
       matchStatus = isPendingOrder(o)
+    } else if (selectedStatus.value === 'Rejected') {
+      matchStatus = isRejectedOrder(o)
     }
 
     // 2. ค้นหาเฉพาะเลขที่ Order หรือช่องทางชำระ
@@ -123,6 +202,60 @@ function viewOrderDetails(order) {
       </div>
     </div>
 
+    <!-- รายการโอนพร้อมเพย์รอตรวจสอบ (ซ่อนเวลาพิมพ์) -->
+    <div class="no-print bg-white p-4 rounded-2xl border-2 shadow-sm"
+         :class="pendingPromptPay.length > 0 ? 'border-amber-300' : 'border-slate-200/80'">
+      <div class="flex items-center justify-between gap-3 mb-3">
+        <div>
+          <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <span>📱</span> รอตรวจสอบยอดโอนพร้อมเพย์
+            <span v-if="pendingPromptPay.length > 0" class="px-2 py-0.5 rounded-full bg-amber-500 text-white text-[11px]">
+              {{ pendingPromptPay.length }}
+            </span>
+          </h2>
+          <p class="text-xs text-slate-500">เปิดแอปธนาคารของร้าน เช็กว่ายอดเงินเข้าจริงก่อนกดยืนยัน</p>
+        </div>
+        <button @click="fetchPendingPromptPay" :disabled="isLoadingPending"
+                class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
+          {{ isLoadingPending ? 'กำลังโหลด...' : '🔄 รีเฟรช' }}
+        </button>
+      </div>
+
+      <div v-if="pendingPromptPay.length === 0" class="text-xs text-slate-400 py-2">
+        ไม่มีรายการรอตรวจสอบ
+      </div>
+
+      <div v-else class="space-y-2">
+        <div v-for="txn in pendingPromptPay" :key="txn.transaction_id"
+             class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-amber-50 border border-amber-200">
+          <div class="text-xs text-slate-700 space-y-0.5">
+            <div class="font-bold text-slate-900 text-sm">
+              ออเดอร์ #{{ txn.order_id }}
+              <span class="ml-1 text-[#2d5a43]">฿{{ formatBaht(txn.amount) }}</span>
+            </div>
+            <div>
+              {{ txn.order?.table ? `โต๊ะ ${txn.order.table.table_number}` : 'เดลิเวอรี่/สั่งออนไลน์' }}
+              <span v-if="txn.order?.delivery_phone"> · โทร {{ txn.order.delivery_phone }}</span>
+              <span v-if="txn.order?.created_at"> · {{ new Date(txn.order.created_at).toLocaleString('th-TH') }}</span>
+            </div>
+            <div v-if="txn.order?.order_items?.length" class="text-slate-500">
+              {{ txn.order.order_items.map(i => `${i.menu?.name || i.menu?.menu_name || 'เมนู'} x${i.quantity}`).join(', ') }}
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button @click="verifyTransfer(txn, true)" :disabled="verifyingId === txn.transaction_id"
+                    class="px-3 py-2 rounded-xl bg-[#2d5a43] hover:bg-[#183324] text-white text-xs font-bold transition disabled:opacity-50">
+              ✓ เงินเข้าแล้ว
+            </button>
+            <button @click="verifyTransfer(txn, false)" :disabled="verifyingId === txn.transaction_id"
+                    class="px-3 py-2 rounded-xl bg-white border border-red-300 text-red-600 hover:bg-red-50 text-xs font-bold transition disabled:opacity-50">
+              ✕ ไม่พบยอด
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Filter Bar (ซ่อนเวลาพิมพ์) -->
     <div class="no-print bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
       <div class="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
@@ -152,6 +285,15 @@ function viewOrderDetails(order) {
           ]"
         >
           รอชำระ (Pending) ({{ pendingCount }})
+        </button>
+        <button 
+          @click="selectedStatus = 'Rejected'"
+          :class="[
+            'px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap',
+            selectedStatus === 'Rejected' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          ]"
+        >
+          ไม่พบยอดโอน ({{ rejectedCount }})
         </button>
       </div>
 
@@ -209,10 +351,10 @@ function viewOrderDetails(order) {
                 <span 
                   :class="[
                     'px-2.5 py-1 rounded-md text-[10px] font-bold',
-                    isCompletedOrder(order) ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                    isCompletedOrder(order) ? 'bg-emerald-100 text-emerald-800' : (isRejectedOrder(order) ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800')
                   ]"
                 >
-                  {{ isCompletedOrder(order) ? '✅ ชำระแล้ว' : '⏳ รอชำระ' }}
+                  {{ isCompletedOrder(order) ? '✅ ชำระแล้ว' : (isRejectedOrder(order) ? '❌ ไม่พบยอดโอน' : '⏳ รอชำระ') }}
                 </span>
               </td>
               <td class="p-4 text-center no-print">

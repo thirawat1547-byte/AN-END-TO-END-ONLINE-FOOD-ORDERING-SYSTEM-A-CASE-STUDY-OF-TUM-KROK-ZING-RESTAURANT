@@ -1,8 +1,19 @@
 // src/transactions/transactions.controller.ts
-import { Controller, Post, Get, Body, Param, ParseIntPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { Controller, Post, Get, Patch, Body, Param, ParseIntPipe, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { TransactionsService } from './transactions.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { VerifyTransactionDto } from './dto/verify-transaction.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+
+// อนุญาตเฉพาะพนักงานร้าน (ADMIN / KITCHEN)
+function assertStaff(req: any) {
+  const role = String(req?.user?.role || '').toUpperCase();
+  if (role !== 'ADMIN' && role !== 'KITCHEN') {
+    throw new ForbiddenException('เฉพาะผู้ดูแลร้านหรือพนักงานเท่านั้นที่ยืนยันการชำระเงินได้');
+  }
+}
 
 @ApiTags('Transactions')
 @Controller('transactions')
@@ -19,6 +30,39 @@ export class TransactionsController {
   @ApiOperation({ summary: 'ดูประวัติรายการชำระเงินทั้งหมด' })
   findAll() {
     return this.transactionsService.findAll();
+  }
+
+  // ---------- PromptPay: ลูกค้าแจ้งโอน -> แอดมินตรวจยอดแล้วยืนยัน ----------
+
+  @Post('promptpay/notify/:orderId')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'ลูกค้าแจ้งว่าโอนเงินผ่านพร้อมเพย์แล้ว (สร้างรายการรอตรวจสอบ)' })
+  @ApiParam({ name: 'orderId', type: Number })
+  notifyPromptPay(@Param('orderId', ParseIntPipe) orderId: number, @Req() req: any) {
+    return this.transactionsService.notifyPromptPayTransfer(orderId, req.user);
+  }
+
+  @Get('promptpay/pending')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'รายการโอนพร้อมเพย์ที่รอแอดมินตรวจสอบ (ADMIN/KITCHEN)' })
+  findPendingPromptPay(@Req() req: any) {
+    assertStaff(req);
+    return this.transactionsService.findPendingPromptPay();
+  }
+
+  @Patch(':id/verify')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'แอดมินยืนยัน/ปฏิเสธยอดโอนพร้อมเพย์ หลังตรวจสอบบัญชีธนาคาร (ADMIN/KITCHEN)' })
+  @ApiParam({ name: 'id', type: Number, description: 'รหัสรายการชำระเงิน (transaction_id)' })
+  verifyPromptPay(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: VerifyTransactionDto,
+    @Req() req: any,
+  ) {
+    assertStaff(req);
+    return this.transactionsService.verifyPromptPay(id, dto.approve);
   }
 
   @Post('stripe/create-intent/:orderId')

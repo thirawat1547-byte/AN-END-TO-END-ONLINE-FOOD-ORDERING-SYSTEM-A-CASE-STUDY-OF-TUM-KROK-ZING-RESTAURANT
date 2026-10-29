@@ -677,12 +677,15 @@
 
         <div class="qr-modal-actions">
           <button class="confirm-qr-btn" @click="confirmQrPayment" :disabled="isSubmitting">
-            <span>✓</span> ยืนยันการชำระเงิน
+            <span>✓</span> ฉันโอนเงินแล้ว
           </button>
           <button class="cancel-qr-btn" @click="closeQrModal">
             ยกเลิก
           </button>
         </div>
+        <p class="qr-scan-hint" style="margin-top: 10px;">
+          หลังโอนแล้วกด "ฉันโอนเงินแล้ว" ทางร้านจะตรวจสอบยอดเงินเข้าบัญชีและยืนยันออเดอร์ให้ครับ
+        </p>
       </div>
     </div>
 
@@ -931,6 +934,9 @@ export default {
       promotionStore: usePromotionStore(),
       isLoggedIn: false,
       selectedPayment: 'card',
+      serverPromptpayNumber: '',
+      serverPromptpayName: '',
+      serverVatRate: null,
       selectedCardBrand: 'visa',
       cardForm: {
         number: '',
@@ -1013,6 +1019,7 @@ export default {
       return Math.min(100, Math.round((this.totalCalories / 2000) * 100));
     },
     vatRate() {
+      if (this.serverVatRate !== null && !Number.isNaN(this.serverVatRate)) return this.serverVatRate;
       return Number(adminStore?.storeSettings?.vatRate ?? 7);
     },
     subtotal() {
@@ -1079,10 +1086,10 @@ export default {
       return `https://maps.google.com/maps?q=${encodedAddress}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
     },
     promptpayNumber() {
-      return adminStore?.storeSettings?.promptpayNumber || '081-234-5678';
+      return this.serverPromptpayNumber || adminStore?.storeSettings?.promptpayNumber || '';
     },
     promptpayName() {
-      return adminStore?.storeSettings?.promptpayName || 'ร้านตำครกซิ่ง (นายธีรวัฒน์ แสนคำเฮียง)';
+      return this.serverPromptpayName || adminStore?.storeSettings?.promptpayName || 'ร้านตำครกซิ่ง';
     }
   },
   async mounted() {
@@ -1196,6 +1203,13 @@ export default {
       const res = await axios.get(`${API_BASE}/settings`);
       if (res.data && res.data.is_open !== undefined) {
         this.isStoreOpen = Boolean(res.data.is_open);
+      }
+      // ใช้เบอร์/ชื่อพร้อมเพย์จากหน้าตั้งค่าร้าน (ฐานข้อมูล) เพื่อให้เงินเข้าบัญชีร้านจริง
+      this.serverPromptpayNumber = res.data?.promptpay_number || '';
+      this.serverPromptpayName = res.data?.promptpay_name || '';
+      // อัตรา VAT จากตั้งค่าร้าน (ฐานข้อมูล) ให้ตรงกับที่ backend ใช้คำนวณยอดออเดอร์
+      if (res.data?.vat_rate !== undefined && res.data?.vat_rate !== null) {
+        this.serverVatRate = Number(res.data.vat_rate);
       }
     } catch (e) {
       console.warn('โหลดสถานะร้านค้าในหน้าชำระเงินไม่สำเร็จ:', e);
@@ -1737,6 +1751,10 @@ export default {
     },
 
     async openQrModal() {
+      if (!this.promptpayNumber) {
+        await showError('ยังไม่พร้อมรับชำระผ่านพร้อมเพย์', 'ร้านยังไม่ได้ตั้งค่าเบอร์พร้อมเพย์ กรุณาเลือกวิธีชำระเงินอื่นครับ');
+        return;
+      }
       this.showQrModal = true;
       await this.generateQrCode();
     },
@@ -1765,7 +1783,7 @@ export default {
 
     confirmQrPayment() {
       this.showQrModal = false;
-      this.processOrderCompletion();
+      this.processOrderCompletion('PromptPay');
     },
 
     // 🛑 เพิ่มฟังก์ชันตรวจสอบสถานะสินค้าล่าสุดจาก Backend ก่อนยืนยันสั่งซื้อ
@@ -2002,7 +2020,7 @@ async validateAndCheckout() {
         };
 
         if (this.vatAmount > 0) {
-          const taxInfo = `[รวม VAT 7%: B${this.formatCurrency(this.vatAmount)}]`;
+          const taxInfo = `[รวม VAT ${this.vatRate}%: B${this.formatCurrency(this.vatAmount)}]`;
           if (orderPayload.items.length > 0) {
             orderPayload.items[0].notes = orderPayload.items[0].notes ? `${orderPayload.items[0].notes} | ${taxInfo}` : taxInfo;
           }
@@ -2022,7 +2040,17 @@ async validateAndCheckout() {
         }
 
         // บันทึกข้อมูล Transaction ลงในฐานข้อมูลจริง
-        if (createdOrder?.order_id) {
+        const isPromptPay = this.selectedPayment === 'qr';
+        let promptPayNotified = false;
+        if (createdOrder?.order_id && isPromptPay) {
+          // PromptPay: แจ้งโอนแล้ว -> สถานะ "รอร้านตรวจสอบยอด" (แอดมินเป็นคนยืนยันว่าเงินเข้าจริง)
+          try {
+            await axios.post(`${API_BASE}/transactions/promptpay/notify/${createdOrder.order_id}`, {}, { headers });
+            promptPayNotified = true;
+          } catch (txnErr) {
+            console.warn('แจ้งโอนพร้อมเพย์ไม่สำเร็จ:', txnErr);
+          }
+        } else if (createdOrder?.order_id) {
           try {
             const paymentLabel = customPaymentMethod || (this.selectedPayment === 'qr' ? 'PromptPay' : (this.selectedPayment === 'card' ? 'Credit Card' : 'Cash'));
             const paymentStatus = (this.selectedPayment === 'cash') ? 'PENDING' : 'COMPLETED';
@@ -2052,9 +2080,14 @@ async validateAndCheckout() {
           this.promotionStore.clearSelectedCoupon();
         } catch (e) {}
 
+        const successNote = isPromptPay
+          ? (promptPayNotified
+              ? 'แจ้งโอนเงินเรียบร้อย ทางร้านกำลังตรวจสอบยอดเงินเข้าบัญชีครับ'
+              : 'ได้รับออเดอร์แล้ว แต่แจ้งโอนไม่สำเร็จ กรุณาแจ้งร้านพร้อมเลขออเดอร์นี้ครับ')
+          : 'ทางร้านได้รับคำสั่งซื้อเรียบร้อยแล้วครับ';
         await showSuccess(
           'สั่งซื้อสำเร็จ!',
-          `เลขออเดอร์: <b style="color: #2e7d32; font-size: 1.15rem;">#${orderId}</b><br><span style="color: #64748b; font-size: 0.9rem;">ทางร้านได้รับคำสั่งซื้อเรียบร้อยแล้วครับ</span>`,
+          `เลขออเดอร์: <b style="color: #2e7d32; font-size: 1.15rem;">#${orderId}</b><br><span style="color: #64748b; font-size: 0.9rem;">${successNote}</span>`,
           {
             confirmButtonText: 'ไปหน้าติดตามออเดอร์',
             timer: 2500,

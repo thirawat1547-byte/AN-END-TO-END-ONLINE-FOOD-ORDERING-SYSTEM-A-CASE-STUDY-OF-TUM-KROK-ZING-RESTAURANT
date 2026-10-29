@@ -1123,8 +1123,13 @@ export const adminStore = reactive({
           else if (rawStatus === 'PAID' || rawStatus === 'COMPLETED') normStatus = 'Completed'
           else if (rawStatus === 'CANCELLED') normStatus = 'Cancelled'
 
-          const txn = Array.isArray(o.transaction) && o.transaction.length > 0 ? o.transaction[0] : (o.transaction || null)
-          const isPaid = normStatus === 'Completed' || txn?.payment_status === 'COMPLETED' || rawStatus === 'PAID'
+          // ใช้รายการชำระเงินล่าสุดของออเดอร์ (หนึ่งออเดอร์อาจมีหลายรายการ เช่น แจ้งโอนแล้วถูกปฏิเสธ)
+          const txnList = Array.isArray(o.transaction) ? [...o.transaction] : (o.transaction ? [o.transaction] : [])
+          txnList.sort((a, b) => Number(b?.transaction_id || 0) - Number(a?.transaction_id || 0))
+          const txn = txnList.find(t => String(t?.payment_status || '').toUpperCase() === 'COMPLETED') || txnList[0] || null
+          const txnStatus = String(txn?.payment_status || '').toUpperCase()
+          const isPaid = normStatus === 'Completed' || txnStatus === 'COMPLETED' || rawStatus === 'PAID'
+          const isRejected = !isPaid && txnStatus === 'REJECTED'
 
           return {
             ...o,
@@ -1134,7 +1139,7 @@ export const adminStore = reactive({
             order_type: o.order_type === 'DINE_IN' || o.table_id ? 'In-store' : 'Delivery',
             raw_order_type: o.order_type || (o.table_id ? 'DINE_IN' : 'DELIVERY'),
             payment_method: txn?.payment_method || (o.table_id ? 'Stripe / QR' : 'PromptPay'),
-            payment_status: isPaid ? 'Completed' : 'Pending',
+            payment_status: isPaid ? 'Completed' : (isRejected ? 'Rejected' : 'Pending'),
             payment_slip_url: txn?.payment_slip_url || null,
             discount_applied: Number(o.discount_applied || 0)
           }
@@ -1390,9 +1395,13 @@ export const adminStore = reactive({
         rider_fee: Number(customSettings.riderFee !== undefined ? customSettings.riderFee : this.storeSettings.riderFee)
       }
 
+      const token = localStorage.getItem('access_token')
       const res = await fetch(`${API_BASE}/settings`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify(payload)
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
