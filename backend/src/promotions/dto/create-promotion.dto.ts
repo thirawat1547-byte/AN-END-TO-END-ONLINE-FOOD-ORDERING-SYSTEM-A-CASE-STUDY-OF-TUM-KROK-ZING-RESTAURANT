@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsDateString, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsDateString, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CreatePromotionDto {
   @ApiProperty({ example: 'ZING50', description: 'รหัสโค้ดโปรโมชัน (ไม่ซ้ำ)' })
@@ -29,4 +29,9 @@ export class CreatePromotionDto {
   @IsDateString()
   @IsNotEmpty()
   expiry_date: string;
+
+  @ApiProperty({ example: true, description: 'เปิด/ปิดการใช้งานโปรโมชัน', required: false })
+  @IsBoolean()
+  @IsOptional()
+  is_active?: boolean;
 }

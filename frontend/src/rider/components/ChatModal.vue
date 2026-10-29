@@ -8,7 +8,7 @@
             👤
           </div>
           <div>
-            <div class="font-bold text-xs">คุณณัฐวุฒิ ใจดี (ลูกค้า)</div>
+            <div class="font-bold text-xs">{{ customerName }} (ลูกค้า)</div>
             <div class="text-[10px] text-emerald-100 flex items-center gap-1">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-300"></span>
               <span>ออนไลน์ • ออเดอร์ตำครกซิ่ง</span>
@@ -28,9 +28,13 @@
           </span>
         </div>
 
-        <div 
-          v-for="(msg, idx) in messages" 
-          :key="idx"
+        <div v-if="messages.length === 0" class="text-center text-slate-400 text-[11px] mt-6 px-4">
+          ยังไม่มีข้อความกับลูกค้าในออเดอร์นี้
+        </div>
+
+        <div
+          v-for="(msg, idx) in messages"
+          :key="msg.id ?? idx"
           class="flex"
           :class="msg.sender === 'rider' ? 'justify-end' : 'justify-start'"
         >
@@ -81,6 +85,10 @@ const props = defineProps({
   messages: {
     type: Array,
     default: () => []
+  },
+  customerName: {
+    type: String,
+    default: 'ลูกค้า'
   }
 })
 

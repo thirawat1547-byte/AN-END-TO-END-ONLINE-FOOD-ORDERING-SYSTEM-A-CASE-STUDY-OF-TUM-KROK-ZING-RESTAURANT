@@ -96,10 +96,11 @@ export class PromotionsService implements OnModuleInit {
     });
   }
 
-  // 2. ดึงโปรโมชันเฉพาะรายการที่ยังไม่หมดอายุ
+  // 2. ดึงโปรโมชันเฉพาะรายการที่เปิดใช้งานและยังไม่หมดอายุ
   async findActive() {
     return this.prisma.promotion.findMany({
       where: {
+        is_active: true,
         expiry_date: {
           gte: new Date(),
         },
@@ -125,8 +126,8 @@ export class PromotionsService implements OnModuleInit {
     const promo = await this.prisma.promotion.findUnique({
       where: { code: cleanCode },
     });
-    if (!promo || new Date(promo.expiry_date) < new Date()) {
-      throw new NotFoundException('โค้ดส่วนลดนี้ไม่ถูกต้อง หรือหมดอายุแล้ว');
+    if (!promo || !promo.is_active || new Date(promo.expiry_date) < new Date()) {
+      throw new NotFoundException('โค้ดส่วนลดนี้ไม่ถูกต้อง ปิดใช้งาน หรือหมดอายุแล้ว');
     }
     return promo;
   }
@@ -134,6 +135,9 @@ export class PromotionsService implements OnModuleInit {
   // 5. User กดเก็บโค้ดโปรโมชันเข้ากระเป๋าของตนเอง
   async claimPromotion(userId: number, promoId: number) {
     const promo = await this.findOne(promoId);
+    if (!promo.is_active) {
+      throw new BadRequestException('ขออภัย โปรโมชันนี้ถูกปิดใช้งานแล้ว');
+    }
     if (new Date(promo.expiry_date) < new Date()) {
       throw new BadRequestException('ขออภัย โค้ดโปรโมชันนี้หมดอายุแล้ว ไม่สามารถเก็บได้');
     }
@@ -171,7 +175,8 @@ export class PromotionsService implements OnModuleInit {
            p.discount_type,
            p.discount_value,
            p.min_order_price,
-           p.expiry_date
+           p.expiry_date,
+           p.is_active
          FROM USER_CLAIMED_PROMOTIONS ucp
          JOIN PROMOTIONS p ON ucp.promo_id = p.promo_id
          WHERE ucp.user_id = ?
@@ -190,6 +195,7 @@ export class PromotionsService implements OnModuleInit {
         discount_value: Number(r.discount_value),
         min_order_price: Number(r.min_order_price || 0),
         expiry_date: r.expiry_date,
+        is_active: r.is_active === undefined ? true : Boolean(r.is_active),
         is_expired: new Date(r.expiry_date) < new Date(),
       }));
     } catch (err) {
@@ -214,6 +220,7 @@ export class PromotionsService implements OnModuleInit {
         discount_value: createDto.discount_value,
         min_order_price: createDto.min_order_price ?? 0,
         expiry_date: new Date(createDto.expiry_date),
+        is_active: createDto.is_active ?? true,
       },
     });
   }

@@ -21,12 +21,10 @@
       <div class="mt-4 bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-100/70 rounded-2xl p-4 border border-emerald-200/80">
         <div class="text-xs text-emerald-800 font-medium">รายได้ออเดอร์นี้</div>
         <div class="text-3xl font-black text-emerald-700 tracking-tight my-1">
-          ฿58.00
+          ฿{{ fee.toFixed(2) }}
         </div>
         <div class="text-[11px] text-emerald-600 flex items-center justify-center gap-2 pt-1 border-t border-emerald-200/60 mt-1">
-          <span>ค่ารอบ: ฿45.00</span>
-          <span>•</span>
-          <span class="font-bold text-amber-700">ทิปลูกค้า: ฿13.00 ⭐</span>
+          <span>ค่ารอบออเดอร์ #TKZ-{{ summary?.orderId || '-' }}</span>
         </div>
       </div>
 
@@ -34,27 +32,30 @@
       <div class="grid grid-cols-3 gap-2 mt-3 text-left">
         <div class="bg-slate-50 p-2 rounded-xl text-center">
           <span class="text-[10px] text-slate-400 block">ระยะทางรวม</span>
-          <span class="text-xs font-bold text-slate-700">4.05 กม.</span>
+          <span class="text-xs font-bold text-slate-700">{{ summary?.distanceKm ? `${summary.distanceKm.toFixed(2)} กม.` : '-' }}</span>
         </div>
         <div class="bg-slate-50 p-2 rounded-xl text-center">
           <span class="text-[10px] text-slate-400 block">เวลาที่ใช้</span>
-          <span class="text-xs font-bold text-slate-700">16 นาที</span>
+          <span class="text-xs font-bold text-slate-700">{{ summary?.minutes ? `${summary.minutes} นาที` : '-' }}</span>
         </div>
         <div class="bg-slate-50 p-2 rounded-xl text-center">
           <span class="text-[10px] text-slate-400 block">คะแนนรีวิว</span>
-          <span class="text-xs font-bold text-amber-600">⭐ 5.0</span>
+          <span v-if="summary?.rating" class="text-xs font-bold text-amber-600">⭐ {{ Number(summary.rating).toFixed(1) }}</span>
+          <span v-else class="text-[10px] font-medium text-slate-400">รอลูกค้ารีวิว</span>
         </div>
       </div>
 
-      <!-- Customer Feedback Comment -->
-      <div class="mt-3 bg-amber-50/60 p-2.5 rounded-xl text-left border border-amber-100">
+      <!-- ความคิดเห็นจริงจากลูกค้า (แสดงเมื่อลูกค้ารีวิวแล้ว) -->
+      <div v-if="summary?.comment" class="mt-3 bg-amber-50/60 p-2.5 rounded-xl text-left border border-amber-100">
         <div class="flex items-center gap-1 text-[11px] font-bold text-amber-900">
           <span>💬 ความคิดเห็นจากลูกค้า:</span>
         </div>
-        <p class="text-[11px] text-amber-800 italic mt-0.5">
-          "ส่งไวมากครับ ไก่ย่างยังอุ่นๆ ส้มตำรสแซ่บสะใจ ไรเดอร์สุภาพมากครับ 👍"
-        </p>
+        <p class="text-[11px] text-amber-800 italic mt-0.5 whitespace-pre-line">"{{ summary.comment }}"</p>
       </div>
+
+      <p v-if="summary?.proofUrl" class="mt-3 text-[10px] text-emerald-700 bg-emerald-50 rounded-lg py-1.5 border border-emerald-100">
+        📸 บันทึกรูปหลักฐานแล้ว ลูกค้าและร้านสามารถดูรูปนี้ได้
+      </p>
 
       <!-- Action Button -->
       <button 
@@ -68,12 +69,20 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+const props = defineProps({
   isOpen: {
     type: Boolean,
     default: false
+  },
+  summary: {
+    type: Object,
+    default: null
   }
 })
+
+const fee = computed(() => Number(props.summary?.fee || 0))
 
 defineEmits(['reset-flow'])
 </script>

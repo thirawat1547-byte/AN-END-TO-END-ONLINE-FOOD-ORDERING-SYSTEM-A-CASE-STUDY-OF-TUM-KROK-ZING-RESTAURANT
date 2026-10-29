@@ -18,6 +18,7 @@ const navLinks = [
   { name: 'โปรโมชัน & ส่วนลด', path: '/admin/promotions', icon: '🏷️', badge: () => adminStore.promotions.filter(p => p.is_active).length },
   { name: 'แชทบอท AI', path: '/admin/chatbot', icon: '🤖', badge: () => 'BOT', badgeColor: 'bg-emerald-600' },
   { name: 'ประวัติบิล & การเงิน', path: '/admin/transactions', icon: '💰', badge: null },
+  { name: 'รูปส่งมอบ & รีวิว', path: '/admin/feedback', icon: '⭐', badge: null },
   { name: 'ตั้งค่าร้านค้า', path: '/admin/settings', icon: '⚙️', badge: null }
 ]
 

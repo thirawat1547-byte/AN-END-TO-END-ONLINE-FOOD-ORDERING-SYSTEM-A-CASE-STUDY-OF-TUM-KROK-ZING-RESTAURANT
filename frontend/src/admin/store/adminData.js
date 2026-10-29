@@ -1205,7 +1205,8 @@ export const adminStore = reactive({
   async togglePromoStatusAPI(promoId) {
     const p = this.promotions.find(x => x.promo_id === promoId)
     if (!p) return
-    p.is_active = !p.is_active
+    const previous = p.is_active
+    p.is_active = !previous
     try {
       const res = await fetch(`${API_BASE}/promotions/${promoId}`, {
         method: 'PATCH',
@@ -1213,8 +1214,12 @@ export const adminStore = reactive({
         body: JSON.stringify({ is_active: p.is_active })
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const saved = await res.json()
+      // ใช้ค่าที่บันทึกจริงในฐานข้อมูล เพื่อไม่ให้สถานะเด้งกลับเมื่อโหลดใหม่
+      p.is_active = saved?.is_active ?? p.is_active
       console.log(`✅ สลับสถานะโปรโมชัน #${promoId} สำเร็จ`)
     } catch (err) {
+      p.is_active = previous
       console.warn('⚠️ สลับสถานะโปรโมชัน API ไม่สำเร็จ:', err.message)
     }
   },
@@ -1233,7 +1238,8 @@ export const adminStore = reactive({
           discount_type: (promo.discount_type || 'FIXED').toUpperCase(),
           discount_value: Number(promo.discount_value),
           min_order_price: Number(promo.min_order_price || 0),
-          expiry_date: expDate
+          expiry_date: expDate,
+          is_active: promo.is_active ?? true
         })
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)

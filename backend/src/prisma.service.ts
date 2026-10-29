@@ -11,14 +11,19 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
       this.logger.log('✅ เชื่อมต่อฐานข้อมูล MySQL สำเร็จ');
 
       // ตรวจสอบและเพิ่มคอลัมน์ notes ในตาราง OrderItem / ORDER_ITEMS แบบอัตโนมัติ
+      // รวมถึงคอลัมน์ is_active ของโปรโมชัน และคอลัมน์รีวิวของออเดอร์
       const alterQueries = [
         'ALTER TABLE OrderItem ADD COLUMN notes TEXT NULL;',
         'ALTER TABLE ORDER_ITEMS ADD COLUMN notes TEXT NULL;',
+        'ALTER TABLE PROMOTIONS ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE;',
+        'ALTER TABLE ORDERS ADD COLUMN rating TINYINT NULL;',
+        'ALTER TABLE ORDERS ADD COLUMN review_comment TEXT NULL;',
+        'ALTER TABLE ORDERS ADD COLUMN reviewed_at DATETIME(3) NULL;',
       ];
       for (const query of alterQueries) {
         try {
           await this.$executeRawUnsafe(query);
-          this.logger.log(`✅ เพิ่มคอลัมน์ notes สำเร็จ: ${query}`);
+          this.logger.log(`✅ เพิ่มคอลัมน์สำเร็จ: ${query}`);
         } catch (e) {
           // ignore if table doesn't exist or column already exists
         }

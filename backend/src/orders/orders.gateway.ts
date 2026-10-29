@@ -64,6 +64,28 @@ export class OrdersGateway
   }
 
   /**
+   * ส่งข้อความแชทระหว่างไรเดอร์และลูกค้าของออเดอร์นั้นๆ (order_chat_message)
+   */
+  sendOrderChatMessage(message: any) {
+    try {
+      this.server?.emit('order_chat_message', message);
+    } catch (e: any) {
+      this.logger.warn('ไม่สามารถกระจายสัญญาณ order_chat_message:', e.message);
+    }
+  }
+
+  /**
+   * แจ้งเมื่อลูกค้ารีวิวออเดอร์ (order_reviewed) เพื่อให้หน้าจอไรเดอร์แสดงคะแนนจริง
+   */
+  sendOrderReviewed(order: any) {
+    try {
+      this.server?.emit('order_reviewed', order);
+    } catch (e: any) {
+      this.logger.warn('ไม่สามารถกระจายสัญญาณ order_reviewed:', e.message);
+    }
+  }
+
+  /**
    * รองรับการรับสัญญาณ place_order หรือ new_order จากฝั่ง Frontend (ถ้ามี)
    */
   @SubscribeMessage('place_order')

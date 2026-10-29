@@ -107,6 +107,7 @@
               </button>
               <button class="action-btn chat-btn" @click="chatRider">
                 <span>💬</span> ข้อความ
+                <span v-if="chat.unreadCount.value > 0" class="chat-unread-badge">{{ chat.unreadCount.value }}</span>
               </button>
             </div>
           </div>
@@ -117,7 +118,15 @@
             <div class="completed-icon-large">🎉</div>
             <h4 class="rider-name">จัดส่งถึงคุณเรียบร้อยแล้ว</h4>
             <p class="rider-vehicle" style="background:#eef7f1; color:#2d5a43;">✓ พนักงานส่งมอบอาหารสำเร็จ</p>
-            
+
+            <!-- รูปถ่ายหลักฐานการจัดส่งจากไรเดอร์ -->
+            <div class="proof-photo-box" v-if="proofImageUrl">
+              <p class="proof-photo-label">📸 รูปหลักฐานการจัดส่งจากไรเดอร์</p>
+              <a :href="proofImageUrl" target="_blank" rel="noopener">
+                <img :src="proofImageUrl" alt="รูปหลักฐานการจัดส่ง" class="proof-photo-img">
+              </a>
+            </div>
+
             <!-- ส่วนรีวิวให้ดาวก่อนกลับหน้าร้าน (Rating & Review Before Return) -->
             <div class="review-box" v-if="!isReviewed">
               <div class="review-header">
@@ -171,8 +180,10 @@
               </div>
 
               <!-- ปุ่มส่งรีวิว และปุ่มข้าม -->
+              <p class="review-error" v-if="reviewError">{{ reviewError }}</p>
+
               <div class="review-buttons">
-                <button class="dismiss-btn review-submit-btn" @click="handleReviewOrDismiss">
+                <button class="dismiss-btn review-submit-btn" @click="handleReviewOrDismiss" :disabled="isSubmittingReview">
                   <span v-if="selectedRating > 0">⭐ ส่งรีวิวและกลับสู่หน้าร้าน ➔</span>
                   <span v-else>⭐ รีวิวให้ดาว / กลับสู่หน้าร้าน ➔</span>
                 </button>
@@ -355,11 +366,13 @@
           ></textarea>
         </div>
 
+        <p class="review-error" v-if="reviewError">{{ reviewError }}</p>
+
         <div class="modal-action-buttons">
-          <button 
-            class="modal-submit-review-btn" 
+          <button
+            class="modal-submit-review-btn"
             @click="submitReviewAndGoHome"
-            :disabled="selectedRating === 0"
+            :disabled="selectedRating === 0 || isSubmittingReview"
           >
             <span v-if="selectedRating > 0">⭐ ส่งรีวิวและกลับสู่หน้าร้าน ➔</span>
             <span v-else>แตะดาวด้านบนเพื่อให้คะแนน</span>
@@ -370,18 +383,39 @@
         </div>
       </div>
     </div>
+
+    <!-- แชทกับไรเดอร์ -->
+    <OrderChatPanel
+      :is-open="chat.isOpen.value"
+      :order-id="chatOrderId"
+      peer-name="ไรเดอร์ตำครกซิ่ง"
+      :messages="chat.messages.value"
+      :is-sending="chat.isSending.value"
+      @close="chat.close()"
+      @send="chat.sendMessage"
+    />
   </div>
 </template>
 
 <script>
+import { ref } from 'vue';
 import axios from 'axios';
-import { API_BASE } from './config/api';
+import { API_BASE, assetUrl } from './config/api';
 import CustomerNavbar from './components/CustomerNavbar.vue';
+import OrderChatPanel from './components/OrderChatPanel.vue';
 import { authStore } from './store/authStore';
+import { useOrderChat } from './composables/useOrderChat';
 
 export default {
   components: {
-    CustomerNavbar
+    CustomerNavbar,
+    OrderChatPanel
+  },
+  setup() {
+    // เลขออเดอร์ที่ใช้คุยกับไรเดอร์ (อัปเดตทุกครั้งที่ดึงสถานะออเดอร์ล่าสุด)
+    const chatOrderIdRef = ref(null);
+    const chat = useOrderChat(chatOrderIdRef, 'customer');
+    return { chat, chatOrderIdRef };
   },
   data() {
     return {
@@ -402,7 +436,10 @@ export default {
       selectedReviewTags: [],
       reviewComment: '',
       isReviewed: false,
+      isSubmittingReview: false,
+      reviewError: '',
       showReviewModal: false,
+      proofImageUrl: '',
       availableReviewTags: [
         '🍲 รสชาติแซ่บนัว',
         '⚡ จัดส่งรวดเร็ว',
@@ -424,6 +461,9 @@ export default {
     }
   },
   computed: {
+    chatOrderId() {
+      return this.chatOrderIdRef || '';
+    },
     mapUrl() {
       if (!this.hasActiveOrder) return '';
       const address = this.userProfile.address || 'ตลาดปากเกร็ด นนทบุรี'; 
@@ -589,6 +629,15 @@ export default {
             items: items
           };
 
+          this.chatOrderIdRef = activeOrder.order_id;
+          this.proofImageUrl = assetUrl(activeOrder.delivery?.proof_image_url);
+
+          // ถ้าออเดอร์นี้เคยรีวิวแล้ว ให้แสดงคะแนนเดิมจากฐานข้อมูล
+          if (activeOrder.rating) {
+            this.isReviewed = true;
+            this.selectedRating = Number(activeOrder.rating);
+          }
+
           this.hasActiveOrder = true;
         } else {
           // ถ้าไม่มีออเดอร์ที่กำลังจัดส่งอยู่ ให้เคลียร์สถานะเป็นไม่มีออเดอร์
@@ -616,7 +665,7 @@ export default {
       alert('กำลังโทรหาคุณสิริโชค (คนขับ)...');
     },
     chatRider() {
-      alert('กำลังเปิดหน้าต่างแชทกับคนขับ...');
+      this.chat.open();
     },
     // เมธอดสำหรับระบบรีวิวและให้ดาวก่อนกลับหน้าร้าน
     setRating(star) {
@@ -637,29 +686,33 @@ export default {
       }
       this.submitReviewAndGoHome();
     },
-    submitReviewAndGoHome() {
+    async submitReviewAndGoHome() {
       if (this.selectedRating === 0) {
         this.showReviewModal = true;
         return;
       }
+      if (!this.currentOrder?.orderNumber || this.isSubmittingReview) return;
 
+      // รวมแท็กที่เลือกกับความคิดเห็นเป็นข้อความรีวิวเดียว
+      const comment = [this.selectedReviewTags.join(' '), this.reviewComment.trim()]
+        .filter(Boolean)
+        .join('\n');
+
+      this.isSubmittingReview = true;
+      this.reviewError = '';
       try {
-        const reviewData = {
-          orderId: this.currentOrder?.orderNumber || 'unknown',
-          rating: this.selectedRating,
-          tags: [...this.selectedReviewTags],
-          comment: this.reviewComment.trim(),
-          createdAt: new Date().toISOString(),
-          userName: this.userProfile.name,
-          total: this.currentOrder?.total || 0
-        };
-
-        const existingReviews = JSON.parse(localStorage.getItem('user_order_reviews') || '[]');
-        existingReviews.unshift(reviewData);
-        localStorage.setItem('user_order_reviews', JSON.stringify(existingReviews));
-        localStorage.setItem(`review_order_${reviewData.orderId}`, JSON.stringify(reviewData));
+        const token = localStorage.getItem('access_token');
+        await axios.post(
+          `${API_BASE}/orders/${this.currentOrder.orderNumber}/review`,
+          { rating: this.selectedRating, comment: comment || undefined },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
       } catch (e) {
-        console.warn('บันทึกรีวิวไม่สำเร็จ:', e);
+        const msg = e?.response?.data?.message;
+        this.reviewError = Array.isArray(msg) ? msg.join(', ') : (msg || 'ส่งรีวิวไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+        return;
+      } finally {
+        this.isSubmittingReview = false;
       }
 
       this.isReviewed = true;
@@ -807,7 +860,12 @@ export default {
 .action-btn { flex: 1; padding: 10px; border-radius: 12px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-family: inherit; border: none; transition: 0.2s; }
 .call-btn { background: #f1ede1; color: #333; }
 .call-btn:hover { background: #e5e2d5; }
-.chat-btn { background: #f1ede1; color: #333; }
+.chat-btn { background: #f1ede1; color: #333; position: relative; }
+.chat-unread-badge { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #d9534f; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.proof-photo-box { width: 100%; margin-top: 14px; text-align: left; }
+.proof-photo-label { font-size: 13px; font-weight: 600; color: #2d5a43; margin-bottom: 6px; }
+.proof-photo-img { width: 100%; max-height: 240px; object-fit: cover; border-radius: 12px; border: 1px solid #e5e2d5; display: block; }
+.review-error { color: #c0392b; font-size: 13px; margin: 8px 0 0; text-align: center; }
 .chat-btn:hover { background: #e5e2d5; }
 
 /* Summary Card */

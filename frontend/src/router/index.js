@@ -49,6 +49,7 @@ const routes = [
       { path: 'promotions', component: () => import('../admin/views/PromotionManagement.vue') },
       { path: 'chatbot', component: () => import('../admin/views/ChatbotManagement.vue') },
       { path: 'transactions', component: () => import('../admin/views/TransactionAudit.vue') },
+      { path: 'feedback', component: () => import('../admin/views/DeliveryFeedback.vue') },
       { path: 'settings', component: () => import('../admin/views/AdminSettings.vue') }
     ]
   },

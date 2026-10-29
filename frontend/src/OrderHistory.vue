@@ -134,6 +134,47 @@
           <div>วิธีชำระ: {{ selectedOrder.paymentMethod }}</div>
         </div>
 
+        <!-- รูปถ่ายหลักฐานการจัดส่งจากไรเดอร์ -->
+        <div class="proof-photo-box" v-if="selectedOrder.proofImageUrl">
+          <p class="section-label">📸 รูปหลักฐานการจัดส่ง</p>
+          <a :href="selectedOrder.proofImageUrl" target="_blank" rel="noopener">
+            <img :src="selectedOrder.proofImageUrl" alt="รูปหลักฐานการจัดส่ง" class="proof-photo-img">
+          </a>
+        </div>
+
+        <!-- รีวิวออเดอร์ -->
+        <div class="review-section" v-if="selectedOrder.rating">
+          <p class="section-label">รีวิวของคุณ</p>
+          <div class="review-stars">
+            <span v-for="s in 5" :key="s" :class="{ on: s <= selectedOrder.rating }">★</span>
+          </div>
+          <p class="review-text" v-if="selectedOrder.reviewComment">{{ selectedOrder.reviewComment }}</p>
+        </div>
+        <div class="review-section" v-else-if="canReview(selectedOrder)">
+          <p class="section-label">⭐ ให้คะแนนออเดอร์นี้</p>
+          <div class="review-stars clickable">
+            <span
+              v-for="s in 5"
+              :key="s"
+              :class="{ on: s <= (reviewHover || reviewRating) }"
+              @mouseenter="reviewHover = s"
+              @mouseleave="reviewHover = 0"
+              @click="reviewRating = s"
+            >★</span>
+          </div>
+          <textarea
+            v-model="reviewText"
+            class="review-textarea"
+            rows="2"
+            maxlength="1000"
+            placeholder="ความคิดเห็นเพิ่มเติม (ไม่บังคับ)"
+          ></textarea>
+          <p class="review-error" v-if="reviewError">{{ reviewError }}</p>
+          <button class="review-submit-btn" :disabled="reviewRating === 0 || isSubmittingReview" @click="submitReview">
+            {{ isSubmittingReview ? 'กำลังส่งรีวิว...' : 'ส่งรีวิว' }}
+          </button>
+        </div>
+
         <div class="modal-actions-box">
           <button class="modal-reorder-btn" @click="reorder(selectedOrder)">
             <span>🔁</span> สั่งรายการนี้อีกครั้ง
@@ -146,7 +187,7 @@
 
 <script>
 import axios from 'axios';
-import { API_BASE } from './config/api';
+import { API_BASE, assetUrl } from './config/api';
 import CustomerNavbar from './components/CustomerNavbar.vue';
 import { authStore } from './store/authStore';
 
@@ -161,7 +202,12 @@ export default {
       selectedOrder: null,
       orderHistory: [],
       currentTab: 'all',
-      isLoading: false
+      isLoading: false,
+      reviewRating: 0,
+      reviewHover: 0,
+      reviewText: '',
+      reviewError: '',
+      isSubmittingReview: false
     }
   },
   computed: {
@@ -200,7 +246,36 @@ export default {
   methods: {
     viewOrderDetails(order) {
       this.selectedOrder = order;
+      this.reviewRating = 0;
+      this.reviewHover = 0;
+      this.reviewText = '';
+      this.reviewError = '';
       this.showReceiptModal = true;
+    },
+    canReview(order) {
+      return ['COMPLETED', 'DELIVERED', 'PAID'].includes(order?.rawStatus);
+    },
+    async submitReview() {
+      const order = this.selectedOrder;
+      if (!order || this.reviewRating === 0 || this.isSubmittingReview) return;
+      this.isSubmittingReview = true;
+      this.reviewError = '';
+      try {
+        const token = localStorage.getItem('access_token');
+        const comment = this.reviewText.trim();
+        const res = await axios.post(
+          `${API_BASE}/orders/${order.orderNumber}/review`,
+          { rating: this.reviewRating, comment: comment || undefined },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        order.rating = Number(res.data?.rating || this.reviewRating);
+        order.reviewComment = res.data?.review_comment || comment;
+      } catch (err) {
+        const msg = err?.response?.data?.message;
+        this.reviewError = Array.isArray(msg) ? msg.join(', ') : (msg || 'ส่งรีวิวไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+      } finally {
+        this.isSubmittingReview = false;
+      }
     },
     reorder(order) {
       if (!order || !order.items || order.items.length === 0) {
@@ -318,7 +393,10 @@ export default {
             paymentMethod: order.payment_method || 'พร้อมเพย์',
             status: statusMap[order.status] || order.status,
             rawStatus: order.status,
-            items: items
+            items: items,
+            proofImageUrl: assetUrl(order.delivery?.proof_image_url),
+            rating: order.rating ? Number(order.rating) : 0,
+            reviewComment: order.review_comment || ''
           };
         });
       } catch (err) {
@@ -336,6 +414,19 @@ export default {
 @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap');
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Prompt', sans-serif; }
 .page-container { background-color: #f7f6f0; min-height: 100vh; display: flex; flex-direction: column; }
+.section-label { font-size: 13px; font-weight: 600; color: #2d5a43; margin-bottom: 6px; }
+.proof-photo-box { margin-top: 14px; }
+.proof-photo-img { width: 100%; max-height: 220px; object-fit: cover; border-radius: 12px; border: 1px solid #e5e2d5; display: block; }
+.review-section { margin-top: 14px; padding: 12px; background: #fbfaf5; border: 1px solid #eee9da; border-radius: 12px; }
+.review-stars { display: flex; gap: 4px; font-size: 24px; color: #d6d2c4; }
+.review-stars .on { color: #f5b301; }
+.review-stars.clickable span { cursor: pointer; }
+.review-text { font-size: 13px; color: #555; margin-top: 6px; white-space: pre-line; }
+.review-textarea { width: 100%; margin-top: 8px; border: 1px solid #e5e2d5; border-radius: 10px; padding: 8px 10px; font-size: 13px; resize: vertical; outline: none; }
+.review-textarea:focus { border-color: #557c61; }
+.review-error { color: #c0392b; font-size: 12px; margin-top: 6px; }
+.review-submit-btn { margin-top: 8px; width: 100%; background: #557c61; color: #fff; border: none; border-radius: 10px; padding: 10px; font-weight: 600; cursor: pointer; }
+.review-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .content-wrapper { max-width: 1300px; margin: 0 auto; width: 100%; padding: 40px; display: flex; flex-direction: column; gap: 25px; flex-grow: 1; }
 .page-main-title { font-size: 26px; font-weight: 700; color: #333; text-align: center; margin-bottom: 10px; }

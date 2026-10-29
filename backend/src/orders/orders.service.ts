@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, OnModuleInit, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { OrdersGateway } from './orders.gateway';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { ReviewOrderDto } from './dto/review-order.dto';
 
 @Injectable()
 export class OrdersService implements OnModuleInit {
@@ -16,7 +17,26 @@ export class OrdersService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    await this.ensureOrderChatTable();
     await this.repairLegacyOrdersWithoutItems();
+  }
+
+  // สร้างตาราง ORDER_CHAT_MESSAGES สำหรับเก็บข้อความแชทระหว่างไรเดอร์และลูกค้า
+  private async ensureOrderChatTable() {
+    try {
+      await this.prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS ORDER_CHAT_MESSAGES (
+          message_id INT AUTO_INCREMENT PRIMARY KEY,
+          order_id INT NOT NULL,
+          sender VARCHAR(20) NOT NULL,
+          message TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_order_chat_order (order_id)
+        );
+      `);
+    } catch (err) {
+      this.logger.error('Failed to ensure ORDER_CHAT_MESSAGES table', err);
+    }
   }
 
   /**
@@ -205,6 +225,10 @@ export class OrdersService implements OnModuleInit {
 
         if (!promo) {
           throw new BadRequestException('ไม่พบโค้ดส่วนลดนี้ในระบบ');
+        }
+
+        if (promo.is_active === false) {
+          throw new BadRequestException('ขออภัย โค้ดส่วนลดนี้ถูกปิดใช้งานแล้ว');
         }
 
         if (new Date(promo.expiry_date) < new Date()) {
@@ -689,6 +713,7 @@ export class OrdersService implements OnModuleInit {
         },
         table: true,
         transaction: true,
+        delivery: true,
       },
       orderBy: { order_id: 'desc' },
     });
@@ -729,6 +754,7 @@ export class OrdersService implements OnModuleInit {
           },
           table: true,
           transaction: true,
+          delivery: true,
           user: {
             select: {
               user_id: true,
@@ -760,6 +786,7 @@ export class OrdersService implements OnModuleInit {
         },
         table: true,
         transaction: true,
+        delivery: true,
         user: {
           select: {
             user_id: true,
@@ -1008,5 +1035,166 @@ export class OrdersService implements OnModuleInit {
       total_earnings: totalEarnings,
       trips: deliveries,
     };
+  }
+
+  // 10. ดึงข้อความแชทของออเดอร์ (ไรเดอร์ <-> ลูกค้า)
+  async getChatMessages(orderId: number, userId?: number) {
+    await this.assertChatAccess(orderId, userId);
+    const rows: any[] = await this.prisma.$queryRawUnsafe(
+      `SELECT message_id, order_id, sender, message, created_at
+       FROM ORDER_CHAT_MESSAGES
+       WHERE order_id = ?
+       ORDER BY message_id ASC;`,
+      orderId,
+    );
+    return rows.map((r) => this.mapChatRow(r));
+  }
+
+  // 11. ส่งข้อความแชท แล้วกระจายผ่าน WebSocket ให้อีกฝ่ายเห็นทันที
+  async sendChatMessage(orderId: number, sender: string, message: string, userId?: number) {
+    await this.assertChatAccess(orderId, sender === 'customer' ? userId : undefined);
+    const text = (message || '').trim();
+    if (!text) {
+      throw new BadRequestException('กรุณาพิมพ์ข้อความก่อนส่ง');
+    }
+
+    await this.prisma.$executeRawUnsafe(
+      `INSERT INTO ORDER_CHAT_MESSAGES (order_id, sender, message) VALUES (?, ?, ?);`,
+      orderId,
+      sender,
+      text,
+    );
+    const rows: any[] = await this.prisma.$queryRawUnsafe(
+      `SELECT message_id, order_id, sender, message, created_at
+       FROM ORDER_CHAT_MESSAGES
+       WHERE order_id = ?
+       ORDER BY message_id DESC
+       LIMIT 1;`,
+      orderId,
+    );
+    const saved = this.mapChatRow(rows[0]);
+
+    try {
+      this.ordersGateway.sendOrderChatMessage(saved);
+    } catch (e) {}
+
+    return saved;
+  }
+
+  // ลูกค้าที่ล็อกอินอยู่จะเข้าถึงแชทได้เฉพาะออเดอร์ของตัวเองเท่านั้น
+  private async assertChatAccess(orderId: number, userId?: number) {
+    const order = await this.prisma.order.findUnique({
+      where: { order_id: orderId },
+      select: { order_id: true, user_id: true },
+    });
+    if (!order) {
+      throw new NotFoundException(`ไม่พบคำสั่งซื้อรหัส #${orderId}`);
+    }
+    if (userId && order.user_id && order.user_id !== userId) {
+      throw new ForbiddenException('ไม่สามารถเข้าถึงแชทของออเดอร์นี้ได้');
+    }
+    return order;
+  }
+
+  private mapChatRow(r: any) {
+    return {
+      message_id: Number(r.message_id),
+      order_id: Number(r.order_id),
+      sender: r.sender,
+      message: r.message,
+      created_at: r.created_at,
+    };
+  }
+
+  // 13. (แอดมิน) ดึงออเดอร์ที่มีรูปหลักฐานการจัดส่งหรือรีวิวจากลูกค้า พร้อมสรุปคะแนน
+  async getAdminFeedback() {
+    const orders = await this.prisma.order.findMany({
+      where: {
+        OR: [
+          { rating: { not: null } },
+          { delivery: { proof_image_url: { not: null } } },
+        ],
+      },
+      select: {
+        order_id: true,
+        order_type: true,
+        status: true,
+        total_price: true,
+        delivery_address: true,
+        created_at: true,
+        rating: true,
+        review_comment: true,
+        reviewed_at: true,
+        user: { select: { user_id: true, username: true, phone_number: true } },
+        delivery: {
+          select: {
+            customer_name: true,
+            rider_id: true,
+            proof_image_url: true,
+            delivered_at: true,
+            rider: { select: { user_id: true, username: true } },
+          },
+        },
+      },
+      orderBy: { order_id: 'desc' },
+      take: 300,
+    });
+
+    const rated = orders.filter((o) => o.rating);
+    const distribution = [1, 2, 3, 4, 5].map((star) => ({
+      star,
+      count: rated.filter((o) => o.rating === star).length,
+    }));
+
+    return {
+      summary: {
+        total_reviews: rated.length,
+        average_rating: rated.length
+          ? Number((rated.reduce((s, o) => s + Number(o.rating), 0) / rated.length).toFixed(2))
+          : 0,
+        total_proofs: orders.filter((o) => o.delivery?.proof_image_url).length,
+        distribution,
+      },
+      orders,
+    };
+  }
+
+  // 12. ลูกค้าให้คะแนนรีวิวออเดอร์ที่ได้รับแล้ว (รีวิวได้ครั้งเดียว)
+  async reviewOrder(orderId: number, userId: number, dto: ReviewOrderDto) {
+    const order = await this.prisma.order.findUnique({ where: { order_id: orderId } });
+    if (!order) {
+      throw new NotFoundException(`ไม่พบคำสั่งซื้อรหัส #${orderId}`);
+    }
+    if (order.user_id !== userId) {
+      throw new ForbiddenException('สามารถรีวิวได้เฉพาะออเดอร์ของตัวเองเท่านั้น');
+    }
+    if (!['COMPLETED', 'DELIVERED', 'PAID'].includes((order.status || '').toUpperCase())) {
+      throw new BadRequestException('สามารถรีวิวได้หลังจากได้รับอาหารเรียบร้อยแล้วเท่านั้น');
+    }
+    if (order.rating) {
+      throw new BadRequestException('ออเดอร์นี้ได้รับการรีวิวไปแล้ว');
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { order_id: orderId },
+      data: {
+        rating: dto.rating,
+        review_comment: dto.comment?.trim() || null,
+        reviewed_at: new Date(),
+      },
+      include: { delivery: true },
+    });
+
+    try {
+      this.ordersGateway.sendOrderReviewed({
+        order_id: updated.order_id,
+        rating: updated.rating,
+        review_comment: updated.review_comment,
+        reviewed_at: updated.reviewed_at,
+        rider_id: updated.delivery?.rider_id ?? null,
+      });
+    } catch (e) {}
+
+    return updated;
   }
 }

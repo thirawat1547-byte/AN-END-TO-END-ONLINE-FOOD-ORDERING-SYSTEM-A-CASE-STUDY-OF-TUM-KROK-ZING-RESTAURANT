@@ -120,8 +120,8 @@
             <div :class="{ 'ring-2 ring-blue-500 rounded-2xl': currentStep >= 1 }">
               <CustomerCard 
                 :customer="customerInfo"
-                :unread-count="unreadChatCount"
-                @open-chat="isChatOpen = true"
+                :unread-count="chat.unreadCount.value"
+                @open-chat="chat.open()"
                 @open-map="handleOpenMap"
                 @send-quick-message="handleSendQuickMessage"
               />
@@ -322,21 +322,26 @@
         @close="isMapOpen = false" 
       />
 
-      <ChatModal 
-        :is-open="isChatOpen"
-        :messages="chatMessages"
-        @close="isChatOpen = false"
+      <ChatModal
+        :is-open="chat.isOpen.value"
+        :messages="chat.messages.value"
+        :customer-name="customerInfo.name"
+        @close="chat.close()"
         @send-message="handleUserChatMessage"
       />
 
-      <PhotoProofModal 
+      <PhotoProofModal
         :is-open="isPhotoModalOpen"
+        :address="customerInfo.address"
+        :is-submitting="isUploadingProof"
+        :error-message="proofError"
         @close="isPhotoModalOpen = false"
         @confirm="handleConfirmDelivery"
       />
 
-      <SuccessModal 
+      <SuccessModal
         :is-open="isSuccessOpen"
+        :summary="deliverySummary"
         @reset-flow="handleResetFlow"
       />
     </div>
@@ -350,6 +355,7 @@ import API_BASE from '../../config/api'
 import { socket } from '../../config/socket'
 import { authStore } from '../../store/authStore'
 import { showSuccess, showWarning, showError } from '../../utils/swal'
+import { useOrderChat } from '../../composables/useOrderChat'
 
 import RiderHeader from '../components/RiderHeader.vue'
 import RestaurantCard from '../components/RestaurantCard.vue'
@@ -390,11 +396,14 @@ const isAllChecked = computed(() => orderItems.value.length > 0 && checkedCount.
 
 // Modal states
 const isMapOpen = ref(false)
-const isChatOpen = ref(false)
 const isPhotoModalOpen = ref(false)
 const isSuccessOpen = ref(false)
 const toastMessage = ref('')
-const unreadChatCount = ref(0)
+const isUploadingProof = ref(false)
+const proofError = ref('')
+
+// สรุปงานที่เพิ่งส่งสำเร็จ (แสดงในหน้าจัดส่งสำเร็จ) — คะแนนรีวิวจะอัปเดตเมื่อลูกค้ากดรีวิวจริง
+const deliverySummary = ref(null)
 
 const customerInfo = ref({
   name: 'ลูกค้าเดลิเวอรี',
@@ -414,11 +423,8 @@ const activeMapData = ref({
   eta: '10-15 นาที'
 })
 
-// Chat messages
-const chatMessages = ref([
-  { sender: 'customer', text: 'สวัสดีครับ ฝากหยิบช้อนส้อมกับน้ำจิ้มแจ่วเพิ่มให้ด้วยนะครับ', time: '12:44' },
-  { sender: 'rider', text: 'รับทราบครับ ทางร้านตำครกซิ่งจัดช้อนส้อมและน้ำจิ้มแจ่วเพิ่มให้เรียบร้อยครับ', time: '12:45' }
-])
+// แชทกับลูกค้าของออเดอร์ที่กำลังส่ง (เก็บในฐานข้อมูลและอัปเดตแบบเรียลไทม์)
+const chat = useOrderChat(realOrderId, 'rider')
 
 // Banner dynamics based on step
 const bannerTitle = computed(() => {
@@ -763,28 +769,74 @@ const handleNextStep = async () => {
   }
 }
 
-const handleConfirmDelivery = async () => {
-  isPhotoModalOpen.value = false
-  isSuccessOpen.value = true
+// อัปโหลดรูปหลักฐานไปเก็บที่ Backend (uploads/delivery-proofs) แล้วแนบ URL ไปกับสถานะ DELIVERED
+// ลูกค้าจะเห็นรูปนี้ในหน้าติดตามออเดอร์และประวัติคำสั่งซื้อ
+const handleConfirmDelivery = async (photoFile) => {
+  const token = localStorage.getItem('access_token')
+  const headers = token ? { Authorization: `Bearer ${token}` } : {}
+  let proofUrl = null
 
   if (isRealOrder.value && realOrderId.value) {
+    isUploadingProof.value = true
+    proofError.value = ''
     try {
-      const token = localStorage.getItem('access_token')
-      const headers = token ? { Authorization: `Bearer ${token}` } : {}
-      await axios.patch(`${API_BASE}/orders/${realOrderId.value}/delivery-status`, { status: 'DELIVERED' }, { headers })
+      const form = new FormData()
+      form.append('file', photoFile)
+      const uploadRes = await axios.post(`${API_BASE}/orders/${realOrderId.value}/delivery-proof`, form, { headers })
+      proofUrl = uploadRes.data?.url || null
+    } catch (err) {
+      const msg = err?.response?.data?.message
+      proofError.value = Array.isArray(msg) ? msg.join(', ') : (msg || 'อัปโหลดรูปไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')
+      isUploadingProof.value = false
+      return
+    }
+
+    try {
+      await axios.patch(
+        `${API_BASE}/orders/${realOrderId.value}/delivery-status`,
+        { status: 'DELIVERED', proof_image_url: proofUrl },
+        { headers }
+      )
     } catch (err) {
       try {
         await axios.patch(`${API_BASE}/orders/${realOrderId.value}/status`, { status: 'COMPLETED' })
       } catch (e) {}
     }
+    isUploadingProof.value = false
   }
 
-  earnings.value += 40.00
+  const deliv = activeOrder.value?.delivery
+  const fee = Number(deliv?.rider_fee || 40)
+  deliverySummary.value = {
+    orderId: realOrderId.value,
+    fee,
+    distanceKm: deliv?.distance_km ? Number(deliv.distance_km) : null,
+    minutes: deliv?.assigned_at ? Math.max(1, Math.round((Date.now() - new Date(deliv.assigned_at).getTime()) / 60000)) : null,
+    proofUrl,
+    rating: null,
+    comment: ''
+  }
+
+  isPhotoModalOpen.value = false
+  isSuccessOpen.value = true
+  earnings.value += fee
   localStorage.removeItem('rider_active_order_id')
+}
+
+// ลูกค้ากดรีวิวออเดอร์ที่ไรเดอร์เพิ่งส่ง -> แสดงคะแนนจริงในหน้าจัดส่งสำเร็จ
+const handleOrderReviewed = (review) => {
+  if (!review || !deliverySummary.value) return
+  if (String(review.order_id) !== String(deliverySummary.value.orderId)) return
+  deliverySummary.value = {
+    ...deliverySummary.value,
+    rating: review.rating,
+    comment: review.review_comment || ''
+  }
 }
 
 const handleResetFlow = () => {
   isSuccessOpen.value = false
+  deliverySummary.value = null
   currentStep.value = 0
   activeOrder.value = null
   isRealOrder.value = false
@@ -803,22 +855,14 @@ const handleOpenMap = (data) => {
   isMapOpen.value = true
 }
 
-const handleSendQuickMessage = (msg) => {
-  chatMessages.value.push({
-    sender: 'rider',
-    text: msg,
-    time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
-  })
-  showToast('ส่งข้อความสำเร็จ: ' + msg)
+const handleSendQuickMessage = async (msg) => {
+  const ok = await chat.sendMessage(msg)
+  showToast(ok ? 'ส่งข้อความสำเร็จ: ' + msg : 'ส่งข้อความไม่สำเร็จ กรุณาลองใหม่')
 }
 
-const handleUserChatMessage = (msg) => {
-  chatMessages.value.push({
-    sender: 'rider',
-    text: msg,
-    time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
-  })
-  unreadChatCount.value = 0
+const handleUserChatMessage = async (msg) => {
+  const ok = await chat.sendMessage(msg)
+  if (!ok) showToast('ส่งข้อความไม่สำเร็จ กรุณาลองใหม่')
 }
 
 const handleOpenHelp = () => {
@@ -833,6 +877,7 @@ onMounted(() => {
   // ฟังเหตุการณ์ผ่าน WebSocket แบบ Real-time
   socket.on('order_status_updated', handleIncomingKitchenOrder)
   socket.on('new_order', handleIncomingKitchenOrder)
+  socket.on('order_reviewed', handleOrderReviewed)
 
   // Polling สำรองทุก 4 วินาทีเพื่อความแม่นยำสูง
   pollInterval = setInterval(fetchActiveOrders, 4000)
@@ -841,6 +886,7 @@ onMounted(() => {
 onUnmounted(() => {
   socket.off('order_status_updated', handleIncomingKitchenOrder)
   socket.off('new_order', handleIncomingKitchenOrder)
+  socket.off('order_reviewed', handleOrderReviewed)
   if (pollInterval) clearInterval(pollInterval)
 })
 </script>
