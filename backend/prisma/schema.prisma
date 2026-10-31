@@ -262,6 +262,39 @@ model MenuIngredient {
   @@map("MENU_INGREDIENTS")
 }
 
+// ตารางที่ service สร้างเองตอนเริ่มระบบและเข้าถึงด้วย raw SQL
+// ต้องประกาศไว้ที่นี่ ไม่เช่นนั้น prisma db push --accept-data-loss จะลบทิ้งตอน deploy
+model OrderChatMessage {
+  message_id Int       @id @default(autoincrement())
+  order_id   Int
+  sender     String    @db.VarChar(20)
+  message    String    @db.Text
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+
+  @@index([order_id], map: "idx_order_chat_order")
+  @@map("ORDER_CHAT_MESSAGES")
+}
+
+model UserClaimedPromotion {
+  id         Int       @id @default(autoincrement())
+  user_id    Int
+  promo_id   Int
+  is_used    Boolean?  @default(false)
+  claimed_at DateTime? @default(now()) @db.Timestamp(0)
+  used_at    DateTime? @db.Timestamp(0)
+
+  @@unique([user_id, promo_id], map: "uq_user_promo")
+  @@map("USER_CLAIMED_PROMOTIONS")
+}
+
+model UserActiveSession {
+  user_id    Int       @id
+  session_id String    @db.VarChar(100)
+  updated_at DateTime? @default(now()) @db.Timestamp(0)
+
+  @@map("USER_ACTIVE_SESSIONS")
+}
+
 // 1. สรุปยอดขายรวม (ออเดอร์)
 view OrderSummary {
   order_id     Int      @unique
