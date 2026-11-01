@@ -40,10 +40,8 @@
           </div>
         </div>
 
-        <!-- Right: Actions (FAQ Knowledge Base modal & Reset chat) -->
+        <!-- Right: Actions (Reset chat) -->
         <div class="flex items-center gap-2">
-
-
           <!-- Button: Clear/Reset Chat -->
           <button 
             v-if="hasUserStartedChat"
@@ -276,180 +274,13 @@
         </div>
       </div>
     </div>
-
-    <!-- MODAL: KNOWLEDGE BASE & FAQ MANAGEMENT -->
-    <div 
-      v-if="showKnowledgeModal" 
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in"
-    >
-      <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
-        <!-- Modal Header -->
-        <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
-          <div class="flex items-center gap-2.5">
-            <span class="text-xl">📚</span>
-            <div>
-              <h3 class="text-sm font-bold text-slate-800">คลังคำตอบอัตโนมัติ & บุคลิกบอท (Knowledge Base)</h3>
-              <p class="text-xs text-slate-500">จัดการคำตอบที่น้องส้มตำ AI จะใช้ตอบลูกค้าโดยอัตโนมัติ</p>
-            </div>
-          </div>
-          <button @click="showKnowledgeModal = false" class="text-slate-400 hover:text-slate-600 text-lg w-8 h-8 rounded-full hover:bg-slate-200 flex items-center justify-center transition">
-            ✕
-          </button>
-        </div>
-
-        <!-- Modal Content: Persona + FAQ List -->
-        <div class="p-6 overflow-y-auto space-y-6 flex-1">
-          <!-- Persona Config -->
-          <div class="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-100 space-y-3">
-            <h4 class="text-xs font-bold text-[#2d5a43] flex items-center gap-1.5">
-              <span>🎭</span> บุคลิกภาพน้องส้มตำ AI
-            </h4>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label class="block text-[11px] font-semibold text-slate-600 mb-1">ชื่อที่แสดง</label>
-                <input v-model="botPersona.name" type="text" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl bg-white outline-none" />
-              </div>
-              <div>
-                <label class="block text-[11px] font-semibold text-slate-600 mb-1">สโลแกน</label>
-                <input v-model="botPersona.title" type="text" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl bg-white outline-none" />
-              </div>
-            </div>
-          </div>
-
-          <!-- FAQ List Header -->
-          <div class="flex items-center justify-between">
-            <h4 class="text-xs font-bold text-slate-800">รายการคำถามที่พบบ่อย ({{ faqList.length }} ข้อ)</h4>
-            <button 
-              @click="openAddFaqModal"
-              class="text-xs bg-[#2d5a43] hover:bg-[#183324] text-white px-3 py-1.5 rounded-xl font-medium transition flex items-center gap-1"
-            >
-              <span>➕</span> เพิ่มคำถาม-คำตอบ
-            </button>
-          </div>
-
-          <!-- FAQ Cards -->
-          <div class="space-y-2.5">
-            <div 
-              v-for="(faq, idx) in faqList" 
-              :key="idx"
-              class="p-3.5 rounded-xl border border-slate-200/80 hover:border-emerald-300 transition bg-white space-y-2"
-            >
-              <div class="flex items-start justify-between gap-3">
-                <div class="flex items-center gap-2">
-                  <span class="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center justify-center shrink-0">
-                    Q{{ idx + 1 }}
-                  </span>
-                  <span class="text-xs font-bold text-slate-800">{{ faq.question }}</span>
-                  <span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-medium">
-                    {{ faq.category }}
-                  </span>
-                </div>
-                <button @click="removeFaq(idx)" title="ลบ" class="text-xs text-slate-400 hover:text-red-500 p-1">
-                  🗑️
-                </button>
-              </div>
-
-              <div class="flex flex-wrap items-center gap-1">
-                <span class="text-[10px] text-slate-400">คีย์เวิร์ด:</span>
-                <span 
-                  v-for="kw in faq.keywords" 
-                  :key="kw"
-                  class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono"
-                >
-                  #{{ kw }}
-                </span>
-              </div>
-
-              <p class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100 leading-relaxed">
-                <span class="font-semibold text-emerald-800">ตอบ:</span> {{ faq.answer }}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Modal Footer -->
-        <div class="p-4 border-t border-slate-100 flex justify-end bg-slate-50">
-          <button @click="showKnowledgeModal = false" class="px-5 py-2 rounded-xl text-xs font-semibold bg-[#2d5a43] hover:bg-[#183324] text-white transition">
-            เสร็จสิ้น
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- SUB-MODAL: ADD NEW FAQ -->
-    <div 
-      v-if="showModal"
-      class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in"
-    >
-      <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
-        <div class="flex items-center justify-between pb-2 border-b border-slate-100">
-          <h3 class="text-sm font-bold text-slate-800">เพิ่มคำถาม-คำตอบอัตโนมัติ</h3>
-          <button @click="showModal = false" class="text-slate-400 hover:text-slate-600">✕</button>
-        </div>
-
-        <div class="space-y-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">หมวดหมู่</label>
-            <select v-model="newFaq.category" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl outline-none">
-              <option value="ทั่วไป">ทั่วไป</option>
-              <option value="เมนูอาหาร">เมนูอาหาร</option>
-              <option value="เวลาทำการ">เวลาทำการ</option>
-              <option value="เดลิเวอรี">เดลิเวอรี</option>
-              <option value="โปรโมชัน">โปรโมชัน</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">หัวข้อคำถาม</label>
-            <input 
-              type="text" 
-              v-model="newFaq.question" 
-              placeholder="เช่น มีเมนูเจไหม?" 
-              class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl outline-none"
-            />
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">คีย์เวิร์ดตรวจจับ (คั่นด้วยจุลภาค ,)</label>
-            <input 
-              type="text" 
-              v-model="newFaq.keywordsStr" 
-              placeholder="เช่น เจ, มังสวิรัติ, vegan" 
-              class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl outline-none"
-            />
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">ข้อความตอบกลับของบอท</label>
-            <textarea 
-              v-model="newFaq.answer" 
-              rows="3" 
-              placeholder="ใส่คำตอบที่บอทจะส่งให้ลูกค้า..." 
-              class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl outline-none"
-            ></textarea>
-          </div>
-        </div>
-
-        <div class="flex items-center justify-end gap-2 pt-2">
-          <button @click="showModal = false" class="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100">
-            ยกเลิก
-          </button>
-          <button @click="saveNewFaq" class="px-4 py-2 rounded-xl text-xs font-semibold bg-[#2d5a43] hover:bg-[#183324] text-white shadow-sm">
-            บันทึกคำตอบ
-          </button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import { API_BASE } from '../../config/api.js'
-import { recordChatbotLog } from '../../utils/chatbotAnalytics'
 
-const showKnowledgeModal = ref(false)
-const showModal = ref(false)
 const simInput = ref('')
 const simIsTyping = ref(false)
 const simContainer = ref(null)
@@ -468,53 +299,12 @@ const showToast = (title, message = '', type = 'success') => {
   }, 2800)
 }
 
-const botPersona = ref({
-  name: 'น้องส้มตำ AI',
-  title: 'ผู้ช่วยร้านตำครกซิ่ง • ตอบทันใจ',
-  greeting: 'สวัสดีค่ะคุณลูกค้า! ยินดีต้อนรับสู่ร้านตำครกซิ่งค่ะ 🌶️✨ มีอะไรให้ช่วยแนะนำเมนูหรือสอบถามข้อมูลร้านได้เลยนะคะ',
-  tone: 'spicy'
-})
-
-const faqList = ref([
-  {
-    category: 'เมนูอาหาร',
-    question: 'เมนูแนะนำยอดฮิตมีอะไรบ้าง?',
-    keywords: ['เมนู', 'แนะนำ', 'ขายดี', 'อร่อย', 'signature'],
-    answer: 'เมนูยอดนิยมของร้านเราคือ ส้มตำปูปลาร้าพริกแห้ง ข้าวกะเพราหมูสับกระทะร้อน ปีกไก่ทอดสมุนไพร และยำวุ้นเส้นรวมมิตรครับ 🌶️'
-  },
-  {
-    category: 'เวลาทำการ',
-    question: 'ร้านเปิด-ปิดกี่โมง?',
-    keywords: ['เวลา', 'เปิด', 'ปิด', 'กี่โมง', 'วันไหน'],
-    answer: 'ร้านตำครกซิ่งเปิดบริการทุกวันเวลา 10:00 - 21:00 น. ครับ ลูกค้าสามารถสั่งล่วงหน้าได้ตลอดเวลาเลยครับ 🍽️'
-  },
-  {
-    category: 'เดลิเวอรี',
-    question: 'ค่าจัดส่งคิดอย่างไรและมีส่งฟรีไหม?',
-    keywords: ['ส่ง', 'เดลิ', 'ค่าส่ง', 'ส่งฟรี', 'ไรเดอร์'],
-    answer: 'เรามีบริการจัดส่งผ่านไรเดอร์ประจำร้าน รวดเร็วทันใจ พร้อมโปรโมชั่นพิเศษ ส่งฟรีเมื่อสั่งครบ ฿300 ขึ้นไปครับ 🛵💨'
-  },
-  {
-    category: 'โปรโมชัน',
-    question: 'มีส่วนลดหรือโปรโมชั่นอะไรบ้างตอนนี้?',
-    keywords: ['โปร', 'ลด', 'คูปอง', 'promotion', 'แถม'],
-    answer: 'มีทั้งคูปองลด 10% สำหรับสมาชิกใหม่ และโปรโมชั่นซื้อคู่สุดคุ้ม สามารถกดดูที่แท็บโปรโมชั่นในหน้าหลักได้เลยครับ 🎉'
-  }
-])
-
 const quickChips = [
   { icon: '📊', text: 'สรุปยอดขายและคำสั่งซื้อวันนี้' },
   { icon: '⚠️', text: 'ตรวจสอบวัตถุดิบที่ใกล้หมดสต็อก' },
   { icon: '🍳', text: 'ดูสถานะออเดอร์ในครัว KDS ตอนนี้' },
   { icon: '🪑', text: 'ตรวจสอบผังโต๊ะอาหารว่ามีโต๊ะว่างกี่โต๊ะ' }
 ]
-
-const newFaq = ref({
-  category: 'ทั่วไป',
-  question: '',
-  keywordsStr: '',
-  answer: ''
-})
 
 const ADMIN_CHAT_STORAGE_KEY = 'tumkrokzing_admin_sim_chat'
 
@@ -595,42 +385,6 @@ const resetChat = () => {
   showToast('เริ่มแชทใหม่', 'พร้อมสำหรับการสนทนากับน้องส้มตำ AI แล้วค่ะ', 'success')
 }
 
-const openAddFaqModal = () => {
-  newFaq.value = {
-    category: 'ทั่วไป',
-    question: '',
-    keywordsStr: '',
-    answer: ''
-  }
-  showModal.value = true
-}
-
-const saveNewFaq = () => {
-  if (!newFaq.value.question.trim() || !newFaq.value.answer.trim()) {
-    showToast('ข้อมูลไม่ครบถ้วน', 'กรุณากรอกหัวข้อคำถามและข้อความตอบกลับ', 'warning')
-    return
-  }
-
-  const kws = newFaq.value.keywordsStr
-    ? newFaq.value.keywordsStr.split(',').map(s => s.trim()).filter(Boolean)
-    : [newFaq.value.question.slice(0, 4)]
-
-  faqList.value.push({
-    category: newFaq.value.category,
-    question: newFaq.value.question,
-    keywords: kws,
-    answer: newFaq.value.answer
-  })
-
-  showModal.value = false
-  showToast('เพิ่มคำถามสำเร็จ', 'บันทึกคำถาม-คำตอบเข้าสู่ Knowledge Base แล้วค่ะ', 'success')
-}
-
-const removeFaq = (idx) => {
-  faqList.value.splice(idx, 1)
-  showToast('ลบรายการสำเร็จ', 'นำคำถามออกจากระบบเรียบร้อย', 'success')
-}
-
 const scrollSimToBottom = () => {
   nextTick(() => {
     if (simContainer.value) {
@@ -695,8 +449,6 @@ const simSubmit = async () => {
   scrollSimToBottom()
 
   simIsTyping.value = true
-  const startTime = performance.now()
-  let responseTimeSec = 0.6
 
   let botReply = ''
   try {
@@ -719,11 +471,6 @@ const simSubmit = async () => {
       const data = await res.json()
       if (data && data.reply) {
         botReply = data.reply
-        if (typeof data.responseTimeSec === 'number') {
-          responseTimeSec = data.responseTimeSec
-        } else {
-          responseTimeSec = Math.max(0.1, Number(((performance.now() - startTime) / 1000).toFixed(1)))
-        }
       }
     }
   } catch {
@@ -732,13 +479,7 @@ const simSubmit = async () => {
 
   if (!botReply) {
     const lower = q.toLowerCase()
-    const matchedFaq = faqList.value.find(f => 
-      f.keywords.some(k => lower.includes(k.toLowerCase())) || lower.includes(f.question.toLowerCase())
-    )
-
-    if (matchedFaq) {
-      botReply = matchedFaq.answer
-    } else if (lower.includes('ยอดขาย') || lower.includes('ขายได้') || lower.includes('รายได้') || lower.includes('เงิน')) {
+    if (lower.includes('ยอดขาย') || lower.includes('ขายได้') || lower.includes('รายได้') || lower.includes('เงิน')) {
       botReply = '📊 <b>สรุปยอดขายร้านตำครกซิ่ง:</b> ยอดขายสะสมทั้งหมด <b>฿2,510</b> (รวม 33 ออเดอร์) ระบบพร้อมเปิดรับออเดอร์ตลอดวันค่ะ 📈'
     } else if (lower.includes('วัตถุดิบ') || lower.includes('สต็อก') || lower.includes('หมด')) {
       botReply = '⚠️ <b>แจ้งเตือนสต็อกวัตถุดิบ:</b> ตรวจพบ <b>พริกป่น</b> คงเหลือ 1 กก. (ต่ำกว่าเกณฑ์ 1.5 กก.) แนะนำให้สั่งซื้อเพิ่มทันทีค่ะ 🌶️'
@@ -751,15 +492,7 @@ const simSubmit = async () => {
     } else {
       botReply = `น้องส้มตำ AI กำลังประมวลผลข้อมูลเกี่ยวกับ "<b>${q}</b>" ให้ผู้จัดการค่ะ สามารถสอบถามเรื่องยอดขาย สต็อก หรือออเดอร์ในครัวได้ตลอดเลยนะคะ 🌶️✨`
     }
-    responseTimeSec = Math.max(0.1, Number(((performance.now() - startTime) / 1000).toFixed(1)))
   }
-
-  recordChatbotLog({
-    question: q,
-    reply: botReply.replace(/<[^>]*>?/gm, ''),
-    responseTime: responseTimeSec,
-    source: 'admin'
-  })
 
   setTimeout(() => {
     simIsTyping.value = false

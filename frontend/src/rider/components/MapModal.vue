@@ -157,11 +157,6 @@ const mapContainer = ref(null)
 let map = null
 let riderMarker = null
 let routePolyline = null
-let animInterval = null
-
-const isSimulating = ref(false)
-const simIndex = ref(0)
-const progressPercent = ref(0)
 
 // Real Bangkok Coordinates
 // Store: ร้านตำครกซิ่ง ซ.รามคำแหง 24 แยก 14
@@ -214,28 +209,15 @@ const routeCoordinates = computed(() => {
 })
 
 const currentTurnDistance = computed(() => {
-  const coords = routeCoordinates.value
-  if (simIndex.value >= coords.length - 2) return 'อีก 50 เมตร'
-  if (simIndex.value > 3) return 'อีก 400 เมตร'
-  return 'อีก 150 เมตร'
+  return props.mapData?.distance ? `ระยะทาง ${props.mapData.distance}` : 'ระยะทาง ~3.2 กม.'
 })
 
 const currentTurnText = computed(() => {
-  const coords = routeCoordinates.value
   const targetLabel = props.mapData?.targetName || 'จุดส่งลูกค้า'
-  if (simIndex.value >= coords.length - 1) return `ถึง${targetLabel}แล้ว`
-  if (simIndex.value > 4) return 'มุ่งหน้าสู่ปลายทางตามเส้นทาง'
-  if (simIndex.value > 2) return 'เลี้ยวขวาเข้าสู่ถนนหลัก'
-  return 'ออกจาก ซอยรามคำแหง 24 แยก 14'
+  return `นำส่งปลายทาง: ${targetLabel}`
 })
 
-const currentTurnIcon = computed(() => {
-  const coords = routeCoordinates.value
-  if (simIndex.value >= coords.length - 1) return '📍'
-  if (simIndex.value > 4) return '⬆️'
-  if (simIndex.value > 2) return '↗️'
-  return '➡️'
-})
+const currentTurnIcon = computed(() => '🛵')
 
 // Google Maps links
 const googleEmbedUrl = computed(() => {
@@ -263,7 +245,6 @@ const createCustomIcon = (emoji, bgColor) => {
 }
 
 const destroyMap = () => {
-  stopSimulation()
   if (map) {
     try {
       map.off()
@@ -338,11 +319,11 @@ const initMap = () => {
       .bindPopup(`<b>${customerLabel}</b><br><span style="font-size:11px;">พิกัด: ${customerCoord.value[0].toFixed(5)}, ${customerCoord.value[1].toFixed(5)}</span>`)
       .addTo(map)
 
-    // Rider Moving Pin
+    // Rider Location Pin
     const riderIcon = createCustomIcon('🛵', '#059669')
-    const currentLoc = coords[simIndex.value] || coords[0]
+    const currentLoc = coords[0]
     riderMarker = L.marker(currentLoc, { icon: riderIcon })
-      .bindPopup('<b>พนักงานส่งของร้าน</b><br><span style="font-size:11px;">กำลังนำส่งอาหาร</span>')
+      .bindPopup('<b>พนักงานส่งของร้าน</b><br><span style="font-size:11px;">จุดรับอาหารประจำร้าน</span>')
       .addTo(map)
 
     // Fit bounds safely
@@ -374,46 +355,6 @@ const switchTab = (tab) => {
         }
       }, 150)
     })
-  }
-}
-
-const toggleSimulation = () => {
-  if (isSimulating.value) {
-    stopSimulation()
-  } else {
-    startSimulation()
-  }
-}
-
-const startSimulation = () => {
-  const coords = routeCoordinates.value
-  if (simIndex.value >= coords.length - 1) {
-    simIndex.value = 0
-  }
-  isSimulating.value = true
-  animInterval = setInterval(() => {
-    const currentCoords = routeCoordinates.value
-    if (simIndex.value < currentCoords.length - 1) {
-      simIndex.value++
-      const coord = currentCoords[simIndex.value]
-      if (riderMarker) {
-        riderMarker.setLatLng(coord)
-      }
-      if (map) {
-        map.panTo(coord, { animate: true, duration: 0.5 })
-      }
-      progressPercent.value = (simIndex.value / (currentCoords.length - 1)) * 100
-    } else {
-      stopSimulation()
-    }
-  }, 1400)
-}
-
-const stopSimulation = () => {
-  isSimulating.value = false
-  if (animInterval) {
-    clearInterval(animInterval)
-    animInterval = null
   }
 }
 

@@ -39,16 +39,10 @@
         <div class="text-xs">
           <span class="font-bold text-orange-950">สถานะครัว:</span>
           <span class="text-orange-800 ml-1">
-            {{ isFoodReady ? '✅ อาหารปรุงเสร็จแล้ว พร้อมรับ!' : '🔥 กำลังตำและย่าง (เหลือ ~2 นาที)' }}
+            {{ isFoodReady ? '✅ อาหารปรุงเสร็จแล้ว พร้อมรับ!' : '🔥 กำลังตำและย่าง (รอห้องครัวทำเสร็จ)' }}
           </span>
         </div>
       </div>
-      <button 
-        @click="toggleFoodReady" 
-        class="text-[10px] text-orange-700 underline font-medium hover:text-orange-900"
-      >
-        {{ isFoodReady ? 'ย้อนสถานะ' : 'จำลองอาหารเสร็จ' }}
-      </button>
     </div>
 
     <!-- Address & Route Details -->
@@ -92,11 +86,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['toggle-food-ready', 'open-map'])
-
-const toggleFoodReady = () => {
-  emit('toggle-food-ready')
-}
+const emit = defineEmits(['open-map'])
 
 const openMapModal = () => {
   emit('open-map', {

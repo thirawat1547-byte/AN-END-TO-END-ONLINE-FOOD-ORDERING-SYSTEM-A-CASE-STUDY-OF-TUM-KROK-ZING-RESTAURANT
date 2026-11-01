@@ -168,8 +168,8 @@ ${liveContext}
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!this.aiClient || !apiKey || apiKey === 'your_gemini_api_key_here' || apiKey.trim() === '') {
-      const elapsedSec = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
       const fallbackRes = await this.handleFallbackReply(userMessage);
+      const elapsedSec = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
       this.recordChatbotLog({
         question: userMessage,
         reply: fallbackRes.reply,
@@ -257,8 +257,8 @@ ${liveContext}
         error?.message?.includes('high demand') ||
         error?.message?.includes('quota');
 
-      const elapsedSec = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
       const fallbackRes = await this.handleFallbackReply(userMessage);
+      const elapsedSec = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
       this.recordChatbotLog({
         question: userMessage,
         reply: fallbackRes.reply,
@@ -618,8 +618,8 @@ ${adminContext}
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!this.aiClient || !apiKey || apiKey === 'your_gemini_api_key_here' || apiKey.trim() === '') {
-      const elapsedSec = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
       const fallbackRes = await this.handleAdminFallbackReply(userMessage);
+      const elapsedSec = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
       this.recordChatbotLog({
         question: userMessage,
         reply: fallbackRes.reply,
@@ -695,8 +695,8 @@ ${adminContext}
       }
 
       this.logger.warn(`Gemini API Admin ขัดข้อง (${error?.message?.slice(0, 50)}) — ใช้ Admin DB Fallback`);
-      const elapsedSec = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
       const fallbackRes = await this.handleAdminFallbackReply(userMessage);
+      const elapsedSec = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
       this.recordChatbotLog({
         question: userMessage,
         reply: fallbackRes.reply,
@@ -856,20 +856,17 @@ ${adminContext}
   }
   private loadLogsFromFile(): any[] {
     if (this.logsLoaded) return this.cachedLogs;
+    this.logsLoaded = true;
     try {
       if (fs.existsSync(this.logsFilePath)) {
-        const raw = fs.readFileSync(this.logsFilePath, 'utf8');
-        this.cachedLogs = JSON.parse(raw);
-        this.logsLoaded = true;
-        return this.cachedLogs;
+        const logs = JSON.parse(fs.readFileSync(this.logsFilePath, 'utf8'));
+        // ล้างข้อมูลตัวอย่างชุดเก่า (id ขึ้นต้นด้วย seed_) ออกจากไฟล์ เหลือเฉพาะคำถามจริง
+        this.cachedLogs = logs.filter(l => !String(l.id).startsWith('seed_'));
+        if (this.cachedLogs.length !== logs.length) this.saveLogsToFile();
       }
     } catch (e) {
       this.logger.warn('Failed to read chatbot logs file:', e);
     }
-
-    this.cachedLogs = this.generateSeedLogs();
-    this.saveLogsToFile();
-    this.logsLoaded = true;
     return this.cachedLogs;
   }
 
@@ -885,42 +882,20 @@ ${adminContext}
     }
   }
 
-  private generateSeedLogs(): any[] {
-    const seed: any[] = [];
-    for (let i = 0; i < 135; i++) {
-      const hh = String(10 + Math.floor(i / 15)).padStart(2, '0');
-      const mm = String((i * 3) % 60).padStart(2, '0');
-      seed.push({
-        id: `seed_0902_${i}`,
-        date: '2026-09-02',
-        timestamp: `2026-09-02T${hh}:${mm}:00`,
-        question: 'สอบถามข้อมูลเมนูและโปรโมชั่น',
-        reply: 'ยินดีต้อนรับสู่ร้านตำครกซิ่งค่ะ มีเมนูแนะนำหลายรายการนะคะ',
-        responseTime: Number((0.5 + (i % 5) * 0.1).toFixed(1)),
-        source: i % 10 === 0 ? 'admin' : 'customer'
-      });
-    }
-    for (let i = 0; i < 168; i++) {
-      const hh = String(10 + Math.floor(i / 18)).padStart(2, '0');
-      const mm = String((i * 2) % 60).padStart(2, '0');
-      seed.push({
-        id: `seed_0903_${i}`,
-        date: '2026-09-03',
-        timestamp: `2026-09-03T${hh}:${mm}:00`,
-        question: 'แนะนำเมนูเด็ดรสแซ่บ',
-        reply: 'ขอแนะนำ ส้มตำปูปลาร้าแซ่บซิ่ง และ ไก่ทอดกรอบๆ ค่ะ 🌶️',
-        responseTime: Number((0.4 + (i % 5) * 0.1).toFixed(1)),
-        source: i % 10 === 0 ? 'admin' : 'customer'
-      });
-    }
-    return seed;
+  // วันที่ YYYY-MM-DD ตามเวลาไทย (เซิร์ฟเวอร์รันเป็น UTC ถ้าใช้เวลาเครื่องจะตัดวันผิด 7 ชม.)
+  private toThaiDateKey(date: Date): string {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Bangkok',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
   }
 
   recordChatbotLog(entry: { question: string; reply: string; responseTime?: number; source?: string; timestamp?: string }) {
     this.loadLogsFromFile();
     const ts = entry.timestamp || new Date().toISOString();
-    const d = new Date(ts);
-    const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const dateKey = this.toThaiDateKey(new Date(ts));
     const logItem = {
       id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       date: dateKey,
@@ -935,18 +910,9 @@ ${adminContext}
     return logItem;
   }
 
-  getChatbotLogs(date?: string): any[] {
-    const logs = this.loadLogsFromFile();
-    if (date) {
-      return logs.filter(l => l.date === date);
-    }
-    return logs;
-  }
-
   getChatbotStats(targetDate?: string) {
     const logs = this.loadLogsFromFile();
-    const now = new Date();
-    const dateKey = targetDate || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const dateKey = targetDate || this.toThaiDateKey(new Date());
 
     const dayLogs = logs.filter(l => l.date === dateKey);
     const messageCount = dayLogs.length;
@@ -988,8 +954,8 @@ ${adminContext}
       diffText = 'ยังไม่มีข้อความ';
       diffClass = 'text-slate-400';
     } else if (yesterdayCount === 0 && messageCount > 0) {
-      diffText = `↑ +100% เทียบกับเมื่อวาน`;
-      diffClass = 'text-emerald-600';
+      diffText = 'เมื่อวานไม่มีข้อความให้เทียบ';
+      diffClass = 'text-slate-500';
     } else if (yesterdayCount > 0 && messageCount === 0) {
       diffText = `↓ -100% เทียบกับเมื่อวาน`;
       diffClass = 'text-rose-600';

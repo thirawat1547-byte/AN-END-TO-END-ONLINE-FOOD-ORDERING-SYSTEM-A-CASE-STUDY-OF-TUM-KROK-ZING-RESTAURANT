@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { adminStore } from '../store/adminData'
 import { socket } from '../../config/socket'
 
@@ -45,6 +45,9 @@ const formattedThaiDate = computed(() => {
   return dt.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })
 })
 
+// โหลดสถิติแชทบอทใหม่ทุกครั้งที่เปลี่ยนวัน
+watch(selectedDate, (date) => adminStore.fetchChatbotStats(date))
+
 // ปรับเลื่อนวันก่อนหน้า / วันถัดไป
 function changeDate(deltaDays) {
   const [y, m, d] = selectedDate.value.split('-').map(Number)
@@ -62,6 +65,7 @@ const handleRealtimeUpdate = () => {
 }
 
 onMounted(async () => {
+  adminStore.fetchChatbotStats(selectedDate.value)
   await adminStore.fetchAdminDashboardData()
 
   // ซิงค์ข้อมูลอัตโนมัติแบบ Real-time เมื่อครัวหรือแคชเชียร์อัปเดตออเดอร์
@@ -71,6 +75,7 @@ onMounted(async () => {
   // Polling fallback ทุก 10 วินาที เพื่อให้ข้อมูลอัปเดตตลอดเวลา
   refreshInterval = setInterval(() => {
     adminStore.fetchAdminDashboardData()
+    adminStore.fetchChatbotStats(selectedDate.value)
   }, 10000)
 
   // ตรวจสอบการเปลี่ยนวันตอนเที่ยงคืน หากยืนอยู่ที่วันเดิม ให้รีเซ็ตไปยังวันใหม่โดยอัตโนมัติ
@@ -214,9 +219,7 @@ function toggleBotStatus() {
 }
 
 // สถิติการตอบกลับของแชทบอท AI อิงตามความจริงของแต่ละวันที่มีการถามคำถาม
-const chatbotDayStats = computed(() => {
-  return adminStore.getChatbotStatsForDate(selectedDate.value)
-})
+const chatbotDayStats = computed(() => adminStore.chatbotDayStats)
 
 const dayRecentOrders = computed(() => {
   const sorted = [...dayOrders.value].sort((a, b) => {

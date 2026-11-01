@@ -178,7 +178,6 @@
 import { ref, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { API_BASE } from '../config/api.js'
-import { recordChatbotLog } from '../utils/chatbotAnalytics'
 
 const route = useRoute()
 const CHATBOT_API = `${API_BASE}/chatbot`
@@ -406,7 +405,6 @@ const formatMessage = (text) => {
 }
 
 const sendToGemini = async (userMessage) => {
-  const startTime = performance.now()
   try {
     const body = {
       message: userMessage,
@@ -431,29 +429,10 @@ const sendToGemini = async (userMessage) => {
       currentSuggestions.value = data.suggestedQuestions
     }
 
-    const elapsedSec = typeof data.responseTimeSec === 'number'
-      ? data.responseTimeSec
-      : Math.max(0.1, Number(((performance.now() - startTime) / 1000).toFixed(1)))
-
-    recordChatbotLog({
-      question: userMessage,
-      reply: data.reply,
-      responseTime: elapsedSec,
-      source: 'customer'
-    })
-
     return data.reply
   } catch (err) {
     console.error('Chatbot API error:', err)
-    const fallbackReply = getFallbackReply(userMessage)
-    const elapsedSec = Math.max(0.1, Number(((performance.now() - startTime) / 1000).toFixed(1)))
-    recordChatbotLog({
-      question: userMessage,
-      reply: fallbackReply,
-      responseTime: elapsedSec,
-      source: 'customer'
-    })
-    return fallbackReply
+    return getFallbackReply(userMessage)
   }
 }
 

@@ -1,4 +1,3 @@
-import { getStoredChatbotLogs, recordChatbotLog, computeChatbotStatsForDate } from '../../utils/chatbotAnalytics'
 import { reactive } from 'vue'
 
 // ===== Backend API Configuration =====
@@ -64,7 +63,16 @@ export const MENU_IMAGE_MAP = {
 }
 
 export const adminStore = reactive({
-  chatbotLogs: [],
+  // สถิติแชทบอทของวันที่เลือกในแดชบอร์ด (คำนวณจาก log จริงฝั่ง Backend)
+  chatbotDayStats: {
+    date: '',
+    messageCount: '-',
+    avgSpeedText: '-',
+    speedLabel: '',
+    speedClass: 'text-slate-400',
+    diffText: '',
+    diffClass: 'text-slate-400'
+  },
   // ===== สถิติแดชบอร์ดที่ดึงจาก Backend จริง =====
   dashboardStats: {
     grossSales: 1320,
@@ -646,8 +654,7 @@ export const adminStore = reactive({
       this.fetchInventoryFromAPI(),
       this.fetchTablesFromAPI(),
       this.fetchOrdersFromAPI(),
-      this.fetchPromotionsFromAPI(),
-      this.fetchChatbotStatsFromAPI()
+      this.fetchPromotionsFromAPI()
     ])
     this.recomputeDashboardStats()
   },
@@ -1460,42 +1467,31 @@ export const adminStore = reactive({
   },
 
 
-  // ===== Chatbot Daily Stats & Real Analytics =====
-  async fetchChatbotStatsFromAPI() {
+  // ===== Chatbot Daily Stats =====
+  async fetchChatbotStats(dateStr) {
+    this.chatbotStatsRequestedDate = dateStr
+    let stats = null
     try {
-      this.chatbotLogs = getStoredChatbotLogs();
-      const res = await fetch(`${API_BASE}/chatbot/logs`);
-      if (res.ok) {
-        const backendLogs = await res.json();
-        if (Array.isArray(backendLogs) && backendLogs.length > 0) {
-          const existingIds = new Set(this.chatbotLogs.map(l => l.id));
-          for (const bLog of backendLogs) {
-            if (!existingIds.has(bLog.id)) {
-              this.chatbotLogs.push(bLog);
-              existingIds.add(bLog.id);
-            }
-          }
-          try {
-            localStorage.setItem('tumkrokzing_chatbot_logs', JSON.stringify(this.chatbotLogs));
-          } catch (e) {}
-        }
-      }
-    } catch (e) {
-      this.chatbotLogs = getStoredChatbotLogs();
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token') || sessionStorage.getItem('token')
+      const res = await fetch(`${API_BASE}/chatbot/stats?date=${dateStr}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      stats = await res.json()
+    } catch (err) {
+      console.warn('⚠️ โหลดสถิติแชทบอทไม่สำเร็จ:', err.message)
     }
-  },
-
-  getChatbotStatsForDate(dateStr) {
-    if (!this.chatbotLogs || this.chatbotLogs.length === 0) {
-      this.chatbotLogs = getStoredChatbotLogs();
+    // ผู้ใช้เปลี่ยนวันระหว่างรอ ให้ทิ้งผลลัพธ์ของวันเก่า
+    if (this.chatbotStatsRequestedDate !== dateStr) return
+    this.chatbotDayStats = stats || {
+      date: dateStr,
+      messageCount: '-',
+      avgSpeedText: '-',
+      speedLabel: 'โหลดข้อมูลไม่สำเร็จ',
+      speedClass: 'text-slate-400',
+      diffText: 'โหลดข้อมูลไม่สำเร็จ',
+      diffClass: 'text-slate-400'
     }
-    return computeChatbotStatsForDate(dateStr, this.chatbotLogs);
-  },
-
-  logChatbotMessage(entry) {
-    const newLog = recordChatbotLog(entry);
-    this.chatbotLogs = getStoredChatbotLogs();
-    return newLog;
   },
 
   // ===== PDF Export =====
@@ -1503,9 +1499,3 @@ export const adminStore = reactive({
     window.print()
   }
 })
-
-if (typeof window !== 'undefined') {
-  window.addEventListener('tumkrokzing:chatbot_log_added', () => {
-    adminStore.chatbotLogs = getStoredChatbotLogs();
-  });
-}

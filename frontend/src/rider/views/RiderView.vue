@@ -98,7 +98,6 @@
             <div :class="{ 'ring-2 ring-emerald-500 rounded-2xl': currentStep === 0 }">
               <RestaurantCard 
                 :is-food-ready="isFoodReady"
-                @toggle-food-ready="handleToggleFoodReady"
                 @open-map="handleOpenMap"
               />
             </div>
@@ -693,41 +692,6 @@ const cancelCurrentTrip = () => {
   currentStep.value = 0
   showToast('สลับเข้าสู่โหมดสแตนด์บาย')
   fetchActiveOrders()
-}
-
-const activateDemoOrder = () => {
-  const mockOrder = {
-    order_id: 9482,
-    order_type: 'DELIVERY',
-    status: 'READY',
-    total_price: 250,
-    delivery_address: 'คอนโด The Grand Rama 9 (อาคาร B) ชั้น 14 ห้อง 1408',
-    delivery_phone: '081-992-8811',
-    order_notes: 'ฝากไว้ที่โต๊ะพนักงานส่งอาหารล็อบบี้ชั้น 1',
-    user: {
-      username: 'คุณณัฐวุฒิ ใจดี',
-      phone_number: '081-992-8811',
-      address: 'คอนโด The Grand Rama 9 (อาคาร B)'
-    },
-    order_items: [
-      { order_item_id: 1, quantity: 2, unit_price: 70, notes: 'พริก 10 เม็ด ปลาร้าสุก', menu: { menu_name: 'ส้มตำปูปลาร้า' } },
-      { order_item_id: 2, quantity: 1, unit_price: 110, notes: 'หนังกรอบ น้ำจิ้มแจ่ว', menu: { menu_name: 'ไก่ย่างสูตรเด็ด' } }
-    ]
-  }
-  handleClaimOrder(mockOrder)
-}
-
-const handleToggleFoodReady = async () => {
-  isFoodReady.value = !isFoodReady.value
-  if (isRealOrder.value && realOrderId.value) {
-    try {
-      const newStatus = isFoodReady.value ? 'READY' : 'COOKING'
-      await axios.patch(`${API_BASE}/orders/${realOrderId.value}/status`, { status: newStatus })
-      showToast(`เปลี่ยนสถานะครัวเป็น: ${newStatus}`)
-    } catch (e) {
-      console.error(e)
-    }
-  }
 }
 
 const handleToggleItem = (id) => {

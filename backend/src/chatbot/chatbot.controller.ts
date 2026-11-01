@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Post, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { BadRequestException, Body, Controller, Get, Post, HttpCode, HttpStatus, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ChatbotService } from './chatbot.service';
 import { AskChatbotDto, ChatbotReplyDto } from './dto/chat-message.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -44,6 +44,25 @@ export class ChatbotController {
   })
   async adminAsk(@Body() askDto: AskChatbotDto): Promise<ChatbotReplyDto> {
     return this.chatbotService.adminAsk(askDto);
+  }
+
+  @Get('stats')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'สถิติการตอบกลับของแชทบอทประจำวัน (จำนวนข้อความ ความเร็วเฉลี่ย เทียบกับวันก่อนหน้า)',
+  })
+  @ApiQuery({ name: 'date', required: false, description: 'YYYY-MM-DD ตามเวลาไทย (ไม่ระบุ = วันนี้)' })
+  @ApiResponse({
+    status: 200,
+    description: 'สถิติของวันที่ระบุ',
+  })
+  getStats(@Query('date') date?: string) {
+    if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new BadRequestException('รูปแบบวันที่ต้องเป็น YYYY-MM-DD');
+    }
+    return this.chatbotService.getChatbotStats(date);
   }
 
   @Get('suggested-questions')
