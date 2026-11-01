@@ -1,8 +1,11 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, ParseIntPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Controller, Get, Post, Patch, Delete, Param, Body, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { TablesService } from './tables.service';
 import { CreateTableDto } from './dto/create-table.dto';
 import { UpdateTableStatusDto } from './dto/update-table-status.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 // src/tables/tables.controller.ts
 @ApiTags('Tables') 
@@ -23,13 +26,19 @@ export class TablesController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'เพิ่มโต๊ะอาหารใหม่' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'STAFF')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'เพิ่มโต๊ะอาหารใหม่ (ADMIN / STAFF)' })
   create(@Body() createTableDto: CreateTableDto) {
     return this.tablesService.create(createTableDto);
   }
 
   @Patch(':id/status')
-  @ApiOperation({ summary: 'อัปเดตสถานะโต๊ะ (AVAILABLE / OCCUPIED)' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'STAFF')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'อัปเดตสถานะโต๊ะ (AVAILABLE / OCCUPIED) (ADMIN / STAFF)' })
   updateStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateTableStatusDto,
@@ -38,7 +47,10 @@ export class TablesController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'ลบโต๊ะอาหารออกจากระบบ' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'STAFF')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'ลบโต๊ะอาหารออกจากระบบ (ADMIN / STAFF)' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.tablesService.remove(id);
   }

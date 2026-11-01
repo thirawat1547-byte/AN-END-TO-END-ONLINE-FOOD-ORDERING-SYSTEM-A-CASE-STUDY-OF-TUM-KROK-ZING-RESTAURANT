@@ -1166,9 +1166,13 @@ export const adminStore = reactive({
     else if (s === 'CANCELLED') dbStatus = 'CANCELLED'
 
     try {
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token') || sessionStorage.getItem('token')
       const res = await fetch(`${API_BASE}/orders/${orderId}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ status: dbStatus })
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -1208,9 +1212,13 @@ export const adminStore = reactive({
     const previous = p.is_active
     p.is_active = !previous
     try {
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token') || sessionStorage.getItem('token')
       const res = await fetch(`${API_BASE}/promotions/${promoId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ is_active: p.is_active })
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -1229,10 +1237,14 @@ export const adminStore = reactive({
 
   async addPromotionAPI(promo) {
     try {
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token') || sessionStorage.getItem('token')
       const expDate = promo.expiry_date ? new Date(promo.expiry_date).toISOString() : new Date('2026-12-31T23:59:59Z').toISOString()
       const res = await fetch(`${API_BASE}/promotions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           code: String(promo.code || '').toUpperCase(),
           discount_type: (promo.discount_type || 'FIXED').toUpperCase(),
@@ -1362,9 +1374,13 @@ export const adminStore = reactive({
     const nextStatus = !this.storeSettings.isOpen
     this.storeSettings.isOpen = nextStatus
     try {
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token') || sessionStorage.getItem('token')
       const res = await fetch(`${API_BASE}/settings/toggle`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()

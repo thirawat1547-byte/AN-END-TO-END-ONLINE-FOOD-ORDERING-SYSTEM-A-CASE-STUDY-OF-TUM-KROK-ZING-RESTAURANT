@@ -1,7 +1,10 @@
-import { Body, Controller, Get, Post, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Post, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ChatbotService } from './chatbot.service';
 import { AskChatbotDto, ChatbotReplyDto } from './dto/chat-message.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @ApiTags('Chatbot')
 @Controller('chatbot')
@@ -25,6 +28,9 @@ export class ChatbotController {
   }
 
   @Post('admin-ask')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'ส่งข้อความถาม-ตอบสำหรับแอดมิน/ผู้จัดการร้าน (น้องส้มตำ AI ผู้ช่วยผู้จัดการ)',

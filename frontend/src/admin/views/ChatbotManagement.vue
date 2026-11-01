@@ -710,9 +710,13 @@ const simSubmit = async () => {
       text: m.text.replace(/<[^>]*>?/gm, '')
     }))
 
+    const token = localStorage.getItem('access_token') || localStorage.getItem('token') || sessionStorage.getItem('token')
     const res = await fetch(`${API_BASE}/chatbot/admin-ask`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
       body: JSON.stringify({ message: q, history: historyPayload })
     })
 

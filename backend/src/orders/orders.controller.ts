@@ -27,6 +27,9 @@ import { OrderChatMessageDto } from './dto/chat-message.dto';
 import { ReviewOrderDto } from './dto/review-order.dto';
 
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @ApiTags('Orders')
 @Controller('orders')
@@ -126,11 +129,12 @@ export class OrdersController {
     return this.ordersService.findOne(id);
   }
 
-  // ไรเดอร์กดรับงานจัดส่ง
+  // ไรเดอร์กดรับงานจัดส่ง (จำกัดสิทธิ์เฉพาะ ADMIN, STAFF, RIDER)
   @Post(':id/claim-delivery')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'STAFF', 'RIDER')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'ไรเดอร์กดรับงานจัดส่งออเดอร์' })
+  @ApiOperation({ summary: 'ไรเดอร์กดรับงานจัดส่งออเดอร์ (ADMIN / STAFF / RIDER)' })
   claimDelivery(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     const rawUserId = req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub;
     const riderId = Number(rawUserId) || 1;
@@ -139,9 +143,10 @@ export class OrdersController {
 
   // ไรเดอร์อัปเดตสถานะงานจัดส่ง (PICKED_UP, DELIVERED)
   @Patch(':id/delivery-status')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'STAFF', 'RIDER')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'ไรเดอร์อัปเดตสถานะการจัดส่ง (พร้อมแนบรูปถ่ายหลักฐาน)' })
+  @ApiOperation({ summary: 'ไรเดอร์อัปเดตสถานะการจัดส่ง (พร้อมแนบรูปถ่ายหลักฐาน) (ADMIN / STAFF / RIDER)' })
   updateDeliveryStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { status: string; proof_image_url?: string },
@@ -154,7 +159,10 @@ export class OrdersController {
 
   // ไรเดอร์อัปโหลดรูปหลักฐานการจัดส่ง -> เก็บไว้ที่ uploads/delivery-proofs แล้วส่ง URL กลับไปแนบตอน DELIVERED
   @Post(':id/delivery-proof')
-  @ApiOperation({ summary: 'อัปโหลดรูปถ่ายหลักฐานการจัดส่ง (ลูกค้าและแอดมินจะเห็นรูปนี้)' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'STAFF', 'RIDER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'อัปโหลดรูปถ่ายหลักฐานการจัดส่ง (ADMIN / STAFF / RIDER)' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -234,8 +242,12 @@ export class OrdersController {
     return this.ordersService.reviewOrder(id, Number(rawUserId), body);
   }
 
+  // เปลี่ยนสถานะคำสั่งซื้อ (ป้องกันไม่ให้ใครก็ได้มายิงเปลี่ยนสถานะ: อนุญาตเฉพาะ ADMIN, STAFF, RIDER)
   @Patch(':id/status')
-  @ApiOperation({ summary: 'เปลี่ยนสถานะคำสั่งซื้อ' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'STAFF', 'RIDER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'เปลี่ยนสถานะคำสั่งซื้อ (ADMIN / STAFF / RIDER)' })
   updateStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateOrderStatusDto: UpdateOrderStatusDto,

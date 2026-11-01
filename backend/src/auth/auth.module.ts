@@ -12,6 +12,9 @@ import { FacebookAuthGuard } from './guards/facebook-auth.guard';
 import { LineAuthGuard } from './guards/line-auth.guard';
 import { PrismaService } from '../prisma.service';
 
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RolesGuard } from './guards/roles.guard';
+
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt', session: false }),
@@ -30,8 +33,10 @@ import { PrismaService } from '../prisma.service';
     GoogleAuthGuard,
     FacebookAuthGuard,
     LineAuthGuard,
+    JwtAuthGuard,
+    RolesGuard,
     PrismaService,
   ],
-  exports: [AuthService, JwtModule, PassportModule],
+  exports: [AuthService, JwtModule, PassportModule, JwtAuthGuard, RolesGuard],
 })
 export class AuthModule {}

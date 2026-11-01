@@ -12,6 +12,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -24,10 +25,14 @@ import {
   ApiQuery,
   ApiParam,
   ApiConsumes,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { MenusService } from './menus.service';
 import { CreateMenuDto } from './dto/create-menu.dto';
 import { UpdateMenuDto } from './dto/update-menu.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @ApiTags('Menus')
 @Controller('menus')
@@ -35,7 +40,10 @@ export class MenusController {
   constructor(private readonly menusService: MenusService) {}
 
   @Post('upload')
-  @ApiOperation({ summary: 'อัปโหลดไฟล์ภาพเมนูอาหารตรง (Multer)' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'อัปโหลดไฟล์ภาพเมนูอาหารตรง (Multer - เฉพาะ Admin)' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -81,7 +89,10 @@ export class MenusController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'เพิ่มเมนูอาหารใหม่' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'เพิ่มเมนูอาหารใหม่ (เฉพาะ Admin)' })
   @ApiResponse({ status: 201, description: 'สร้างเมนูอาหารสำเร็จ' })
   create(@Body() createMenuDto: CreateMenuDto) {
     return this.menusService.create(createMenuDto);
@@ -137,7 +148,10 @@ export class MenusController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'แก้ไขข้อมูลเมนูอาหาร' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'แก้ไขข้อมูลเมนูอาหาร (เฉพาะ Admin)' })
   @ApiParam({ name: 'id', description: 'รหัสเมนูอาหาร (menu_id)' })
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -147,14 +161,20 @@ export class MenusController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'ลบเมนูอาหารออกจากระบบ' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'ลบเมนูอาหารออกจากระบบ (เฉพาะ Admin)' })
   @ApiParam({ name: 'id', description: 'รหัสเมนูอาหาร (menu_id)' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.menusService.remove(id);
   }
 
   @Put(':id/ingredients')
-  @ApiOperation({ summary: 'ผูกสูตรอาหาร / ปรับปรุงสัดส่วนวัตถุดิบ (Recipe Formulation)' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'ผูกสูตรอาหาร / ปรับปรุงสัดส่วนวัตถุดิบ (เฉพาะ Admin)' })
   @ApiParam({ name: 'id', description: 'รหัสเมนูอาหาร (menu_id)' })
   updateIngredients(
     @Param('id', ParseIntPipe) id: number,
@@ -164,7 +184,10 @@ export class MenusController {
   }
 
   @Post(':id/ingredients')
-  @ApiOperation({ summary: 'ผูกสูตรอาหาร / ปรับปรุงสัดส่วนวัตถุดิบ (Recipe Formulation)' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'ผูกสูตรอาหาร / ปรับปรุงสัดส่วนวัตถุดิบ (เฉพาะ Admin)' })
   @ApiParam({ name: 'id', description: 'รหัสเมนูอาหาร (menu_id)' })
   saveIngredients(
     @Param('id', ParseIntPipe) id: number,

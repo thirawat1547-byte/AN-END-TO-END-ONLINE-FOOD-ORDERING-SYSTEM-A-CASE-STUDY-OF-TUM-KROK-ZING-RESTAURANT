@@ -14,6 +14,8 @@ import { PromotionsService } from './promotions.service';
 import { CreatePromotionDto } from './dto/create-promotion.dto';
 import { UpdatePromotionDto } from './dto/update-promotion.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('Promotions')
@@ -67,13 +69,19 @@ export class PromotionsController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'สร้างโปรโมชัน/โค้ดส่วนลดใหม่' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'สร้างโปรโมชัน/โค้ดส่วนลดใหม่ (เฉพาะ Admin)' })
   create(@Body() createDto: CreatePromotionDto) {
     return this.promotionsService.create(createDto);
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'แก้ไขข้อมูลโปรโมชัน หรือเปิด/ปิดการใช้งาน' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'แก้ไขข้อมูลโปรโมชัน หรือเปิด/ปิดการใช้งาน (เฉพาะ Admin)' })
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdatePromotionDto,
@@ -82,7 +90,10 @@ export class PromotionsController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'ลบโปรโมชันออกจากระบบ' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'ลบโปรโมชันออกจากระบบ (เฉพาะ Admin)' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.promotionsService.remove(id);
   }

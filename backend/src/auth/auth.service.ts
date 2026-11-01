@@ -233,7 +233,8 @@ export class AuthService implements OnModuleInit {
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(dto.password, saltRounds);
 
-    const normalizedRole = (dto.role || 'CUSTOMER').toUpperCase();
+    // บังคับให้ผู้ใช้งานที่สมัครใหม่ได้รับ role เป็น 'CUSTOMER' เสมอ (ห้ามรับค่า role จากภายนอก ป้องกัน Privilege Escalation)
+    const assignedRole = 'CUSTOMER';
     const user = await this.prisma.user.create({
       data: {
         username: dto.username,
@@ -241,12 +242,12 @@ export class AuthService implements OnModuleInit {
         email: dto.email ? dto.email.trim() : null,
         phone_number: cleanPhone,
         address: dto.address ? dto.address.trim().substring(0, 255) : null,
-        role: normalizedRole,
+        role: assignedRole,
       },
     });
 
     const { password, ...result } = user;
-    return { ...result, role: normalizedRole };
+    return { ...result, role: assignedRole };
   }
 
   async login(dto: LoginDto) {

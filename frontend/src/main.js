@@ -10,6 +10,18 @@ import { initGlobalAlertInterceptor } from './utils/swal'
 // เปิดใช้งานระบบ Popup สวยงาม แทน browser alert() ทั่วทั้งระบบ
 initGlobalAlertInterceptor()
 
+// แนบ JWT Token ใน Header ของทุก Axios Request อัตโนมัติเมื่อมี Token ในเครื่อง
+axios.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token') || localStorage.getItem('token') || sessionStorage.getItem('token')
+  if (token) {
+    config.headers = config.headers || {}
+    if (!config.headers.Authorization) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+  }
+  return config
+})
+
 // ดักจับการตอบกลับจาก Backend เพื่อตรวจจับเมื่อถูกเตะออกจากระบบทันที (Real-time Kickout)
 axios.interceptors.response.use(
   (response) => response,

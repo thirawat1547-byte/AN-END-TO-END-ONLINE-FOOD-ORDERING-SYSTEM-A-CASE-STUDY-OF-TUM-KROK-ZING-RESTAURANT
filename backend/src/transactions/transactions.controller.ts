@@ -6,6 +6,8 @@ import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { VerifyTransactionDto } from './dto/verify-transaction.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 // อนุญาตเฉพาะพนักงานร้าน (ADMIN / KITCHEN)
 function assertStaff(req: any) {
@@ -75,7 +77,10 @@ export class TransactionsController {
   }
 
   @Post('stripe/confirm-test/:orderId')
-  @ApiOperation({ summary: 'จำลองการชำระเงินผ่าน Stripe สำเร็จ (สำหรับทดสอบ Flow)' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'STAFF')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'จำลองการชำระเงินผ่าน Stripe สำเร็จ (สำหรับทดสอบ Flow - ADMIN/STAFF)' })
   @ApiParam({ name: 'orderId', type: Number, description: 'รหัสคำสั่งซื้อ (Order ID)' })
   @ApiResponse({ status: 200, description: 'ปรับสถานะ Transaction เป็น COMPLETED และ Order เป็น PAID เรียบร้อย' })
   @ApiResponse({ status: 404, description: 'ไม่พบคำสั่งซื้อ' })
