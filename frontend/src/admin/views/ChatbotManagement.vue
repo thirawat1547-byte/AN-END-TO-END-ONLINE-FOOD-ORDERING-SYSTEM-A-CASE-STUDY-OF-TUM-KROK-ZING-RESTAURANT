@@ -42,15 +42,7 @@
 
         <!-- Right: Actions (FAQ Knowledge Base modal & Reset chat) -->
         <div class="flex items-center gap-2">
-          <!-- Button: Open FAQ Knowledge Base -->
-          <button 
-            @click="showKnowledgeModal = true"
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-emerald-50 text-slate-700 hover:text-[#2d5a43] border border-slate-200 hover:border-emerald-200 text-xs font-medium transition shadow-2xs"
-            title="จัดการคลังคำตอบ FAQ และบุคลิกบอท"
-          >
-            <span>📚</span>
-            <span class="hidden sm:inline">คลังคำตอบ FAQ</span>
-          </button>
+
 
           <!-- Button: Clear/Reset Chat -->
           <button 
@@ -454,6 +446,7 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import { API_BASE } from '../../config/api.js'
+import { recordChatbotLog } from '../../utils/chatbotAnalytics'
 
 const showKnowledgeModal = ref(false)
 const showModal = ref(false)
@@ -702,6 +695,8 @@ const simSubmit = async () => {
   scrollSimToBottom()
 
   simIsTyping.value = true
+  const startTime = performance.now()
+  let responseTimeSec = 0.6
 
   let botReply = ''
   try {
@@ -724,6 +719,11 @@ const simSubmit = async () => {
       const data = await res.json()
       if (data && data.reply) {
         botReply = data.reply
+        if (typeof data.responseTimeSec === 'number') {
+          responseTimeSec = data.responseTimeSec
+        } else {
+          responseTimeSec = Math.max(0.1, Number(((performance.now() - startTime) / 1000).toFixed(1)))
+        }
       }
     }
   } catch {
@@ -751,7 +751,15 @@ const simSubmit = async () => {
     } else {
       botReply = `น้องส้มตำ AI กำลังประมวลผลข้อมูลเกี่ยวกับ "<b>${q}</b>" ให้ผู้จัดการค่ะ สามารถสอบถามเรื่องยอดขาย สต็อก หรือออเดอร์ในครัวได้ตลอดเลยนะคะ 🌶️✨`
     }
+    responseTimeSec = Math.max(0.1, Number(((performance.now() - startTime) / 1000).toFixed(1)))
   }
+
+  recordChatbotLog({
+    question: q,
+    reply: botReply.replace(/<[^>]*>?/gm, ''),
+    responseTime: responseTimeSec,
+    source: 'admin'
+  })
 
   setTimeout(() => {
     simIsTyping.value = false

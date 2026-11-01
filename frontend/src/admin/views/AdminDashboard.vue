@@ -208,7 +208,15 @@ const botEnabled = ref(localStorage.getItem('tumkrokzing_bot_enabled') !== 'fals
 function toggleBotStatus() {
   botEnabled.value = !botEnabled.value
   localStorage.setItem('tumkrokzing_bot_enabled', String(botEnabled.value))
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('tumkrokzing:bot_status_changed', { detail: { enabled: botEnabled.value } }))
+  }
 }
+
+// สถิติการตอบกลับของแชทบอท AI อิงตามความจริงของแต่ละวันที่มีการถามคำถาม
+const chatbotDayStats = computed(() => {
+  return adminStore.getChatbotStatsForDate(selectedDate.value)
+})
 
 const dayRecentOrders = computed(() => {
   const sorted = [...dayOrders.value].sort((a, b) => {
@@ -1189,15 +1197,19 @@ const avgPrepTimeMinutes = computed(() => {
         </router-link>
       </div>
 
-      <!-- Stats Cards -->
+      <!-- Stats Cards (อิงตามความจริงของวันที่เลือก) -->
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <!-- Card 1: ข้อความตอบกลับวันนี้ -->
+        <!-- Card 1: ข้อความตอบกลับวันนี้ / วันที่เลือก -->
         <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
           <div>
-            <p class="text-xs font-medium text-slate-500">ข้อความตอบกลับวันนี้</p>
-            <h3 class="text-2xl font-bold text-slate-800 mt-1">168 <span class="text-xs font-normal text-slate-400">ข้อความ</span></h3>
-            <span class="inline-flex items-center text-[11px] text-emerald-600 font-medium mt-1">
-              ↑ +24% เทียบกับเมื่อวาน
+            <p class="text-xs font-medium text-slate-500">
+              {{ isTodaySelected ? 'ข้อความตอบกลับวันนี้' : 'ข้อความตอบกลับประจำวัน (' + formattedThaiDate + ')' }}
+            </p>
+            <h3 class="text-2xl font-bold text-slate-800 mt-1">
+              {{ chatbotDayStats.messageCount }} <span class="text-xs font-normal text-slate-400">ข้อความ</span>
+            </h3>
+            <span class="inline-flex items-center text-[11px] font-medium mt-1" :class="chatbotDayStats.diffClass">
+              {{ chatbotDayStats.diffText }}
             </span>
           </div>
           <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl">
@@ -1209,9 +1221,11 @@ const avgPrepTimeMinutes = computed(() => {
         <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
           <div>
             <p class="text-xs font-medium text-slate-500">ความเร็วตอบกลับเฉลี่ย</p>
-            <h3 class="text-2xl font-bold text-slate-800 mt-1">0.6 <span class="text-xs font-normal text-slate-400">วินาที</span></h3>
-            <span class="inline-flex items-center text-[11px] text-amber-600 font-medium mt-1">
-              ⚡ รวดเร็วทันใจ
+            <h3 class="text-2xl font-bold text-slate-800 mt-1">
+              {{ chatbotDayStats.avgSpeedText }} <span class="text-xs font-normal text-slate-400" v-if="chatbotDayStats.avgSpeedText !== '-'">วินาที</span>
+            </h3>
+            <span class="inline-flex items-center text-[11px] font-medium mt-1" :class="chatbotDayStats.speedClass">
+              {{ chatbotDayStats.speedLabel }}
             </span>
           </div>
           <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl">

@@ -178,6 +178,7 @@
 import { ref, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { API_BASE } from '../config/api.js'
+import { recordChatbotLog } from '../utils/chatbotAnalytics'
 
 const route = useRoute()
 const CHATBOT_API = `${API_BASE}/chatbot`
@@ -188,6 +189,15 @@ const isTyping = ref(false)
 const messagesContainer = ref(null)
 const geminiReady = ref(false)
 const chatHistory = ref([])
+const isBotEnabled = ref(localStorage.getItem('tumkrokzing_bot_enabled') !== 'false')
+
+const handleBotStatusChange = (e) => {
+  if (e && e.detail && e.detail.enabled !== undefined) {
+    isBotEnabled.value = e.detail.enabled
+  } else {
+    isBotEnabled.value = localStorage.getItem('tumkrokzing_bot_enabled') !== 'false'
+  }
+}
 
 const defaultSuggestions = [
   'เมนูขายดีแนะนำ',
@@ -296,6 +306,8 @@ onMounted(async () => {
 
   if (typeof window !== 'undefined') {
     window.addEventListener('app:logout', handleLogoutEvent)
+    window.addEventListener('tumkrokzing:bot_status_changed', handleBotStatusChange)
+    window.addEventListener('storage', handleBotStatusChange)
   }
 
   try {
@@ -324,6 +336,8 @@ onMounted(async () => {
 onUnmounted(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener('app:logout', handleLogoutEvent)
+    window.removeEventListener('tumkrokzing:bot_status_changed', handleBotStatusChange)
+    window.removeEventListener('storage', handleBotStatusChange)
   }
 })
 
@@ -392,6 +406,7 @@ const formatMessage = (text) => {
 }
 
 const sendToGemini = async (userMessage) => {
+  const startTime = performance.now()
   try {
     const body = {
       message: userMessage,
@@ -415,10 +430,30 @@ const sendToGemini = async (userMessage) => {
     if (data.suggestedQuestions && data.suggestedQuestions.length > 0) {
       currentSuggestions.value = data.suggestedQuestions
     }
+
+    const elapsedSec = typeof data.responseTimeSec === 'number'
+      ? data.responseTimeSec
+      : Math.max(0.1, Number(((performance.now() - startTime) / 1000).toFixed(1)))
+
+    recordChatbotLog({
+      question: userMessage,
+      reply: data.reply,
+      responseTime: elapsedSec,
+      source: 'customer'
+    })
+
     return data.reply
   } catch (err) {
     console.error('Chatbot API error:', err)
-    return getFallbackReply(userMessage)
+    const fallbackReply = getFallbackReply(userMessage)
+    const elapsedSec = Math.max(0.1, Number(((performance.now() - startTime) / 1000).toFixed(1)))
+    recordChatbotLog({
+      question: userMessage,
+      reply: fallbackReply,
+      responseTime: elapsedSec,
+      source: 'customer'
+    })
+    return fallbackReply
   }
 }
 
@@ -448,6 +483,19 @@ const sendMessage = async (text) => {
   scrollToBottom()
   isTyping.value = true
   currentSuggestions.value = []
+
+  if (!isBotEnabled.value) {
+    setTimeout(() => {
+      isTyping.value = false
+      messages.value.push({
+        sender: 'bot',
+        text: 'ขออภัยด้วยนะคะ ขณะนี้ทางร้านปิดระบบตอบกลับอัตโนมัติชั่วคราวค่ะ หากต้องการสอบถามหรือสั่งอาหารเร่งด่วน โทรหาเราได้ที่ 081-234-5678 นะคะ 🙏',
+        time: getTimeString()
+      })
+      scrollToBottom()
+    }, 400)
+    return
+  }
 
   const botReply = await sendToGemini(query)
 

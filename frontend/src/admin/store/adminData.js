@@ -1,3 +1,4 @@
+import { getStoredChatbotLogs, recordChatbotLog, computeChatbotStatsForDate } from '../../utils/chatbotAnalytics'
 import { reactive } from 'vue'
 
 // ===== Backend API Configuration =====
@@ -63,6 +64,7 @@ export const MENU_IMAGE_MAP = {
 }
 
 export const adminStore = reactive({
+  chatbotLogs: [],
   // ===== สถิติแดชบอร์ดที่ดึงจาก Backend จริง =====
   dashboardStats: {
     grossSales: 1320,
@@ -644,7 +646,8 @@ export const adminStore = reactive({
       this.fetchInventoryFromAPI(),
       this.fetchTablesFromAPI(),
       this.fetchOrdersFromAPI(),
-      this.fetchPromotionsFromAPI()
+      this.fetchPromotionsFromAPI(),
+      this.fetchChatbotStatsFromAPI()
     ])
     this.recomputeDashboardStats()
   },
@@ -1456,8 +1459,53 @@ export const adminStore = reactive({
     }
   },
 
+
+  // ===== Chatbot Daily Stats & Real Analytics =====
+  async fetchChatbotStatsFromAPI() {
+    try {
+      this.chatbotLogs = getStoredChatbotLogs();
+      const res = await fetch(`${API_BASE}/chatbot/logs`);
+      if (res.ok) {
+        const backendLogs = await res.json();
+        if (Array.isArray(backendLogs) && backendLogs.length > 0) {
+          const existingIds = new Set(this.chatbotLogs.map(l => l.id));
+          for (const bLog of backendLogs) {
+            if (!existingIds.has(bLog.id)) {
+              this.chatbotLogs.push(bLog);
+              existingIds.add(bLog.id);
+            }
+          }
+          try {
+            localStorage.setItem('tumkrokzing_chatbot_logs', JSON.stringify(this.chatbotLogs));
+          } catch (e) {}
+        }
+      }
+    } catch (e) {
+      this.chatbotLogs = getStoredChatbotLogs();
+    }
+  },
+
+  getChatbotStatsForDate(dateStr) {
+    if (!this.chatbotLogs || this.chatbotLogs.length === 0) {
+      this.chatbotLogs = getStoredChatbotLogs();
+    }
+    return computeChatbotStatsForDate(dateStr, this.chatbotLogs);
+  },
+
+  logChatbotMessage(entry) {
+    const newLog = recordChatbotLog(entry);
+    this.chatbotLogs = getStoredChatbotLogs();
+    return newLog;
+  },
+
   // ===== PDF Export =====
   exportSalesPDF() {
     window.print()
   }
 })
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('tumkrokzing:chatbot_log_added', () => {
+    adminStore.chatbotLogs = getStoredChatbotLogs();
+  });
+}

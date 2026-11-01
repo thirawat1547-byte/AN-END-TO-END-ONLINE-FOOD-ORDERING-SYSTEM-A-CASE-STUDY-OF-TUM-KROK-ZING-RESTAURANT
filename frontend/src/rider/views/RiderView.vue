@@ -44,15 +44,9 @@
 
         <div class="flex items-center gap-2">
           <span class="text-emerald-400 font-bold">รายได้ ฿{{ earnings.toFixed(2) }}</span>
+
           <button 
-            v-if="!activeOrder" 
-            @click="activateDemoOrder" 
-            class="text-[10px] text-amber-300 hover:text-white underline ml-1"
-          >
-            จำลองออเดอร์
-          </button>
-          <button 
-            v-else 
+            v-if="activeOrder" 
             @click="cancelCurrentTrip" 
             class="text-[10px] text-rose-300 hover:text-white underline ml-1"
           >

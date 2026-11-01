@@ -61,16 +61,10 @@
           </div>
           <div>
             <div class="text-[10px] text-emerald-400 font-bold leading-tight">{{ currentTurnDistance }}</div>
-            <div class="text-[11px] font-semibold text-slate-100 truncate max-w-[200px]">{{ currentTurnText }}</div>
+            <div class="text-[11px] font-semibold text-slate-100 truncate">{{ currentTurnText }}</div>
           </div>
         </div>
-        <button 
-          @click="toggleSimulation" 
-          class="text-[10px] font-bold px-2 py-1 rounded-lg transition active:scale-95 flex items-center gap-1 shrink-0"
-          :class="isSimulating ? 'bg-amber-500 text-slate-900 hover:bg-amber-400' : 'bg-emerald-600 text-white hover:bg-emerald-500'"
-        >
-          <span>{{ isSimulating ? '⏸️ หยุด' : '▶️ จำลองขับ' }}</span>
-        </button>
+
       </div>
 
       <!-- Map Display Area -->
@@ -109,11 +103,7 @@
           </button>
         </div>
 
-        <!-- Simulation Progress HUD (Leaflet Mode) -->
-        <div v-if="activeTab === 'leaflet' && isSimulating" class="absolute top-2 left-2 z-[500] bg-slate-900/85 backdrop-blur-sm text-white px-2.5 py-1 rounded-lg text-[10px] flex items-center gap-1.5 border border-white/10">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-          <span>ความคืบหน้า: {{ Math.round(progressPercent) }}%</span>
-        </div>
+
       </div>
 
       <!-- Action Buttons -->
