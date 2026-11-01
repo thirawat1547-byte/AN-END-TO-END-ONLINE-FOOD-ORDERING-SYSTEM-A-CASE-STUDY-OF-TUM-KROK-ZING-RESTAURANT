@@ -78,4 +78,10 @@ export class ChatbotReplyDto {
     example: '2026-10-24T21:00:00.000Z',
   })
   timestamp: string;
+
+  @ApiPropertyOptional({
+    description: 'ระยะเวลาประมวลผลคำตอบ (วินาที)',
+    example: 0.6,
+  })
+  responseTimeSec?: number;
 }
