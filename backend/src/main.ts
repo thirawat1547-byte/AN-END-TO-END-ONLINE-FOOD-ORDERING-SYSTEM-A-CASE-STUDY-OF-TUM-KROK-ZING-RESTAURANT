@@ -81,6 +81,7 @@ async function bootstrap() {
     .addTag('Transactions', 'ระบบการชำระเงินและปิดบิล')
     .addTag('Ingredients', 'ระบบจัดการสต็อกวัตถุดิบห้องครัว')
     .addTag('Promotions', 'ระบบโปรโมชันและโค้ดส่วนลด')
+    .addTag('Settings', 'ระบบการตั้งค่าร้านค้าและเวลาทำการ')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
