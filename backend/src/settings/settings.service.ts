@@ -19,6 +19,10 @@ export interface StoreSettings {
   max_delivery_km: number;
   min_order_delivery: number;
   base_rider_fee: number;
+  rider_free_km: number;
+  rider_fee_per_km: number;
+  store_lat: number | null;
+  store_lng: number | null;
   vat_rate: number;
 }
 
@@ -85,6 +89,10 @@ export class SettingsService implements OnModuleInit {
           max_delivery_km: Number(row.max_delivery_km || 15.00),
           min_order_delivery: Number(row.min_order_delivery || 100.00),
           base_rider_fee: Number(row.base_rider_fee || 40.00),
+          rider_free_km: Number(row.rider_free_km ?? 3.00),
+          rider_fee_per_km: Number(row.rider_fee_per_km ?? 7.00),
+          store_lat: row.store_lat != null ? Number(row.store_lat) : null,
+          store_lng: row.store_lng != null ? Number(row.store_lng) : null,
           vat_rate: Number(row.vat_rate || 7.00),
         };
       }
@@ -109,6 +117,10 @@ export class SettingsService implements OnModuleInit {
       max_delivery_km: 15.00,
       min_order_delivery: 100.00,
       base_rider_fee: 40.00,
+      rider_free_km: 3.00,
+      rider_fee_per_km: 7.00,
+      store_lat: null,
+      store_lng: null,
       vat_rate: 7.00,
     };
   }
@@ -134,6 +146,10 @@ export class SettingsService implements OnModuleInit {
         ...(dto.max_delivery_km !== undefined && { max_delivery_km: dto.max_delivery_km }),
         ...(dto.min_order_delivery !== undefined && { min_order_delivery: dto.min_order_delivery }),
         ...(dto.base_rider_fee !== undefined && { base_rider_fee: dto.base_rider_fee }),
+        ...(dto.rider_free_km !== undefined && { rider_free_km: dto.rider_free_km }),
+        ...(dto.rider_fee_per_km !== undefined && { rider_fee_per_km: dto.rider_fee_per_km }),
+        ...(dto.store_lat !== undefined && { store_lat: dto.store_lat }),
+        ...(dto.store_lng !== undefined && { store_lng: dto.store_lng }),
         ...(dto.vat_rate !== undefined && { vat_rate: dto.vat_rate }),
       },
     });

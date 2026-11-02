@@ -5,6 +5,7 @@ import { OrdersGateway } from './orders.gateway';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { ReviewOrderDto } from './dto/review-order.dto';
+import { calcRiderFee } from './rider-fee.util';
 
 @Injectable()
 export class OrdersService implements OnModuleInit {
@@ -342,7 +343,7 @@ export class OrdersService implements OnModuleInit {
 
       // ถ้าเป็นการสั่งประเภทจัดส่ง (DELIVERY) ให้สร้างข้อมูลลงตาราง DELIVERIES อัตโนมัติ (1:1)
       if (createOrderDto.order_type === 'DELIVERY') {
-        const riderTripFee = Number(storeSetting?.base_rider_fee || 40.00);
+        const riderFee = calcRiderFee(storeSetting, createOrderDto.delivery_lat, createOrderDto.delivery_lng);
         try {
           await tx.delivery.create({
             data: {
@@ -351,8 +352,8 @@ export class OrdersService implements OnModuleInit {
               customer_name: createOrderDto.customer_name || existingUser?.username || 'ลูกค้าเดลิเวอรี',
               customer_phone: createOrderDto.delivery_phone || existingUser?.phone_number || '-',
               delivery_address: createOrderDto.delivery_address || existingUser?.address || 'ตามหมุดจัดส่ง',
-              rider_fee: riderTripFee,
-              distance_km: 0.0,
+              rider_fee: riderFee.rider_fee,
+              distance_km: riderFee.distance_km,
               ...(createOrderDto.delivery_lat && createOrderDto.delivery_lng && {
                 customer_lat: createOrderDto.delivery_lat,
                 customer_lng: createOrderDto.delivery_lng,
@@ -963,8 +964,11 @@ export class OrdersService implements OnModuleInit {
       throw new BadRequestException(`คุณมีงานที่ยังส่งไม่เสร็จอยู่ (ออเดอร์ #${myActive.order_id})`);
     }
 
+    // คิดค่ารอบตามระยะทางจากร้านถึงลูกค้าใหม่ตอนรับงาน (ใช้ค่าตั้งค่าร้านล่าสุด) แล้วล็อกไว้กับงานนี้
+    const storeSetting = await this.prisma.storeSetting.findUnique({ where: { id: 1 } }).catch(() => null);
+    const riderFee = calcRiderFee(storeSetting, order.delivery?.customer_lat, order.delivery?.customer_lng);
+
     if (!order.delivery) {
-      const storeSetting = await this.settingsService.getSettings().catch(() => null);
       await this.prisma.delivery.create({
         data: {
           order_id: orderId,
@@ -972,7 +976,7 @@ export class OrdersService implements OnModuleInit {
           customer_name: (order.user as any)?.username || 'ลูกค้าเดลิเวอรี',
           customer_phone: order.delivery_phone || (order.user as any)?.phone_number || '-',
           delivery_address: order.delivery_address || (order.user as any)?.address || '-',
-          rider_fee: Number(storeSetting?.base_rider_fee || 40.00),
+          rider_fee: riderFee.rider_fee,
         },
       }).catch(() => {});
     }
@@ -988,6 +992,8 @@ export class OrdersService implements OnModuleInit {
         rider_id: riderId,
         delivery_status: 'ASSIGNED',
         assigned_at: new Date(),
+        rider_fee: riderFee.rider_fee,
+        distance_km: riderFee.distance_km,
       },
     });
     if (claimed.count === 0) {
@@ -1063,8 +1069,16 @@ export class OrdersService implements OnModuleInit {
       }),
     ]);
 
+    // งานที่ยังไม่มีคนรับ: แสดงค่ารอบตามระยะทางด้วยค่าตั้งค่าร้านล่าสุด (ค่าจริงจะล็อกตอนกดรับงาน)
+    const storeSetting = await this.prisma.storeSetting.findUnique({ where: { id: 1 } }).catch(() => null);
+    const withFeeEstimate = (o: any) => {
+      if (!o.delivery) return o;
+      const fee = calcRiderFee(storeSetting, o.delivery.customer_lat, o.delivery.customer_lng);
+      return { ...o, delivery: { ...o.delivery, ...fee } };
+    };
+
     return {
-      available: available.map((o) => this.attachFallbackItemsIfEmpty(o)),
+      available: available.map((o) => this.attachFallbackItemsIfEmpty(withFeeEstimate(o))),
       mine: mine ? this.attachFallbackItemsIfEmpty(mine) : null,
       cooking: cooking.map((o) => this.attachFallbackItemsIfEmpty(o)),
     };

@@ -641,7 +641,11 @@ export const adminStore = reactive({
     vatRate: 7,
     baseDeliveryFee: 30,
     deliveryFeePerKm: 10,
-    riderFee: 25,
+    riderFee: 40,
+    riderFreeKm: 3,
+    riderFeePerKm: 7,
+    storeLat: null,
+    storeLng: null,
     autoDeductStock: true,
     soundAlertKDS: true
   },
@@ -1367,7 +1371,11 @@ export const adminStore = reactive({
           vatRate: data.vat_rate !== undefined ? Number(data.vat_rate) : this.storeSettings.vatRate,
           baseDeliveryFee: data.base_delivery_fee !== undefined ? Number(data.base_delivery_fee) : this.storeSettings.baseDeliveryFee,
           deliveryFeePerKm: data.delivery_fee_per_km !== undefined ? Number(data.delivery_fee_per_km) : this.storeSettings.deliveryFeePerKm,
-          riderFee: data.rider_fee !== undefined ? Number(data.rider_fee) : this.storeSettings.riderFee
+          riderFee: data.base_rider_fee !== undefined ? Number(data.base_rider_fee) : this.storeSettings.riderFee,
+          riderFreeKm: data.rider_free_km !== undefined ? Number(data.rider_free_km) : this.storeSettings.riderFreeKm,
+          riderFeePerKm: data.rider_fee_per_km !== undefined ? Number(data.rider_fee_per_km) : this.storeSettings.riderFeePerKm,
+          storeLat: data.store_lat ?? null,
+          storeLng: data.store_lng ?? null
         }
         try {
           localStorage.setItem('tumkrok_store_settings', JSON.stringify(this.storeSettings))
@@ -1409,6 +1417,8 @@ export const adminStore = reactive({
   },
 
   async saveSettingsToAPI(customSettings = {}) {
+    // ช่องพิกัดว่าง = ล้างค่า (null) ไม่ใช่ 0
+    const toCoord = (v) => (v === '' || v === null || v === undefined || isNaN(Number(v)) ? null : Number(v))
     try {
       const payload = {
         store_name: customSettings.storeName || this.storeSettings.storeName,
@@ -1424,7 +1434,11 @@ export const adminStore = reactive({
         vat_rate: Number(customSettings.vatRate !== undefined ? customSettings.vatRate : this.storeSettings.vatRate),
         base_delivery_fee: Number(customSettings.baseDeliveryFee !== undefined ? customSettings.baseDeliveryFee : this.storeSettings.baseDeliveryFee),
         delivery_fee_per_km: Number(customSettings.deliveryFeePerKm !== undefined ? customSettings.deliveryFeePerKm : this.storeSettings.deliveryFeePerKm),
-        rider_fee: Number(customSettings.riderFee !== undefined ? customSettings.riderFee : this.storeSettings.riderFee)
+        base_rider_fee: Number(customSettings.riderFee !== undefined ? customSettings.riderFee : this.storeSettings.riderFee),
+        rider_free_km: Number(customSettings.riderFreeKm !== undefined ? customSettings.riderFreeKm : this.storeSettings.riderFreeKm),
+        rider_fee_per_km: Number(customSettings.riderFeePerKm !== undefined ? customSettings.riderFeePerKm : this.storeSettings.riderFeePerKm),
+        store_lat: toCoord(customSettings.storeLat !== undefined ? customSettings.storeLat : this.storeSettings.storeLat),
+        store_lng: toCoord(customSettings.storeLng !== undefined ? customSettings.storeLng : this.storeSettings.storeLng)
       }
 
       const token = localStorage.getItem('access_token')
@@ -1454,7 +1468,11 @@ export const adminStore = reactive({
         vatRate: Number(data.vat_rate),
         baseDeliveryFee: Number(data.base_delivery_fee),
         deliveryFeePerKm: Number(data.delivery_fee_per_km),
-        riderFee: Number(data.rider_fee)
+        riderFee: Number(data.base_rider_fee),
+        riderFreeKm: Number(data.rider_free_km),
+        riderFeePerKm: Number(data.rider_fee_per_km),
+        storeLat: data.store_lat ?? null,
+        storeLng: data.store_lng ?? null
       }
       try {
         localStorage.setItem('tumkrok_store_settings', JSON.stringify(this.storeSettings))

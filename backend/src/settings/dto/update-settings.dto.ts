@@ -1,4 +1,4 @@
-import { IsBoolean, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsLatitude, IsLongitude, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
 // ต้องมี decorator ทุกฟิลด์ เพราะ ValidationPipe ตั้ง whitelist + forbidNonWhitelisted
 // (ถ้าไม่มี ระบบจะปฏิเสธทุกฟิลด์ และหน้าตั้งค่าร้านบันทึกไม่ได้)
@@ -18,8 +18,13 @@ export class UpdateSettingsDto {
   @IsOptional() @IsNumber() @Min(0) max_delivery_km?: number;
   @IsOptional() @IsNumber() @Min(0) min_order_delivery?: number;
   @IsOptional() @IsNumber() @Min(0) base_rider_fee?: number;
-  // หน้าแอดมินส่งฟิลด์นี้มาด้วย แต่ยังไม่ได้โหลดค่าจริงจากเซิร์ฟเวอร์ จึงรับไว้เฉย ๆ ไม่บันทึก
-  // (กันค่าเริ่มต้นฝั่งหน้าเว็บ 25 บาท ไปทับค่าจริง base_rider_fee ในฐานข้อมูล)
+  // ค่ารอบตามระยะทาง: ค่าเริ่มต้นครอบคลุม rider_free_km กม.แรก แล้วคิดเพิ่ม rider_fee_per_km ต่อ กม.
+  @IsOptional() @IsNumber() @Min(0) rider_free_km?: number;
+  @IsOptional() @IsNumber() @Min(0) rider_fee_per_km?: number;
+  // พิกัดร้าน (ใช้คำนวณระยะทางไปหาลูกค้า) ส่ง null เพื่อล้างค่า
+  @IsOptional() @IsLatitude() store_lat?: number | null;
+  @IsOptional() @IsLongitude() store_lng?: number | null;
+  // หน้าแอดมินรุ่นเก่าส่งฟิลด์นี้มา รับไว้แต่ไม่บันทึก (ใช้ base_rider_fee แทน)
   @IsOptional() @IsNumber() @Min(0) rider_fee?: number;
   @IsOptional() @IsNumber() @Min(0) vat_rate?: number;
 }

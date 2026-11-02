@@ -371,7 +371,11 @@ model StoreSetting {
   max_delivery_km     Decimal  @default(15.00) @db.Decimal(5, 2)
   min_order_delivery  Decimal  @default(100.00) @db.Decimal(10, 2)
   base_rider_fee      Decimal  @default(40.00) @db.Decimal(10, 2)
-  vat_rate            Decimal? @default(7.00) @db.Decimal(5, 2)
+  rider_free_km       Decimal  @default(3.00) @db.Decimal(5, 2)
+  rider_fee_per_km    Decimal  @default(7.00) @db.Decimal(10, 2)
+  store_lat           Decimal? @db.Decimal(10, 7)
+  store_lng           Decimal? @db.Decimal(10, 7)
+  vat_rate           Decimal? @default(7.00) @db.Decimal(5, 2)
   updated_at          DateTime @default(now()) @updatedAt
 
   @@map("STORE_SETTINGS")

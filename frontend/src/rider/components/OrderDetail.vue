@@ -62,12 +62,9 @@
     </section>
 
     <!-- การชำระเงิน -->
-    <section
-      class="rounded-2xl border p-3 text-sm font-bold flex items-center justify-between"
-      :class="collectCash ? 'bg-amber-50 border-amber-300 text-amber-900' : 'bg-emerald-50 border-emerald-200 text-emerald-800'"
-    >
-      <span>{{ collectCash ? '💵 เก็บเงินสดปลายทาง' : '✅ ' + paymentLabel }}</span>
-      <span v-if="collectCash">฿{{ money(order.total_price) }}</span>
+    <section class="rounded-2xl border p-3 text-sm font-bold flex items-center justify-between gap-2" :class="payment.cls">
+      <span>{{ payment.text }}</span>
+      <span v-if="payment.amount" class="shrink-0">฿{{ money(order.total_price) }}</span>
     </section>
   </div>
 </template>
@@ -102,14 +99,22 @@ const txn = computed(() => {
   const list = props.order.transaction || []
   return list[list.length - 1] || null
 })
-const collectCash = computed(() => {
-  if (!txn.value) return false
-  return /cash/i.test(txn.value.payment_method || '') && (txn.value.payment_status || '').toUpperCase() !== 'COMPLETED'
-})
-const paymentLabel = computed(() => {
-  if (!txn.value) return 'ไม่มีข้อมูลการชำระเงิน'
-  const st = (txn.value.payment_status || '').toUpperCase()
-  if (st === 'COMPLETED') return `ชำระแล้ว (${txn.value.payment_method})`
-  return `${txn.value.payment_method} • รอตรวจสอบยอด`
+// สถานะการชำระเงินที่ไรเดอร์ต้องรู้ก่อนออกส่ง
+const payment = computed(() => {
+  const t = txn.value
+  if (!t) {
+    return { text: '⚠️ ไม่พบข้อมูลการชำระเงิน • สอบถามร้านก่อนออกส่ง', cls: 'bg-slate-100 border-slate-300 text-slate-700' }
+  }
+  const st = (t.payment_status || '').toUpperCase()
+  if (st === 'COMPLETED') {
+    return { text: `✅ ชำระแล้ว (${t.payment_method})`, cls: 'bg-emerald-50 border-emerald-200 text-emerald-800' }
+  }
+  if (/cash/i.test(t.payment_method || '')) {
+    return { text: '💵 เก็บเงินสดปลายทาง', amount: true, cls: 'bg-amber-50 border-amber-300 text-amber-900' }
+  }
+  if (st === 'REJECTED') {
+    return { text: `❌ การชำระเงินถูกปฏิเสธ (${t.payment_method}) • แจ้งร้านก่อนออกส่ง`, cls: 'bg-rose-50 border-rose-200 text-rose-800' }
+  }
+  return { text: `⏳ ${t.payment_method} • รอร้านตรวจสอบยอด`, cls: 'bg-amber-50 border-amber-200 text-amber-900' }
 })
 </script>

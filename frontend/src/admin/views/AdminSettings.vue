@@ -1,9 +1,42 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { adminStore } from '../store/adminData'
 
 const savedNotice = ref(false)
 const isSaving = ref(false)
+
+// ค่ารอบไรเดอร์ตามระยะทาง (สูตรเดียวกับ backend: calcRiderFee)
+const hasStoreLocation = computed(() =>
+  Number(adminStore.storeSettings.storeLat) && Number(adminStore.storeSettings.storeLng)
+)
+const exampleFee = (km) => {
+  const s = adminStore.storeSettings
+  const extraKm = Math.max(0, Math.ceil(km - Number(s.riderFreeKm || 0)))
+  return Number(s.riderFee || 0) + extraKm * Number(s.riderFeePerKm || 0)
+}
+
+const isLocating = ref(false)
+const locateError = ref('')
+function useCurrentLocation() {
+  if (!navigator.geolocation) {
+    locateError.value = 'เบราว์เซอร์นี้ไม่รองรับการหาตำแหน่ง กรุณากรอกพิกัดเอง'
+    return
+  }
+  isLocating.value = true
+  locateError.value = ''
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      adminStore.storeSettings.storeLat = Number(pos.coords.latitude.toFixed(7))
+      adminStore.storeSettings.storeLng = Number(pos.coords.longitude.toFixed(7))
+      isLocating.value = false
+    },
+    () => {
+      locateError.value = 'หาตำแหน่งไม่สำเร็จ (อาจไม่ได้อนุญาตการเข้าถึงตำแหน่ง) กรุณากรอกพิกัดเอง'
+      isLocating.value = false
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  )
+}
 
 // โหลดข้อมูลตั้งค่าจาก Backend ทันทีเมื่อเปิดหน้าเว็บ
 onMounted(async () => {
@@ -218,15 +251,89 @@ async function saveSettings() {
           />
           <span class="text-[10px] text-slate-400 mt-0.5 block">อัตราคิดเพิ่มตามระยะทางคำนวณจาก GPS</span>
         </div>
-        <div>
-          <label class="block font-bold text-slate-700 mb-1">ค่ารอบไรเดอร์ (บาท/เที่ยว)</label>
-          <input 
-            type="number" 
-            step="1"
-            v-model="adminStore.storeSettings.riderFee"
-            class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none font-bold text-emerald-700 font-mono"
-          />
-          <span class="text-[10px] text-slate-400 mt-0.5 block">รายได้ค่าเที่ยวส่งมอบของไรเดอร์ต่อบิล</span>
+      </div>
+
+      <!-- ค่ารอบไรเดอร์ตามระยะทาง -->
+      <div class="pt-3 border-t border-slate-100 space-y-3">
+        <h3 class="font-bold text-slate-800">ค่ารอบไรเดอร์ (คิดตามระยะทาง)</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">ค่ารอบเริ่มต้น (บาท)</label>
+            <input
+              type="number"
+              step="1"
+              min="0"
+              v-model.number="adminStore.storeSettings.riderFee"
+              class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none font-bold text-emerald-700 font-mono"
+            />
+            <span class="text-[10px] text-slate-400 mt-0.5 block">ได้ทุกเที่ยว ครอบคลุมระยะทางช่วงแรก</span>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">ระยะที่รวมในค่าเริ่มต้น (กม.)</label>
+            <input
+              type="number"
+              step="0.5"
+              min="0"
+              v-model.number="adminStore.storeSettings.riderFreeKm"
+              class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none font-bold text-slate-800"
+            />
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">ส่วนที่เกิน (บาท/กม.)</label>
+            <input
+              type="number"
+              step="1"
+              min="0"
+              v-model.number="adminStore.storeSettings.riderFeePerKm"
+              class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none font-bold text-slate-800"
+            />
+            <span class="text-[10px] text-slate-400 mt-0.5 block">ปัดขึ้นเป็นกิโลเต็ม</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">ละติจูดร้าน</label>
+            <input
+              type="number"
+              step="any"
+              v-model="adminStore.storeSettings.storeLat"
+              placeholder="เช่น 13.8876"
+              class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none font-mono"
+            />
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">ลองจิจูดร้าน</label>
+            <input
+              type="number"
+              step="any"
+              v-model="adminStore.storeSettings.storeLng"
+              placeholder="เช่น 100.5790"
+              class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none font-mono"
+            />
+          </div>
+          <button
+            type="button"
+            @click="useCurrentLocation"
+            :disabled="isLocating"
+            class="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 font-bold text-slate-700 disabled:opacity-50"
+          >
+            {{ isLocating ? 'กำลังหาตำแหน่ง…' : '📍 ใช้ตำแหน่งปัจจุบัน (ยืนอยู่ที่ร้าน)' }}
+          </button>
+        </div>
+        <p v-if="locateError" class="text-rose-600">{{ locateError }}</p>
+
+        <div
+          class="rounded-xl p-3 border"
+          :class="hasStoreLocation ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-amber-50 border-amber-200 text-amber-900'"
+        >
+          <template v-if="hasStoreLocation">
+            ตัวอย่างค่ารอบ: 2 กม. = ฿{{ exampleFee(2) }} • 5 กม. = ฿{{ exampleFee(5) }} • 10 กม. = ฿{{ exampleFee(10) }}
+            <span class="block text-[10px] opacity-80 mt-0.5">ระยะทางประมาณจากพิกัด GPS ร้านถึงหมุดลูกค้า (เส้นตรง × 1.3 ตามเส้นทางถนน) ค่ารอบจริงล็อกตอนไรเดอร์กดรับงาน</span>
+          </template>
+          <template v-else>
+            ⚠️ ยังไม่ได้ตั้งพิกัดร้าน ระบบจะจ่ายค่ารอบเริ่มต้น ฿{{ Number(adminStore.storeSettings.riderFee || 0) }} ทุกเที่ยว จนกว่าจะใส่พิกัดร้าน
+          </template>
         </div>
       </div>
     </div>

@@ -69,7 +69,7 @@
                 </div>
                 <div class="text-right">
                   <p class="font-extrabold text-emerald-700">+฿{{ money(o.delivery?.rider_fee ?? 40) }}</p>
-                  <p class="text-[10px] text-slate-400">ค่ารอบ</p>
+                  <p class="text-[10px] text-slate-400">ค่ารอบ • {{ distanceText(o) }}</p>
                 </div>
               </div>
               <p class="text-sm text-slate-700 line-clamp-2">📍 {{ addressOf(o) }}</p>
@@ -124,7 +124,10 @@
           <!-- ขั้นตอนการส่ง -->
           <section class="bg-white rounded-2xl border border-slate-200 p-4">
             <div class="flex items-center justify-between">
-              <h2 class="font-black">ออเดอร์ #{{ myJob.order_id }}</h2>
+              <div>
+                <h2 class="font-black">ออเดอร์ #{{ myJob.order_id }}</h2>
+                <p class="text-xs text-slate-500">ค่ารอบ ฿{{ money(myJob.delivery?.rider_fee) }} • {{ distanceText(myJob) }}</p>
+              </div>
               <span class="text-xs font-bold px-2 py-1 rounded-lg" :class="isDelivering ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'">
                 {{ isDelivering ? 'กำลังนำส่ง' : 'รอรับอาหารที่ร้าน' }}
               </span>
@@ -191,7 +194,10 @@
           <ul class="divide-y divide-slate-100">
             <li v-for="t in earnings.trips.slice(0, 50)" :key="t.delivery_id" class="px-4 py-2.5 flex justify-between gap-3 text-sm">
               <div class="min-w-0">
-                <p class="font-bold">#{{ t.order_id }} <span class="font-normal text-slate-500">{{ t.customer_name }}</span></p>
+                <p class="font-bold">
+                  #{{ t.order_id }} <span class="font-normal text-slate-500">{{ t.customer_name }}</span>
+                  <span v-if="Number(t.distance_km) > 0" class="font-normal text-slate-400">• {{ Number(t.distance_km).toFixed(1) }} กม.</span>
+                </p>
                 <p class="text-xs text-slate-500 truncate">{{ formatDate(t.delivered_at) }} • {{ t.delivery_address }}</p>
               </div>
               <span class="shrink-0 font-bold text-emerald-700">+฿{{ money(t.rider_fee) }}</span>
@@ -300,6 +306,10 @@ const todayStats = computed(() => {
 const money = (v) => Number(v || 0).toLocaleString('th-TH', { maximumFractionDigits: 2 })
 const addressOf = (o) => o.delivery?.delivery_address || o.delivery_address || o.user?.address || '-'
 const customerOf = (o) => o.delivery?.customer_name || o.user?.username || 'ลูกค้าเดลิเวอรี'
+const distanceText = (o) => {
+  const km = Number(o.delivery?.distance_km)
+  return km > 0 ? `~${km.toFixed(1)} กม.` : 'ไม่มีพิกัด GPS'
+}
 const itemCount = (o) => (o.order_items || []).reduce((s, i) => s + (i.quantity || 1), 0)
 const isClaimable = (o) => ['READY', 'SERVED'].includes((o.status || '').toUpperCase()) && !o.delivery?.rider_id
 const isCash = (o) => {
@@ -319,7 +329,10 @@ const formatDate = (d) => (d ? new Date(d).toLocaleString('th-TH', { dateStyle: 
 const timeAgo = (d) => {
   if (!d) return ''
   const min = Math.max(0, Math.round((Date.now() - new Date(d).getTime()) / 60000))
-  return min < 1 ? 'เมื่อสักครู่' : `${min} นาทีที่แล้ว`
+  if (min < 1) return 'เมื่อสักครู่'
+  if (min < 60) return `${min} นาทีที่แล้ว`
+  if (min < 1440) return `${Math.floor(min / 60)} ชม.ที่แล้ว`
+  return `${Math.floor(min / 1440)} วันที่แล้ว`
 }
 const errMsg = (err, fallback) => {
   const m = err?.response?.data?.message
