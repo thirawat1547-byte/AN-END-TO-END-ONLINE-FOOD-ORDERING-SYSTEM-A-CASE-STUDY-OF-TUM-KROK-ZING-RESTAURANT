@@ -59,7 +59,10 @@ export class OrdersController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'ดูรายการคำสั่งซื้อทั้งหมด' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'STAFF', 'RIDER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'ดูรายการคำสั่งซื้อทั้งหมด (ADMIN / STAFF / RIDER)' })
   @ApiQuery({ name: 'status', required: false, description: 'กรองตามสถานะ (PENDING, COOKING, READY, IN_DELIVERY, DELIVERED, COMPLETED)' })
   @ApiQuery({ name: 'tableId', required: false, type: Number, description: 'กรองตามหมายเลขโต๊ะ' })
   @ApiQuery({ name: 'orderType', required: false, description: 'กรองตามประเภท (DELIVERY, DINE_IN, TAKEAWAY)' })
@@ -108,7 +111,10 @@ export class OrdersController {
 
   // ดึงรายการออเดอร์เดลิเวอรี่สำหรับให้ไรเดอร์รับงาน
   @Get('deliveries/available')
-  @ApiOperation({ summary: 'ดูรายการงานจัดส่งที่เปิดรับไรเดอร์' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'STAFF', 'RIDER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'ดูรายการงานจัดส่งที่เปิดรับไรเดอร์ (ADMIN / STAFF / RIDER)' })
   getAvailableDeliveries() {
     return this.ordersService.getAvailableDeliveries();
   }
@@ -135,6 +141,9 @@ export class OrdersController {
 
   // แอดมินดูรูปหลักฐานการจัดส่งและรีวิวจากลูกค้า (ต้องวางไว้ก่อน @Get(':id'))
   @Get('admin/feedback')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'ดูรูปหลักฐานการจัดส่งและรีวิวจากลูกค้าทั้งหมด (Admin)' })
   getAdminFeedback() {
     return this.ordersService.getAdminFeedback();

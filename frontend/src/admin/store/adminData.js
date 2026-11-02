@@ -1116,7 +1116,10 @@ export const adminStore = reactive({
   // ===== Orders API =====
   async fetchOrdersFromAPI() {
     try {
-      const res = await fetch(`${API_BASE}/orders`)
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token') || sessionStorage.getItem('token')
+      const res = await fetch(`${API_BASE}/orders`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       if (Array.isArray(data) && data.length > 0) {
@@ -1309,21 +1312,37 @@ export const adminStore = reactive({
   },
 
   // ===== CSV Export (ดึงตรงจาก Database View ผ่าน Backend API พร้อมชื่อไฟล์ .csv จาก Content-Disposition) =====
-  exportSalesCSV() {
-    const link = document.createElement('a')
-    link.href = `${API_BASE}/reports/export-csv`
-    link.setAttribute('download', `TumKrokZing_SalesReport_${new Date().toISOString().slice(0, 10)}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    setTimeout(() => {
-      document.body.removeChild(link)
-    }, 200)
+  async exportSalesCSV() {
+    try {
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token') || sessionStorage.getItem('token')
+      const res = await fetch(`${API_BASE}/reports/export-csv`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `TumKrokZing_SalesReport_${new Date().toISOString().slice(0, 10)}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      setTimeout(() => {
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+      }, 200)
+    } catch (err) {
+      console.error('❌ ดาวน์โหลด CSV ไม่สำเร็จ:', err)
+      alert('ไม่สามารถดาวน์โหลดไฟล์รายงานยอดขาย CSV ได้ (อาจหมดอายุการใช้งานหรือไม่มีสิทธิ์)')
+    }
   },
 
   // ===== Database Views Integration =====
   async fetchReceiptsFromView() {
     try {
-      const res = await fetch(`${API_BASE}/reports/receipts`)
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token') || sessionStorage.getItem('token')
+      const res = await fetch(`${API_BASE}/reports/receipts`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       if (Array.isArray(data) && data.length > 0) {
@@ -1337,7 +1356,10 @@ export const adminStore = reactive({
 
   async fetchSalesSummaryFromView() {
     try {
-      const res = await fetch(`${API_BASE}/reports/sales-summary`)
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token') || sessionStorage.getItem('token')
+      const res = await fetch(`${API_BASE}/reports/sales-summary`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       if (Array.isArray(data) && data.length > 0) {

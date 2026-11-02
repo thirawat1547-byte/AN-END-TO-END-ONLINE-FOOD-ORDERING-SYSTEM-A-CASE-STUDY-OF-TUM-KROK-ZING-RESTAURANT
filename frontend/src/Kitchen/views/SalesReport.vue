@@ -366,15 +366,23 @@ const fetchSalesData = async () => {
 // ฟังก์ชันดาวน์โหลดรายงานเป็นไฟล์ Excel (CSV) ประจำวันที่เลือก
 const exportCSV = () => {
   if (validDayOrders.value.length === 0) {
-    // หากไม่มีออเดอร์ในวันนี้ ให้ดาวน์โหลดจาก backend view CSV ดั้งเดิม
-    const link = document.createElement('a')
-    link.href = `${API_BASE}/reports/export-csv`
-    link.setAttribute('download', `TumKrokZing_SalesReport_${selectedDate.value}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    setTimeout(() => {
-      document.body.removeChild(link)
-    }, 200)
+    // หากไม่มีออเดอร์ในวันนี้ ให้ดาวน์โหลดจาก backend view CSV ดั้งเดิม (ใช้ axios เพื่อแนบ Token)
+    axios.get(`${API_BASE}/reports/export-csv`, { responseType: 'blob' })
+      .then(res => {
+        const url = window.URL.createObjectURL(new Blob([res.data]))
+        const link = document.createElement('a')
+        link.href = url
+        link.setAttribute('download', `TumKrokZing_SalesReport_${selectedDate.value}.csv`)
+        document.body.appendChild(link)
+        link.click()
+        setTimeout(() => {
+          document.body.removeChild(link)
+          window.URL.revokeObjectURL(url)
+        }, 200)
+      })
+      .catch(err => {
+        console.error('ดาวน์โหลด CSV ไม่สำเร็จ:', err)
+      })
     return
   }
 

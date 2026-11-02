@@ -184,14 +184,13 @@ function viewOrderDetails(order) {
         <p class="text-xs text-slate-500">ข้อมูลเชื่อมต่อตรงจาก TRANSACTION_RECEIPTS_VIEW ในระบบฐานข้อมูล MySQL</p>
       </div>
       <div class="flex items-center gap-2">
-        <a 
-          :href="`${API_BASE}/reports/export-csv`"
-          download="TumKrokZing_SalesReport.csv"
+        <button 
+          @click="adminStore.exportSalesCSV()"
           class="px-3.5 py-2.5 rounded-xl bg-[#2d5a43] hover:bg-[#183324] text-white font-bold text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer"
           title="ดาวน์โหลดไฟล์รายงาน Excel / CSV จากฐานข้อมูล"
         >
           <span>📊 ส่งออก Excel (CSV)</span>
-        </a>
+        </button>
         <button 
           @click="adminStore.exportSalesPDF()"
           class="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs shadow-md transition flex items-center gap-1.5"

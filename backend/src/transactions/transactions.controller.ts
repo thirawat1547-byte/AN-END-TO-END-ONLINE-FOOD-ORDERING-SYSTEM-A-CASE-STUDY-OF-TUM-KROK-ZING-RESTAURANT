@@ -23,13 +23,19 @@ export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
 
   @Post()
-  @ApiOperation({ summary: 'บันทึกการชำระเงินและปิดบิลออร์เดอร์' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'STAFF')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'บันทึกการชำระเงินและปิดบิลออร์เดอร์ (ADMIN / STAFF)' })
   create(@Body() createTransactionDto: CreateTransactionDto) {
     return this.transactionsService.create(createTransactionDto);
   }
 
   @Get()
-  @ApiOperation({ summary: 'ดูประวัติรายการชำระเงินทั้งหมด' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'ดูประวัติรายการชำระเงินทั้งหมด (ADMIN)' })
   findAll() {
     return this.transactionsService.findAll();
   }
