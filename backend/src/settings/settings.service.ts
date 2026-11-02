@@ -70,7 +70,7 @@ export class SettingsService implements OnModuleInit {
 
   async getSettings(): Promise<StoreSettings> {
     try {
-      const row = await this.prisma.storeSetting.findUnique({ where: { id: 1 } });
+      const row: any = await this.prisma.storeSetting.findUnique({ where: { id: 1 } });
       if (row) {
         return {
           id: row.id,

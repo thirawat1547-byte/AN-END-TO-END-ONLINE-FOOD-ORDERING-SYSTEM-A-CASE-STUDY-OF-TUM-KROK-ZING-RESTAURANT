@@ -202,20 +202,12 @@ ${liveContext}
       }
       contents.push({ role: 'user', parts: [{ text: finalUserPrompt }] });
 
-      const TIMEOUT_MS = 25000;
-
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('GEMINI_TIMEOUT')), TIMEOUT_MS),
-      );
-
-      const response = await Promise.race([
-        this.aiClient.models.generateContent({
-          model: this.modelName,
-          contents: contents,
-          config: { systemInstruction: systemInstruction },
-        }),
-        timeoutPromise,
-      ]);
+      // เรียก Gemini API โดยไม่จำกัดเวลา เพื่อให้ AI สามารถประมวลผลและตอบข้อมูลจริงได้อย่างครบถ้วน
+      const response = await this.aiClient.models.generateContent({
+        model: this.modelName,
+        contents: contents,
+        config: { systemInstruction: systemInstruction },
+      });
 
       const replyText =
         response.text ||
@@ -648,19 +640,12 @@ ${adminContext}
 
       contents.push({ role: 'user', parts: [{ text: userMessage }] });
 
-      const TIMEOUT_MS = 25000;
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('GEMINI_TIMEOUT')), TIMEOUT_MS),
-      );
-
-      const response = await Promise.race([
-        this.aiClient.models.generateContent({
-          model: this.modelName,
-          contents: contents,
-          config: { systemInstruction: systemInstruction },
-        }),
-        timeoutPromise,
-      ]);
+      // เรียก Gemini API โดยไม่จำกัดเวลา เพื่อให้ AI สามารถประมวลผลและตอบข้อมูลจริงได้อย่างครบถ้วน
+      const response = await this.aiClient.models.generateContent({
+        model: this.modelName,
+        contents: contents,
+        config: { systemInstruction: systemInstruction },
+      });
 
       const replyText =
         response.text ||
