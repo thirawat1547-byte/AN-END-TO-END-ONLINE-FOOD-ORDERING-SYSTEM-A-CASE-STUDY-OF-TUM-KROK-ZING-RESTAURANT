@@ -45,18 +45,18 @@
             <p v-if="optionText(item)" class="text-xs text-slate-500">{{ optionText(item) }}</p>
             <p v-if="item.notes" class="text-xs text-amber-700">หมายเหตุ: {{ item.notes }}</p>
           </div>
-          <span class="shrink-0 text-slate-700">฿{{ money(Number(item.unit_price || 0) * (item.quantity || 1)) }}</span>
+          <span class="shrink-0 text-slate-700 num">฿{{ money(Number(item.unit_price || 0) * (item.quantity || 1)) }}</span>
         </li>
       </ul>
       <div class="mt-2 pt-2 border-t border-slate-200 space-y-1 text-sm">
         <div v-if="Number(order.delivery_fee)" class="flex justify-between text-slate-600">
-          <span>ค่าจัดส่ง</span><span>฿{{ money(order.delivery_fee) }}</span>
+          <span>ค่าจัดส่ง</span><span class="num">฿{{ money(order.delivery_fee) }}</span>
         </div>
         <div v-if="Number(order.discount_amount)" class="flex justify-between text-rose-600">
-          <span>ส่วนลด</span><span>-฿{{ money(order.discount_amount) }}</span>
+          <span>ส่วนลด</span><span class="num">-฿{{ money(order.discount_amount) }}</span>
         </div>
         <div class="flex justify-between font-extrabold text-slate-900">
-          <span>ยอดรวม</span><span>฿{{ money(order.total_price) }}</span>
+          <span>ยอดรวม</span><span class="num">฿{{ money(order.total_price) }}</span>
         </div>
       </div>
     </section>
@@ -64,7 +64,7 @@
     <!-- การชำระเงิน -->
     <section class="rounded-2xl border p-3 text-sm font-bold flex items-center justify-between gap-2" :class="payment.cls">
       <span>{{ payment.text }}</span>
-      <span v-if="payment.amount" class="shrink-0">฿{{ money(order.total_price) }}</span>
+      <span v-if="payment.amount" class="shrink-0"><span class="num">฿{{ money(order.total_price) }}</span></span>
     </section>
   </div>
 </template>
@@ -76,7 +76,12 @@ const props = defineProps({
   order: { type: Object, required: true }
 })
 
-const money = (v) => Number(v || 0).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+// จำนวนเต็มแสดงไม่มีทศนิยม, มีเศษแสดง 2 ตำแหน่งเสมอ (62.80 ไม่ใช่ 62.8)
+const money = (v) => {
+  const n = Number(v || 0)
+  const digits = Number.isInteger(n) ? 0 : 2
+  return n.toLocaleString('th-TH', { minimumFractionDigits: digits, maximumFractionDigits: 2 })
+}
 
 const delivery = computed(() => props.order.delivery || {})
 const customerName = computed(() => delivery.value.customer_name || props.order.user?.username || 'ลูกค้าเดลิเวอรี')

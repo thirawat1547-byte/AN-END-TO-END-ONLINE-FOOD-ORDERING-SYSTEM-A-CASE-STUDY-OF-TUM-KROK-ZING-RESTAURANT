@@ -22,6 +22,12 @@ html, body {
   text-align: left;
 }
 
+/* ตัวเลขราคา/ระยะทาง: ฟอนต์ Prompt จุดทศนิยมเล็กมาก ใช้ฟอนต์ระบบที่อ่านตัวเลขชัดกว่าและความกว้างเท่ากัน */
+.num {
+  font-family: ui-sans-serif, system-ui, 'Segoe UI', Roboto, Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
 /* SweetAlert2 TumKrokZing Theme */
 .tkz-swal-popup {
   font-family: 'Prompt', sans-serif !important;

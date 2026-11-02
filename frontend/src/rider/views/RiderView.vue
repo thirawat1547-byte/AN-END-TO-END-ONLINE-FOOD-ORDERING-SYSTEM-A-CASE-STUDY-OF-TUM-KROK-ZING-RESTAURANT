@@ -68,13 +68,13 @@
                   <p class="text-[11px] text-emerald-700 font-bold">พร้อมส่ง • {{ timeAgo(o.updated_at) }}</p>
                 </div>
                 <div class="text-right">
-                  <p class="font-extrabold text-emerald-700">+฿{{ money(o.delivery?.rider_fee ?? 40) }}</p>
+                  <p class="font-extrabold text-emerald-700"><span class="num">+฿{{ money(o.delivery?.rider_fee ?? 40) }}</span></p>
                   <p class="text-[10px] text-slate-400">ค่ารอบ • {{ distanceText(o) }}</p>
                 </div>
               </div>
               <p class="text-sm text-slate-700 line-clamp-2">📍 {{ addressOf(o) }}</p>
               <p class="text-xs text-slate-500">
-                👤 {{ customerOf(o) }} • {{ itemCount(o) }} ชิ้น • ฿{{ money(o.total_price) }}
+                👤 {{ customerOf(o) }} • {{ itemCount(o) }} ชิ้น • <span class="num">฿{{ money(o.total_price) }}</span>
                 <span v-if="isCash(o)" class="text-amber-700 font-bold"> • เก็บเงินสด</span>
               </p>
               <div class="mt-auto pt-2 flex gap-2">
@@ -89,6 +89,25 @@
                   🛵 รับงาน
                 </button>
               </div>
+            </article>
+          </div>
+        </section>
+
+        <section v-if="awaitingPayment.length">
+          <h2 class="text-sm font-bold text-slate-700 mb-2">💳 ครัวทำเสร็จแล้ว แต่รอร้านยืนยันการชำระเงิน ({{ awaitingPayment.length }}) — ยังรับไม่ได้</h2>
+          <div class="grid gap-2 sm:grid-cols-2">
+            <article
+              v-for="o in awaitingPayment"
+              :key="o.order_id"
+              class="bg-white/70 rounded-2xl border border-slate-300 p-3 flex items-center justify-between gap-2"
+            >
+              <div class="min-w-0">
+                <p class="text-sm font-bold">#{{ o.order_id }} <span class="text-[11px] font-medium text-slate-500">{{ paymentWaitLabel(o) }}</span></p>
+                <p class="text-xs text-slate-500 truncate">📍 {{ addressOf(o) }}</p>
+              </div>
+              <button @click="detailOrder = o" class="shrink-0 text-xs font-bold px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50">
+                ดู
+              </button>
             </article>
           </div>
         </section>
@@ -126,7 +145,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <h2 class="font-black">ออเดอร์ #{{ myJob.order_id }}</h2>
-                <p class="text-xs text-slate-500">ค่ารอบ ฿{{ money(myJob.delivery?.rider_fee) }} • {{ distanceText(myJob) }}</p>
+                <p class="text-xs text-slate-500">ค่ารอบ <span class="num">฿{{ money(myJob.delivery?.rider_fee) }}</span> • {{ distanceText(myJob) }}</p>
               </div>
               <span class="text-xs font-bold px-2 py-1 rounded-lg" :class="isDelivering ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'">
                 {{ isDelivering ? 'กำลังนำส่ง' : 'รอรับอาหารที่ร้าน' }}
@@ -179,12 +198,12 @@
         <section class="grid grid-cols-2 gap-3">
           <div class="bg-white rounded-2xl border border-slate-200 p-4">
             <p class="text-xs text-slate-500">วันนี้</p>
-            <p class="text-2xl font-black text-emerald-700">฿{{ money(todayStats.earnings) }}</p>
+            <p class="text-2xl font-black text-emerald-700"><span class="num">฿{{ money(todayStats.earnings) }}</span></p>
             <p class="text-xs text-slate-500">{{ todayStats.trips }} รอบ</p>
           </div>
           <div class="bg-white rounded-2xl border border-slate-200 p-4">
             <p class="text-xs text-slate-500">ทั้งหมด</p>
-            <p class="text-2xl font-black">฿{{ money(earnings.total_earnings) }}</p>
+            <p class="text-2xl font-black"><span class="num">฿{{ money(earnings.total_earnings) }}</span></p>
             <p class="text-xs text-slate-500">{{ earnings.total_trips }} รอบ</p>
           </div>
         </section>
@@ -200,7 +219,7 @@
                 </p>
                 <p class="text-xs text-slate-500 truncate">{{ formatDate(t.delivered_at) }} • {{ t.delivery_address }}</p>
               </div>
-              <span class="shrink-0 font-bold text-emerald-700">+฿{{ money(t.rider_fee) }}</span>
+              <span class="shrink-0 font-bold text-emerald-700"><span class="num">+฿{{ money(t.rider_fee) }}</span></span>
             </li>
           </ul>
         </section>
@@ -224,8 +243,11 @@
           :disabled="!!myJob || busy"
           class="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold disabled:bg-slate-300"
         >
-          🛵 รับงานนี้ (+฿{{ money(detailOrder.delivery?.rider_fee ?? 40) }})
+          🛵 รับงานนี้ (<span class="num">+฿{{ money(detailOrder.delivery?.rider_fee ?? 40) }}</span>)
         </button>
+        <p v-else-if="isAwaitingPayment(detailOrder)" class="text-center text-xs text-slate-600 font-bold">
+          รอร้านยืนยันการชำระเงิน — รับงานได้เมื่อร้านยืนยันยอดแล้ว
+        </p>
         <p v-else class="text-center text-xs text-amber-700 font-bold">ครัวยังทำไม่เสร็จ — รับงานได้เมื่อครัวกดเสร็จแล้ว</p>
       </div>
     </div>
@@ -273,6 +295,7 @@ const loadError = ref('')
 
 const available = ref([])
 const cooking = ref([])
+const awaitingPayment = ref([])
 const myJob = ref(null)
 const earnings = ref({ total_trips: 0, total_earnings: 0, trips: [] })
 
@@ -303,7 +326,12 @@ const todayStats = computed(() => {
 })
 
 // ---------- helpers ----------
-const money = (v) => Number(v || 0).toLocaleString('th-TH', { maximumFractionDigits: 2 })
+// จำนวนเต็มแสดงไม่มีทศนิยม, มีเศษแสดง 2 ตำแหน่งเสมอ (62.80 ไม่ใช่ 62.8)
+const money = (v) => {
+  const n = Number(v || 0)
+  const digits = Number.isInteger(n) ? 0 : 2
+  return n.toLocaleString('th-TH', { minimumFractionDigits: digits, maximumFractionDigits: 2 })
+}
 const addressOf = (o) => o.delivery?.delivery_address || o.delivery_address || o.user?.address || '-'
 const customerOf = (o) => o.delivery?.customer_name || o.user?.username || 'ลูกค้าเดลิเวอรี'
 const distanceText = (o) => {
@@ -311,7 +339,14 @@ const distanceText = (o) => {
   return km > 0 ? `~${km.toFixed(1)} กม.` : 'ไม่มีพิกัด GPS'
 }
 const itemCount = (o) => (o.order_items || []).reduce((s, i) => s + (i.quantity || 1), 0)
-const isClaimable = (o) => ['READY', 'SERVED'].includes((o.status || '').toUpperCase()) && !o.delivery?.rider_id
+const isAwaitingPayment = (o) => awaitingPayment.value.some((a) => a.order_id === o.order_id)
+const isClaimable = (o) => available.value.some((a) => a.order_id === o.order_id)
+const paymentWaitLabel = (o) => {
+  const t = (o.transaction || []).slice(-1)[0]
+  if (!t) return 'ยังไม่มีข้อมูลการชำระเงิน'
+  if ((t.payment_status || '').toUpperCase() === 'REJECTED') return 'การชำระเงินถูกปฏิเสธ'
+  return `${t.payment_method} • รอตรวจสอบยอด`
+}
 const isCash = (o) => {
   const t = (o.transaction || []).slice(-1)[0]
   return t && /cash/i.test(t.payment_method || '') && (t.payment_status || '').toUpperCase() !== 'COMPLETED'
@@ -372,9 +407,10 @@ const fetchJobs = async () => {
 
     available.value = data.available || []
     cooking.value = data.cooking || []
+    awaitingPayment.value = data.awaiting_payment || []
     myJob.value = data.mine || null
     if (detailOrder.value) {
-      detailOrder.value = [...available.value, ...cooking.value].find((o) => o.order_id === detailOrder.value.order_id) || detailOrder.value
+      detailOrder.value = [...available.value, ...awaitingPayment.value, ...cooking.value].find((o) => o.order_id === detailOrder.value.order_id) || detailOrder.value
     }
     loadError.value = ''
   } catch (err) {

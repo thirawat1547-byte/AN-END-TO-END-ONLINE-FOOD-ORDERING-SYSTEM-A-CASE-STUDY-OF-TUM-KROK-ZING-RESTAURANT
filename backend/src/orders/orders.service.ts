@@ -869,8 +869,27 @@ export class OrdersService implements OnModuleInit {
       }
     }
 
-    // คืนสต็อกวัตถุดิบกรณีออเดอร์ถูกยกเลิก (CANCELLED)
     const statusUpper = updateOrderStatusDto.status.toUpperCase();
+
+    // ปิดงานจัดส่งที่ค้างอยู่ให้ตรงกับออเดอร์ (ไม่งั้นไรเดอร์จะติดสถานะ "มีงานค้าง" และรับงานใหม่ไม่ได้)
+    if (statusUpper === 'CANCELLED') {
+      await this.prisma.delivery.updateMany({
+        where: { order_id: id, delivery_status: { notIn: ['DELIVERED', 'CANCELLED'] } },
+        data: { delivery_status: 'CANCELLED' },
+      });
+    } else if (statusUpper === 'COMPLETED') {
+      // ไรเดอร์รับอาหารออกไปแล้ว = ถือว่าส่งสำเร็จ (นับค่ารอบ), ยังไม่ได้รับอาหาร = ปิดงานโดยไม่นับค่ารอบ
+      await this.prisma.delivery.updateMany({
+        where: { order_id: id, delivery_status: 'DELIVERING' },
+        data: { delivery_status: 'DELIVERED', delivered_at: new Date() },
+      });
+      await this.prisma.delivery.updateMany({
+        where: { order_id: id, delivery_status: { in: ['WAITING_RIDER', 'ASSIGNED'] } },
+        data: { delivery_status: 'CANCELLED' },
+      });
+    }
+
+    // คืนสต็อกวัตถุดิบกรณีออเดอร์ถูกยกเลิก (CANCELLED)
     if (statusUpper === 'CANCELLED' && order.status.toUpperCase() !== 'CANCELLED') {
       for (const item of order.order_items) {
         const menu = await this.prisma.menu.findUnique({ where: { menu_id: item.menu_id } });
@@ -950,13 +969,15 @@ export class OrdersService implements OnModuleInit {
     if (!['READY', 'SERVED'].includes((order.status || '').toUpperCase())) {
       throw new BadRequestException('ครัวยังทำอาหารไม่เสร็จ ยังไม่สามารถรับงานนี้ได้');
     }
+    if (!this.isPaymentReadyForRider(order)) {
+      throw new BadRequestException('ออเดอร์นี้ยังไม่ได้ชำระเงินหรือร้านยังไม่ยืนยันยอดโอน ยังไม่สามารถรับงานได้');
+    }
 
-    // ไรเดอร์ 1 คนถือได้ทีละ 1 งาน
+    // ไรเดอร์ 1 คนถือได้ทีละ 1 งาน (เงื่อนไขเดียวกับแท็บ "งานของฉัน")
     const myActive = await this.prisma.delivery.findFirst({
       where: {
-        rider_id: riderId,
+        ...this.activeRiderDeliveryWhere(riderId),
         order_id: { not: orderId },
-        delivery_status: { in: ['ASSIGNED', 'DELIVERING'] },
       },
       select: { order_id: true },
     });
@@ -1009,6 +1030,24 @@ export class OrdersService implements OnModuleInit {
     return { order: updatedOrder, delivery: updatedOrder.delivery };
   }
 
+  // ไรเดอร์รับงานได้เมื่อ: ชำระเงินแล้ว (ร้านยืนยันยอด) หรือเป็นเงินสดปลายทาง (ไรเดอร์เก็บเงินเอง)
+  private isPaymentReadyForRider(order: { transaction?: { payment_method: string; payment_status: string }[] }) {
+    const txn = (order.transaction || []).slice(-1)[0];
+    if (!txn) return false;
+    const status = (txn.payment_status || '').toUpperCase();
+    if (status === 'COMPLETED') return true;
+    return /cash/i.test(txn.payment_method || '') && status === 'PENDING';
+  }
+
+  // งานจัดส่งที่ไรเดอร์ถืออยู่จริง: ยังไม่ส่งเสร็จ และออเดอร์ยังไม่ถูกปิด/ยกเลิก
+  private activeRiderDeliveryWhere(riderId: number) {
+    return {
+      rider_id: riderId,
+      delivery_status: { in: ['ASSIGNED', 'DELIVERING'] },
+      order: { order_type: 'DELIVERY', status: { notIn: ['COMPLETED', 'CANCELLED'] } },
+    };
+  }
+
   // 7.1 ไรเดอร์คืนงาน (ยกเลิกการรับงาน) ได้เฉพาะก่อนรับอาหารออกจากร้าน
   async releaseDelivery(orderId: number, riderId: number, isAdmin = false) {
     const delivery = await this.prisma.delivery.findUnique({ where: { order_id: orderId } });
@@ -1051,14 +1090,9 @@ export class OrdersService implements OnModuleInit {
         include,
         orderBy: { updated_at: 'asc' },
       }),
-      this.prisma.order.findFirst({
-        where: {
-          order_type: 'DELIVERY',
-          status: { notIn: ['COMPLETED', 'CANCELLED'] },
-          delivery: { rider_id: riderId, delivery_status: { in: ['ASSIGNED', 'DELIVERING'] } },
-        },
-        include,
-      }),
+      this.prisma.delivery
+        .findFirst({ where: this.activeRiderDeliveryWhere(riderId), select: { order_id: true } })
+        .then((d) => (d ? this.prisma.order.findUnique({ where: { order_id: d.order_id }, include }) : null)),
       this.prisma.order.findMany({
         where: {
           order_type: 'DELIVERY',
@@ -1077,8 +1111,13 @@ export class OrdersService implements OnModuleInit {
       return { ...o, delivery: { ...o.delivery, ...fee } };
     };
 
+    // ครัวทำเสร็จแล้วแต่ยังไม่ได้ชำระเงิน/ร้านยังไม่ยืนยันยอดโอน -> แยกไว้ ยังไม่ให้รับงาน
+    const paid = available.filter((o) => this.isPaymentReadyForRider(o));
+    const awaitingPayment = available.filter((o) => !this.isPaymentReadyForRider(o));
+
     return {
-      available: available.map((o) => this.attachFallbackItemsIfEmpty(withFeeEstimate(o))),
+      available: paid.map((o) => this.attachFallbackItemsIfEmpty(withFeeEstimate(o))),
+      awaiting_payment: awaitingPayment.map((o) => this.attachFallbackItemsIfEmpty(o)),
       mine: mine ? this.attachFallbackItemsIfEmpty(mine) : null,
       cooking: cooking.map((o) => this.attachFallbackItemsIfEmpty(o)),
     };
