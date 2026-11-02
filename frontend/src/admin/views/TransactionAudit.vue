@@ -335,7 +335,7 @@ function viewOrderDetails(order) {
               <td class="p-4 text-slate-500">{{ order.created_at }}</td>
               <td class="p-4 font-medium">
                 <span :class="order.order_type === 'In-store' ? 'text-amber-700' : 'text-blue-700'">
-                  {{ order.order_type === 'In-store' ? `🍽️ ${order.table_id ? 'โต๊ะ T-0' + order.table_id : 'ทานที่ร้าน'}` : '🛵 สั่งกลับบ้าน' }}
+                  {{ order.order_type === 'In-store' ? `🍽️ ${order.table_id ? 'โต๊ะ T-0' + order.table_id : 'ทานที่ร้าน'}` : '🛵 เดลิเวอรี่' }}
                 </span>
               </td>
               <td class="p-4">

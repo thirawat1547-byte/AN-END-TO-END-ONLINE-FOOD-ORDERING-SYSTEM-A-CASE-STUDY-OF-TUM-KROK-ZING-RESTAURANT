@@ -118,10 +118,10 @@ const totalDishesInKitchen = computed(() => {
         >
           <div>
             <span class="text-[10px] font-bold uppercase tracking-wider opacity-85 text-emerald-100">
-              {{ order.order_type === 'In-store' ? '🍽️ ทานในร้าน' : '🛍️ สั่งกลับบ้าน (Takeaway)' }}
+              {{ order.order_type === 'In-store' ? '🍽️ ทานในร้าน' : '🛵 เดลิเวอรี่' }}
             </span>
             <h2 class="text-2xl font-black tracking-tight text-white mt-0.5">
-              {{ order.table_id ? 'โต๊ะ T-0' + order.table_id : 'สั่งกลับบ้าน' }}
+              {{ order.table_id ? 'โต๊ะ T-0' + order.table_id : 'เดลิเวอรี่' }}
             </h2>
           </div>
           <div class="text-right">

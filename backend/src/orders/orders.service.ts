@@ -353,6 +353,10 @@ export class OrdersService implements OnModuleInit {
               delivery_address: createOrderDto.delivery_address || existingUser?.address || 'ตามหมุดจัดส่ง',
               rider_fee: riderTripFee,
               distance_km: 0.0,
+              ...(createOrderDto.delivery_lat && createOrderDto.delivery_lng && {
+                customer_lat: createOrderDto.delivery_lat,
+                customer_lng: createOrderDto.delivery_lng,
+              }),
             },
           });
         } catch (delivErr) {
@@ -934,60 +938,163 @@ export class OrdersService implements OnModuleInit {
     });
   }
 
-  // 7. ไรเดอร์กดรับงานจัดส่ง
+  // 7. ไรเดอร์กดรับงานจัดส่ง (รับได้เฉพาะออเดอร์ที่ครัวทำเสร็จแล้ว และยังไม่มีไรเดอร์คนอื่นรับ)
   async claimDelivery(orderId: number, riderId: number) {
+    if (!riderId) throw new ForbiddenException('ไม่พบข้อมูลไรเดอร์ กรุณาเข้าสู่ระบบใหม่');
     const order = await this.findOne(orderId);
-    if (!order) throw new NotFoundException(`ไม่พบออเดอร์ #${orderId}`);
 
-    // อัปเดตข้อมูล Delivery
-    const delivery = await this.prisma.delivery.upsert({
-      where: { order_id: orderId },
-      update: {
+    if ((order.order_type || '').toUpperCase() !== 'DELIVERY') {
+      throw new BadRequestException('ออเดอร์นี้ไม่ใช่งานเดลิเวอรี');
+    }
+    if (!['READY', 'SERVED'].includes((order.status || '').toUpperCase())) {
+      throw new BadRequestException('ครัวยังทำอาหารไม่เสร็จ ยังไม่สามารถรับงานนี้ได้');
+    }
+
+    // ไรเดอร์ 1 คนถือได้ทีละ 1 งาน
+    const myActive = await this.prisma.delivery.findFirst({
+      where: {
         rider_id: riderId,
-        delivery_status: 'ASSIGNED',
-        assigned_at: new Date(),
+        order_id: { not: orderId },
+        delivery_status: { in: ['ASSIGNED', 'DELIVERING'] },
       },
-      create: {
+      select: { order_id: true },
+    });
+    if (myActive) {
+      throw new BadRequestException(`คุณมีงานที่ยังส่งไม่เสร็จอยู่ (ออเดอร์ #${myActive.order_id})`);
+    }
+
+    if (!order.delivery) {
+      const storeSetting = await this.settingsService.getSettings().catch(() => null);
+      await this.prisma.delivery.create({
+        data: {
+          order_id: orderId,
+          delivery_status: 'WAITING_RIDER',
+          customer_name: (order.user as any)?.username || 'ลูกค้าเดลิเวอรี',
+          customer_phone: order.delivery_phone || (order.user as any)?.phone_number || '-',
+          delivery_address: order.delivery_address || (order.user as any)?.address || '-',
+          rider_fee: Number(storeSetting?.base_rider_fee || 40.00),
+        },
+      }).catch(() => {});
+    }
+
+    // อัปเดตแบบมีเงื่อนไข ป้องกันไรเดอร์ 2 คนกดรับงานเดียวกันพร้อมกัน
+    const claimed = await this.prisma.delivery.updateMany({
+      where: {
         order_id: orderId,
+        OR: [{ rider_id: null }, { rider_id: riderId }],
+        delivery_status: { in: ['WAITING_RIDER', 'ASSIGNED'] },
+      },
+      data: {
         rider_id: riderId,
         delivery_status: 'ASSIGNED',
-        customer_name: (order.user as any)?.username || 'ลูกค้าเดลิเวอรี',
-        customer_phone: order.delivery_phone || (order.user as any)?.phone_number || '-',
-        delivery_address: order.delivery_address || (order.user as any)?.address || '-',
-        rider_fee: 40.00,
         assigned_at: new Date(),
       },
     });
+    if (claimed.count === 0) {
+      throw new BadRequestException('งานนี้มีไรเดอร์คนอื่นรับไปแล้ว');
+    }
 
-    const updatedOrder = await this.prisma.order.update({
-      where: { order_id: orderId },
-      data: {
-        status: 'READY',
-      },
-      include: {
-        order_items: { include: { menu: true, order_item_options: true } },
-        delivery: true,
-        user: true,
-      },
-    });
+    const updatedOrder = await this.findOne(orderId);
 
     try {
       this.ordersGateway.sendOrderStatusUpdated(updatedOrder);
     } catch (e) {}
 
-    return { order: updatedOrder, delivery };
+    return { order: updatedOrder, delivery: updatedOrder.delivery };
+  }
+
+  // 7.1 ไรเดอร์คืนงาน (ยกเลิกการรับงาน) ได้เฉพาะก่อนรับอาหารออกจากร้าน
+  async releaseDelivery(orderId: number, riderId: number, isAdmin = false) {
+    const delivery = await this.prisma.delivery.findUnique({ where: { order_id: orderId } });
+    if (!delivery) throw new NotFoundException(`ไม่พบงานจัดส่งของออเดอร์ #${orderId}`);
+    if (!isAdmin && delivery.rider_id !== riderId) {
+      throw new ForbiddenException('งานนี้ไม่ใช่งานของคุณ');
+    }
+    if (delivery.delivery_status !== 'ASSIGNED') {
+      throw new BadRequestException('รับอาหารออกจากร้านแล้ว ไม่สามารถคืนงานได้');
+    }
+
+    await this.prisma.delivery.update({
+      where: { order_id: orderId },
+      data: { rider_id: null, delivery_status: 'WAITING_RIDER', assigned_at: null },
+    });
+
+    const updatedOrder = await this.findOne(orderId);
+    try {
+      this.ordersGateway.sendOrderStatusUpdated(updatedOrder);
+    } catch (e) {}
+    return updatedOrder;
+  }
+
+  // 7.2 ข้อมูลหน้าไรเดอร์: งานที่เปิดให้รับ, งานที่กำลังส่งของฉัน, ออเดอร์ที่ยังปรุงอยู่ในครัว
+  async getRiderJobs(riderId: number) {
+    const include = {
+      order_items: { include: { menu: true, order_item_options: true } },
+      delivery: true,
+      transaction: true,
+      user: { select: { user_id: true, username: true, phone_number: true, address: true } },
+    };
+
+    const [available, mine, cooking] = await Promise.all([
+      this.prisma.order.findMany({
+        where: {
+          order_type: 'DELIVERY',
+          status: { in: ['READY', 'SERVED'] },
+          OR: [{ delivery: null }, { delivery: { rider_id: null } }],
+        },
+        include,
+        orderBy: { updated_at: 'asc' },
+      }),
+      this.prisma.order.findFirst({
+        where: {
+          order_type: 'DELIVERY',
+          status: { notIn: ['COMPLETED', 'CANCELLED'] },
+          delivery: { rider_id: riderId, delivery_status: { in: ['ASSIGNED', 'DELIVERING'] } },
+        },
+        include,
+      }),
+      this.prisma.order.findMany({
+        where: {
+          order_type: 'DELIVERY',
+          status: { in: ['PENDING', 'PAID', 'COOKING'] },
+        },
+        include,
+        orderBy: { created_at: 'asc' },
+      }),
+    ]);
+
+    return {
+      available: available.map((o) => this.attachFallbackItemsIfEmpty(o)),
+      mine: mine ? this.attachFallbackItemsIfEmpty(mine) : null,
+      cooking: cooking.map((o) => this.attachFallbackItemsIfEmpty(o)),
+    };
   }
 
   // 8. ไรเดอร์อัปเดตสถานะการนำส่ง (PICKED_UP, DELIVERED) พร้อมแนบรูปถ่าย
-  async updateDeliveryStatus(orderId: number, riderId: number, status: string, proofImageUrl?: string) {
+  async updateDeliveryStatus(orderId: number, riderId: number, status: string, proofImageUrl?: string, isAdmin = false) {
     const stUpper = (status || '').toUpperCase();
     const isDelivered = stUpper === 'DELIVERED';
     const isPickedUp = stUpper === 'PICKED_UP' || stUpper === 'IN_DELIVERY';
+    if (!isDelivered && !isPickedUp) {
+      throw new BadRequestException('สถานะการจัดส่งไม่ถูกต้อง');
+    }
 
-    await this.prisma.delivery.updateMany({
+    const delivery = await this.prisma.delivery.findUnique({ where: { order_id: orderId } });
+    if (!delivery) throw new NotFoundException(`ไม่พบงานจัดส่งของออเดอร์ #${orderId}`);
+    if (!isAdmin && delivery.rider_id !== riderId) {
+      throw new ForbiddenException('งานนี้ไม่ใช่งานของคุณ');
+    }
+    if (isPickedUp && delivery.delivery_status !== 'ASSIGNED') {
+      throw new BadRequestException('สถานะงานไม่ถูกต้องสำหรับการรับอาหาร');
+    }
+    if (isDelivered && delivery.delivery_status !== 'DELIVERING') {
+      throw new BadRequestException('ต้องกดรับอาหารออกจากร้านก่อนจึงจะยืนยันส่งสำเร็จได้');
+    }
+
+    await this.prisma.delivery.update({
       where: { order_id: orderId },
       data: {
-        delivery_status: isDelivered ? 'DELIVERED' : (isPickedUp ? 'DELIVERING' : stUpper),
+        delivery_status: isDelivered ? 'DELIVERED' : 'DELIVERING',
         ...(isPickedUp && { picked_up_at: new Date() }),
         ...(isDelivered && {
           delivered_at: new Date(),

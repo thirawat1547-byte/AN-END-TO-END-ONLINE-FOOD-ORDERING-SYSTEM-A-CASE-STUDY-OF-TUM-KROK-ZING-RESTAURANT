@@ -25,7 +25,7 @@ const qrCodeDataUrl = ref('')
 const paymentQrDataUrl = ref('')
 const stripePaymentIntent = ref(null)
 const qrTab = ref('payment') // 'payment' | 'order'
-const promptpayNumber = ref('081-234-5678')
+const promptpayNumber = ref('095-423-8372')
 const promptpayName = ref('ร้านตำครกซิ่ง (นายธีรวัฒน์ แสนคำเฮียง)')
 
 // คำนวณรหัส CRC16 สำหรับ PromptPay EMVCo
@@ -41,7 +41,7 @@ function crc16(data) {
 
 // สร้างสตริง Payload PromptPay ตามมาตรฐาน EMVCo / ธนาคารแห่งประเทศไทย
 function generatePromptPayPayload(target, amount) {
-  const cleanTarget = String(target || '0812345678').replace(/[^0-9]/g, '');
+  const cleanTarget = String(target || '0954238372').replace(/[^0-9]/g, '');
   const targetType = cleanTarget.length >= 13 ? '02' : '01';
   let formattedTarget = cleanTarget;
   if (targetType === '01') {
@@ -220,6 +220,10 @@ const fetchTableDetail = async () => {
 
 onMounted(() => {
   fetchTableDetail()
+  axios.get(`${API_BASE}/settings`).then((res) => {
+    if (res.data?.promptpay_number) promptpayNumber.value = res.data.promptpay_number
+    if (res.data?.promptpay_name) promptpayName.value = res.data.promptpay_name
+  }).catch(() => {})
 })
 
 const subtotal = computed(() => {

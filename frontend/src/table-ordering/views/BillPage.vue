@@ -109,7 +109,7 @@ function crc16(data) {
 }
 
 function generatePromptPayPayload(target, amount) {
-  const cleanTarget = String(target || '0812345678').replace(/[^0-9]/g, '');
+  const cleanTarget = String(target || '0954238372').replace(/[^0-9]/g, '');
   const targetType = cleanTarget.length >= 13 ? '02' : '01';
   let formattedTarget = cleanTarget;
   if (targetType === '01') {

@@ -36,6 +36,14 @@ import { Roles } from '../auth/decorators/roles.decorator';
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
+  private getUserId(req: any): number {
+    return Number(req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub);
+  }
+
+  private isAdmin(req: any): boolean {
+    return String(req.user?.role || '').toUpperCase() === 'ADMIN';
+  }
+
   @Post()
   @UseGuards(OptionalJwtAuthGuard)
   @ApiBearerAuth()
@@ -105,15 +113,24 @@ export class OrdersController {
     return this.ordersService.getAvailableDeliveries();
   }
 
+  // หน้าไรเดอร์: งานที่ครัวทำเสร็จพร้อมให้รับ, งานที่ฉันกำลังส่ง, ออเดอร์ที่ยังปรุงอยู่
+  @Get('rider/jobs')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'STAFF', 'RIDER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'ดูงานจัดส่งสำหรับไรเดอร์ (ADMIN / STAFF / RIDER)' })
+  getRiderJobs(@Req() req: any) {
+    return this.ordersService.getRiderJobs(this.getUserId(req));
+  }
+
   // ดูยอดรายได้สะสมของไรเดอร์
   @Get('rider/earnings')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'STAFF', 'RIDER')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'ดูยอดรายได้ค่ารอบสะสมของไรเดอร์' })
   getRiderEarnings(@Req() req: any) {
-    const rawUserId = req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub;
-    const riderId = Number(rawUserId) || 1;
-    return this.ordersService.getRiderEarnings(riderId);
+    return this.ordersService.getRiderEarnings(this.getUserId(req));
   }
 
   // แอดมินดูรูปหลักฐานการจัดส่งและรีวิวจากลูกค้า (ต้องวางไว้ก่อน @Get(':id'))
@@ -136,9 +153,17 @@ export class OrdersController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'ไรเดอร์กดรับงานจัดส่งออเดอร์ (ADMIN / STAFF / RIDER)' })
   claimDelivery(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
-    const rawUserId = req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub;
-    const riderId = Number(rawUserId) || 1;
-    return this.ordersService.claimDelivery(id, riderId);
+    return this.ordersService.claimDelivery(id, this.getUserId(req));
+  }
+
+  // ไรเดอร์คืนงาน (ทำได้เฉพาะก่อนรับอาหารออกจากร้าน)
+  @Post(':id/release-delivery')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'STAFF', 'RIDER')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'ไรเดอร์คืนงานจัดส่งที่รับไว้ (ADMIN / STAFF / RIDER)' })
+  releaseDelivery(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.ordersService.releaseDelivery(id, this.getUserId(req), this.isAdmin(req));
   }
 
   // ไรเดอร์อัปเดตสถานะงานจัดส่ง (PICKED_UP, DELIVERED)
@@ -152,9 +177,7 @@ export class OrdersController {
     @Body() body: { status: string; proof_image_url?: string },
     @Req() req: any,
   ) {
-    const rawUserId = req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub;
-    const riderId = Number(rawUserId) || 1;
-    return this.ordersService.updateDeliveryStatus(id, riderId, body.status, body.proof_image_url);
+    return this.ordersService.updateDeliveryStatus(id, this.getUserId(req), body.status, body.proof_image_url, this.isAdmin(req));
   }
 
   // ไรเดอร์อัปโหลดรูปหลักฐานการจัดส่ง -> เก็บไว้ที่ uploads/delivery-proofs แล้วส่ง URL กลับไปแนบตอน DELIVERED

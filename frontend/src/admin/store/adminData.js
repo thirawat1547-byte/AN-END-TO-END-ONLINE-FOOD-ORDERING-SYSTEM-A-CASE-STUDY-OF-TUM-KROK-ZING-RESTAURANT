@@ -630,7 +630,7 @@ export const adminStore = reactive({
   storeSettings: {
     storeName: 'ร้านตำครกซิ่ง (Tum Krok Zing)',
     tagline: 'แซ่บนัว ถึงใจ อาหารอีสานแท้รสเด็ด',
-    promptpayNumber: '081-234-5678',
+    promptpayNumber: '095-423-8372',
     promptpayName: 'นายธีรวัฒน์ แสนคำเฮียง (ตำครกซิ่ง)',
     taxId: '0105566099881',
     address: '123/45 ถนนแจ้งวัฒนะ แขวงทุ่งสองห้อง เขตหลักสี่ กรุงเทพมหานคร 10210',

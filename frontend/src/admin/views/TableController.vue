@@ -169,7 +169,19 @@ const fetchTablesData = async () => {
   }
 }
 
+// ข้อมูลพร้อมเพย์ ดึงจากหน้าตั้งค่าร้าน (Admin Settings) ผ่าน GET /settings
+const promptpayNumber = ref('095-423-8372')
+const loadPromptPaySettings = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/settings`)
+    if (res.data?.promptpay_number) promptpayNumber.value = res.data.promptpay_number
+  } catch (e) {
+    console.error('โหลดข้อมูลพร้อมเพย์จากตั้งค่าร้านไม่สำเร็จ:', e)
+  }
+}
+
 onMounted(() => {
+  loadPromptPaySettings()
   fetchTablesData()
   pollingTimer = setInterval(fetchTablesData, 4000)
 })
@@ -207,7 +219,7 @@ function crc16(data) {
 }
 
 function generatePromptPayPayload(target, amount) {
-  const cleanTarget = String(target || '0812345678').replace(/[^0-9]/g, '');
+  const cleanTarget = String(target || '0954238372').replace(/[^0-9]/g, '');
   const targetType = cleanTarget.length >= 13 ? '02' : '01';
   let formattedTarget = cleanTarget;
   if (targetType === '01') {
@@ -249,7 +261,7 @@ const openPaymentModal = async (table) => {
   }
 
   try {
-    const payload = generatePromptPayPayload('081-234-5678', amount)
+    const payload = generatePromptPayPayload(promptpayNumber.value, amount)
     payQrDataUrl.value = await QRCode.toDataURL(payload, {
       width: 260,
       margin: 2,
@@ -297,7 +309,7 @@ const printTablePaymentSlip = () => {
       <div class="instruction">📱 สแกน QR ผ่าน Mobile Banking หรือ Stripe เพื่อชำระเงิน</div>
       <img class="qr-img" src="${payQrDataUrl.value}" alt="QR Code" />
       <div style="font-size: 11px; color: #4b5563; margin-top: 8px;">
-        ร้านตำครกซิ่ง | พร้อมเพย์: 081-234-5678
+        ร้านตำครกซิ่ง | พร้อมเพย์: ${promptpayNumber.value}
       </div>
       <div class="divider"></div>
       <div class="footer">
@@ -934,7 +946,7 @@ const confirmDeleteTable = async (table) => {
 
           <!-- รูป QR PromptPay -->
           <img :src="payQrDataUrl" alt="Payment QR" style="width: 170px; height: 170px; display: block; border-radius: 10px; border: 1px solid #E5E7EB;" />
-          <span style="font-size: 11px; color: #4B5563; margin-top: 6px;">ร้านตำครกซิ่ง | พร้อมเพย์: 081-234-5678</span>
+          <span style="font-size: 11px; color: #4B5563; margin-top: 6px;">ร้านตำครกซิ่ง | พร้อมเพย์: {{ promptpayNumber }}</span>
         </div>
 
         <!-- ปุ่ม Action ใน Modal -->
