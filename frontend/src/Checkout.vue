@@ -428,12 +428,13 @@
               <div class="item-info">
                 <div class="item-name">{{ item.name }}</div>
                 <div class="item-sub">
+                  <span v-if="item.customName">📝 {{ item.customName }}</span>
                   <span v-if="item.dishType">🍽️ {{ item.dishType }}</span>
                   <span v-if="item.spiceLevel">🌶️ {{ item.spiceLevel }}</span>
                   <span v-for="addon in item.addons" :key="addon.name"> +{{ addon.name }}</span>
                 </div>
                 <!-- ⚡ แสดงพลังงานแคลอรี่ต่อรายการ -->
-                <div class="item-cal-tag">
+                <div class="item-cal-tag" v-if="getItemCalories(item) > 0">
                   <span class="fire-icon">🔥</span>
                   <span>{{ getItemCalories(item) }} kcal</span>
                   <span v-if="item.qty > 1" class="item-cal-multiplier"> (รวม {{ getItemCalories(item) * item.qty }} kcal)</span>
@@ -531,7 +532,7 @@
           </div>
 
           <!-- 🥗 ส่วนแสดงผลพลังงานรวมทั้งมื้อ (Total Calories) -->
-          <div class="calories-summary-box" v-if="cartItems.length > 0">
+          <div class="calories-summary-box" v-if="cartItems.length > 0 && totalCalories > 0">
             <div class="cal-box-header">
               <div class="cal-title-left">
                 <div class="cal-badge-pill">
@@ -569,7 +570,7 @@
 
           <div class="price-breakdown">
             <!-- แถวแสดงพลังงานรวมทั้งมื้อในตารางคำนวณ -->
-            <div class="breakdown-row calories-breakdown-row">
+            <div class="breakdown-row calories-breakdown-row" v-if="totalCalories > 0">
               <span class="cal-breakdown-label">
                 <span class="cal-fire-icon">🔥</span> พลังงานรวมทั้งมื้อ (Total Calories)
               </span>
@@ -1218,6 +1219,8 @@ export default {
   methods: {
     getItemCalories(item) {
       if (!item) return 0;
+      // เมนูอาหารตามสั่งแบบระบุเอง ไม่ทราบแคลอรี่ จึงไม่นับรวม
+      if ((item.name || '').includes('ระบุเมนูเอง')) return 0;
       // 1. หากมีค่า calories เก็บมาในอ็อบเจกต์รายการแล้ว
       if (item.calories !== undefined && item.calories !== null && Number(item.calories) > 0) {
         return Number(item.calories);
@@ -2014,6 +2017,8 @@ async validateAndCheckout() {
               quantity: Number(item.qty || item.quantity || 1),
               notes: options.join(' | '),
               dish_type: item.dishType || undefined,
+              custom_name: item.customName || undefined,
+              custom_price: item.customName ? Number(item.customPrice) : undefined,
               options: structuredOptions.length > 0 ? structuredOptions : undefined
             };
           })

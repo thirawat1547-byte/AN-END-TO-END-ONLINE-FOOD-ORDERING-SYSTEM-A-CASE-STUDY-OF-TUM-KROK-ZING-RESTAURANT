@@ -8,6 +8,8 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Max,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -53,6 +55,19 @@ export class OrderItemDto {
   @IsString()
   @IsOptional()
   dishType?: string;
+
+  @ApiPropertyOptional({ example: 'ผัดซีอิ๊วหมู', description: 'ชื่อเมนูที่ลูกค้าระบุเอง (เฉพาะเมนูอาหารตามสั่งแบบระบุเมนูเอง)' })
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  custom_name?: string;
+
+  @ApiPropertyOptional({ example: 60, description: 'ราคาที่ลูกค้าระบุเอง (บาท) สำหรับเมนูระบุเอง' })
+  @IsInt()
+  @IsOptional()
+  @Min(1)
+  @Max(1000)
+  custom_price?: number;
 
   @ApiPropertyOptional({ type: [OrderItemOptionDto], description: 'ท็อปปิ้งและตัวเลือกเสริมที่เลือก' })
   @IsArray()

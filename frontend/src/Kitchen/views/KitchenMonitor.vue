@@ -160,6 +160,7 @@ const formatOrder = (order) => {
     qty: oi.quantity || 1,
     name: oi.menu?.menu_name || oi.menu?.name || oi.menu_name || `เมนู #${oi.menu_id}`,
     note: extractNote(oi),
+    unitPrice: Number(oi.unit_price) || 0,
     isMadeToOrder: (oi.menu?.category?.category_name || '').includes('ตามสั่ง') || oi.menu?.category_id === 6
   }))
 
@@ -642,6 +643,7 @@ onBeforeUnmount(() => {
             <div style="display: flex; align-items: baseline; gap: 10px;">
               <span style="font-size: 17px; font-weight: 800; color: #70A584;">{{ item.qty }}x</span>
               <span style="font-size: 16px; font-weight: 700; color: #2B2621;">{{ item.name }}</span>
+              <span v-if="item.unitPrice" style="font-size: 13px; font-weight: 600; color: #6B7280; white-space: nowrap;">฿{{ item.unitPrice }}/จาน</span>
               <span v-if="item.isMadeToOrder" style="margin-left: auto; font-size: 11px; font-weight: 700; color: #7C2D12; background-color: #FFEDD5; padding: 2px 8px; border-radius: 9999px; white-space: nowrap;">ตามสั่ง</span>
             </div>
             <div v-if="item.note" style="margin-top: 6px; font-size: 13px; color: #92400E;">📌 {{ item.note }}</div>

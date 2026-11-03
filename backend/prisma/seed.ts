@@ -407,14 +407,16 @@ async function main() {
     {
       category_id: 6,
       menu_name: 'อาหารตามสั่ง (ระบุเมนูเอง)',
-      description: 'พิมพ์เมนูที่อยากทานในหมายเหตุ ครัวจะยืนยันว่าทำให้ได้หรือไม่',
+      description: 'ระบุชื่อเมนูและราคาเอง ครัวจะยืนยันว่าทำให้ได้หรือไม่',
       price: 50.00,
       image_url: '/images/kao.jpg',
-      calories: 700,
+      calories: 0,
       is_available: true,
     },
+
+    // เมนูผัดเพิ่มเติม (หมวดที่ 1: อาหารจานเดียว / ผัด)
     {
-      category_id: 6,
+      category_id: 1,
       menu_name: 'ผัดพริกเผาหมู',
       description: 'หมูผัดน้ำพริกเผา หอมหวานกลมกล่อม ราดข้าวสวยร้อนๆ',
       price: 45.00,
@@ -423,7 +425,7 @@ async function main() {
       is_available: true,
     },
     {
-      category_id: 6,
+      category_id: 1,
       menu_name: 'ผัดผักรวมมิตรหมู',
       description: 'ผักสดหลากชนิดผัดน้ำมันหอย ใส่หมูนุ่ม ราดข้าว',
       price: 45.00,
@@ -456,6 +458,7 @@ async function main() {
       await prisma.menu.update({
         where: { menu_id: existingMenu.menu_id },
         data: {
+          category_id: m.category_id,
           calories: m.calories,
           description: m.description,
           price: m.price,
