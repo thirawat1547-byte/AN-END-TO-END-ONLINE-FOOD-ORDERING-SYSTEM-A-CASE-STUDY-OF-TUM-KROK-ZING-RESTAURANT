@@ -29,6 +29,12 @@ import imgKao from '../../assets/kao.jpg'
 import imgKaon from '../../assets/kaon.jpg'
 import imgNamtokmoo from '../../assets/namtokmoo.jpg'
 
+// แนบ JWT Token สำหรับ fetch() ที่เรียก API ซึ่งมี Guard (axios แนบให้อัตโนมัติใน main.js แต่ fetch ไม่ผ่าน interceptor)
+function authHeaders(extra = {}) {
+  const token = localStorage.getItem('access_token') || localStorage.getItem('token') || sessionStorage.getItem('token')
+  return token ? { ...extra, Authorization: `Bearer ${token}` } : { ...extra }
+}
+
 export const MENU_IMAGE_MAP = {
   'กะเพราหมู': imgKapaomu,
   'กระเพราหมู': imgKapaomu,
@@ -779,7 +785,7 @@ export const adminStore = reactive({
     try {
       const res = await fetch(`${API_BASE}/menus/${menuId}/ingredients`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ ingredients })
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -818,7 +824,7 @@ export const adminStore = reactive({
     try {
       const res = await fetch(`${API_BASE}/menus/${menuId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ is_available: newStatus })
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -835,7 +841,7 @@ export const adminStore = reactive({
     try {
       const res = await fetch(`${API_BASE}/menus`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           category_id: Number(newMenu.category_id) || 1,
           menu_name: newMenu.menu_name,
@@ -897,7 +903,7 @@ export const adminStore = reactive({
     try {
       const res = await fetch(`${API_BASE}/menus/${updatedMenu.menu_id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           category_id: Number(updatedMenu.category_id) || 1,
           menu_name: updatedMenu.menu_name,
@@ -919,7 +925,8 @@ export const adminStore = reactive({
   async deleteMenuItem(menuId) {
     try {
       const res = await fetch(`${API_BASE}/menus/${menuId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: authHeaders()
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       this.menus = this.menus.filter(m => m.menu_id !== menuId)
@@ -967,7 +974,7 @@ export const adminStore = reactive({
     try {
       const res = await fetch(`${API_BASE}/ingredients/${ingredientId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           name: item.ingredient_name,
           unit: item.unit,
@@ -995,7 +1002,7 @@ export const adminStore = reactive({
     try {
       const res = await fetch(`${API_BASE}/ingredients/translate-thai`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: authHeaders({ 'Content-Type': 'application/json' })
       })
       if (res.ok) {
         await this.fetchInventoryFromAPI()
@@ -1011,7 +1018,7 @@ export const adminStore = reactive({
     try {
       const res = await fetch(`${API_BASE}/ingredients`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           name: item.ingredient_name || item.name,
           quantity: Number(item.quantity_in_stock || item.quantity || 0),
@@ -1044,7 +1051,8 @@ export const adminStore = reactive({
   async deleteIngredientAPI(id) {
     try {
       const res = await fetch(`${API_BASE}/ingredients/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: authHeaders()
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       this.ingredients = this.ingredients.filter(i => i.ingredient_id !== id)
@@ -1100,7 +1108,7 @@ export const adminStore = reactive({
     try {
       const res = await fetch(`${API_BASE}/tables/${tableId}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ status: dbStatus })
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -1297,7 +1305,8 @@ export const adminStore = reactive({
   async deletePromotionAPI(promoId) {
     try {
       const res = await fetch(`${API_BASE}/promotions/${promoId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: authHeaders()
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       this.promotions = this.promotions.filter(p => p.promo_id !== promoId)
