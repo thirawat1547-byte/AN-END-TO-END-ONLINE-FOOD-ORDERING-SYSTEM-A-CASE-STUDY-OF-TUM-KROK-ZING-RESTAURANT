@@ -301,7 +301,7 @@
                     <input type="checkbox" :value="addon" v-model="modalOptions.addons">
                     <span>
                       {{ addon.name }} 
-                      <span class="addon-cal-mini" v-if="!isCustomRequest(selectedItem)">(+{{ addon.calories }} kcal)</span>
+                      <span class="addon-cal-mini">(+{{ addon.calories }} kcal)</span>
                     </span>
                   </div>
                   <span class="addon-price">+B{{ addon.price }}</span>
@@ -477,7 +477,7 @@ export default {
       return 'ยังไม่ระบุที่อยู่จัดส่ง';
     },
     availableAddons() {
-      if (!this.selectedItem) return [];
+      if (!this.selectedItem || this.isCustomRequest(this.selectedItem)) return [];
       const name = this.selectedItem.name;
       const cats = this.selectedItem.category || [];
 
