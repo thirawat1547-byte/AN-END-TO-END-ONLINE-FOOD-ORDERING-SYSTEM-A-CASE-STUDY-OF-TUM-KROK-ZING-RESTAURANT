@@ -550,7 +550,7 @@ export class OrdersService implements OnModuleInit {
       },
       include: {
         order_items: {
-          include: { menu: true, order_item_options: true },
+          include: { menu: { include: { category: true } }, order_item_options: true },
         },
         table: true,
         transaction: true,

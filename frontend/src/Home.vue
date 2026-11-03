@@ -355,7 +355,7 @@ export default {
       searchQuery: '',
       cartItems: [],
       currentCategory: 'ขายดีที่สุด',
-      tabs: ['ขายดีที่สุด', 'ทั้งหมด', 'อาหารจานเดียว / ผัด', 'ส้มตำแซ่บซิ่ง', 'ลาบ / ยำ', 'ของทอด', 'เครื่องดื่ม'],
+      tabs: ['ขายดีที่สุด', 'ทั้งหมด', 'อาหารจานเดียว / ผัด', 'ส้มตำแซ่บซิ่ง', 'ลาบ / ยำ', 'ของทอด', 'อาหารตามสั่ง', 'เครื่องดื่ม'],
       
       userProfile: { address: '' },
 
@@ -680,6 +680,7 @@ export default {
               else if (catName.includes('ส้มตำ') || dbItem.category_id === 2) cats.push('ส้มตำแซ่บซิ่ง');
               else if (catName.includes('ลาบ') || catName.includes('ยำ') || dbItem.category_id === 3) cats.push('ลาบ / ยำ');
               else if (catName.includes('ของทอด') || dbItem.category_id === 4) cats.push('ของทอด');
+              else if (catName.includes('ตามสั่ง') || dbItem.category_id === 6) cats.push('อาหารตามสั่ง');
               else cats.push('อาหารจานเดียว / ผัด');
 
               const newAllergenIds = Array.isArray(dbItem.allergen_ids)

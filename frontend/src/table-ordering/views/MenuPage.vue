@@ -137,6 +137,7 @@ const categories = [
   { id: 'ส้มตำแซ่บซิ่ง', name: 'ส้มตำแซ่บซิ่ง' },
   { id: 'ลาบ / ยำ', name: 'ลาบ / ยำ' },
   { id: 'ของทอด', name: 'ของทอด' },
+  { id: 'อาหารตามสั่ง', name: 'อาหารตามสั่ง' },
   { id: 'เครื่องดื่ม', name: 'เครื่องดื่ม' }
 ]
 
@@ -184,6 +185,8 @@ const fetchMenus = async () => {
           cats.push('ลาบ / ยำ')
         } else if (catName.includes('ของทอด') || m.category_id === 4) {
           cats.push('ของทอด')
+        } else if (catName.includes('ตามสั่ง') || m.category_id === 6) {
+          cats.push('อาหารตามสั่ง')
         } else {
           cats.push('อาหารจานเดียว / ผัด')
         }
