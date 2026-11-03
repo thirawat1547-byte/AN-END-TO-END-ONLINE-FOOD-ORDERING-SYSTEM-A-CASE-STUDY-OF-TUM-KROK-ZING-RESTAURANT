@@ -137,7 +137,6 @@ const categories = [
   { id: 'ส้มตำแซ่บซิ่ง', name: 'ส้มตำแซ่บซิ่ง' },
   { id: 'ลาบ / ยำ', name: 'ลาบ / ยำ' },
   { id: 'ของทอด', name: 'ของทอด' },
-  { id: 'อาหารตามสั่ง', name: 'อาหารตามสั่ง' },
   { id: 'เครื่องดื่ม', name: 'เครื่องดื่ม' }
 ]
 
@@ -165,8 +164,6 @@ const fetchMenus = async () => {
       const seen = new Set()
       const uniqueData = []
       for (const m of res.data) {
-        // เมนูระบุเองต้องกรอกชื่อและราคา ซึ่งหน้าสั่งที่โต๊ะยังไม่รองรับ
-        if ((m.menu_name || '').includes('ระบุเมนูเอง')) continue
         const canonical = m.menu_name === 'ไข่เจียวหมูสับ' ? 'ข้าวไข่เจียวหมูสับ' :
                           m.menu_name === 'ไข่เจียวกุ้ง' ? 'ข้าวไข่เจียวกุ้ง' :
                           m.menu_name === 'ปีกไก่ทอด' ? 'ไก่ทอด (ปีก)' : m.menu_name
@@ -187,8 +184,6 @@ const fetchMenus = async () => {
           cats.push('ลาบ / ยำ')
         } else if (catName.includes('ของทอด') || m.category_id === 4) {
           cats.push('ของทอด')
-        } else if (catName.includes('ตามสั่ง') || m.category_id === 6) {
-          cats.push('อาหารตามสั่ง')
         } else {
           cats.push('อาหารจานเดียว / ผัด')
         }

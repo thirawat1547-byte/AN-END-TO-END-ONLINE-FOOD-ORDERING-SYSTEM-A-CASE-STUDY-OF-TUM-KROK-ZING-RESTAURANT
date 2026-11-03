@@ -127,7 +127,6 @@ async function main() {
     { category_id: 3, category_name: 'ลาบ / ยำ' },
     { category_id: 4, category_name: 'ของทอด' },
     { category_id: 5, category_name: 'เครื่องดื่ม' },
-    { category_id: 6, category_name: 'อาหารตามสั่ง' },
   ];
 
   for (const cat of categories) {
@@ -402,37 +401,6 @@ async function main() {
       calories: 0,
       is_available: true,
     },
-
-    // หมวดที่ 6: อาหารตามสั่ง (ครัวต้องกดยืนยันว่าทำได้หรือไม่ก่อนเริ่มทำ)
-    {
-      category_id: 6,
-      menu_name: 'อาหารตามสั่ง (ระบุเมนูเอง)',
-      description: 'ระบุชื่อเมนูและราคาเอง ครัวจะยืนยันว่าทำให้ได้หรือไม่',
-      price: 50.00,
-      image_url: '/images/kao.jpg',
-      calories: 0,
-      is_available: true,
-    },
-
-    // เมนูผัดเพิ่มเติม (หมวดที่ 1: อาหารจานเดียว / ผัด)
-    {
-      category_id: 1,
-      menu_name: 'ผัดพริกเผาหมู',
-      description: 'หมูผัดน้ำพริกเผา หอมหวานกลมกล่อม ราดข้าวสวยร้อนๆ',
-      price: 45.00,
-      image_url: '/images/pikkangmu.jpg',
-      calories: 780,
-      is_available: true,
-    },
-    {
-      category_id: 1,
-      menu_name: 'ผัดผักรวมมิตรหมู',
-      description: 'ผักสดหลากชนิดผัดน้ำมันหอย ใส่หมูนุ่ม ราดข้าว',
-      price: 45.00,
-      image_url: '/images/kanamokrop.jpg',
-      calories: 620,
-      is_available: true,
-    },
   ];
 
   for (const m of menus) {
@@ -458,7 +426,6 @@ async function main() {
       await prisma.menu.update({
         where: { menu_id: existingMenu.menu_id },
         data: {
-          category_id: m.category_id,
           calories: m.calories,
           description: m.description,
           price: m.price,

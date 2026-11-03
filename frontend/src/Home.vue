@@ -72,8 +72,8 @@
             </h3>
             <p class="food-desc">{{ item.desc }}</p>
             <div class="food-footer">
-              <span class="price">{{ isCustomRequest(item) ? 'ระบุราคาเอง' : 'B' + item.price }}</span>
-              <span class="food-card-cal" v-if="item.calories && !isCustomRequest(item)">🔥 {{ item.calories }} kcal</span>
+              <span class="price">B{{ item.price }}</span>
+              <span class="food-card-cal" v-if="item.calories">🔥 {{ item.calories }} kcal</span>
               <button 
                 class="plus-btn" 
                 :disabled="item.is_available === false"
@@ -104,7 +104,6 @@
               </div>
               
               <div class="cart-item-options">
-                <span v-if="item.customName" class="opt-badge dish-badge">📝 {{ item.customName }}</span>
                 <span v-if="item.dishType" class="opt-badge dish-badge">🍽️ {{ item.dishType }}</span>
                 <span v-if="item.seafoodChoice" class="opt-badge">✔️ {{ item.seafoodChoice }}</span>
                 <span v-if="item.spiceLevel" class="opt-badge">🌶️ {{ item.spiceLevel }}</span>
@@ -113,7 +112,7 @@
               
               <div class="cart-item-price-cal">
                 <span class="cart-item-price">B{{ item.price }}</span>
-                <span class="cart-item-cal" v-if="item.calories && !isCustomRequest(item)">🔥 {{ item.calories * item.qty }} kcal</span>
+                <span class="cart-item-cal" v-if="item.calories">🔥 {{ item.calories * item.qty }} kcal</span>
               </div>
             </div>
             
@@ -180,7 +179,7 @@
             </div>
             <div class="price-cal-box">
               <span class="modal-base-price">B{{ unitModalPrice }}</span>
-              <span class="modal-cal-text" v-if="selectedItem.calories !== undefined && !isCustomRequest(selectedItem)">🔥 ~{{ unitModalCalories }} kcal</span>
+              <span class="modal-cal-text" v-if="selectedItem.calories !== undefined">🔥 ~{{ unitModalCalories }} kcal</span>
             </div>
           </div>
 
@@ -204,22 +203,6 @@
           <p class="modal-desc">{{ selectedItem.desc }}</p>
 
           <div class="modal-scroll-area">
-
-            <!-- อาหารตามสั่งแบบระบุเมนูเอง: ลูกค้าพิมพ์ชื่อเมนูและราคาเอง ครัวจะยืนยันอีกครั้งว่าทำได้หรือไม่ -->
-            <div class="option-group" v-if="isCustomRequest(selectedItem)">
-              <div class="option-group-title">
-                <h3>ชื่อเมนูที่ต้องการ</h3>
-                <span class="req-badge">จำเป็น</span>
-              </div>
-              <input type="text" class="note-input" maxlength="100" placeholder="เช่น ผัดซีอิ๊วหมู, ต้มยำกุ้งน้ำข้น" v-model="modalOptions.customName">
-
-              <div class="option-group-title" style="margin-top: 14px;">
-                <h3>ราคา (บาท)</h3>
-                <span class="req-badge">จำเป็น</span>
-              </div>
-              <input type="number" class="note-input" min="1" max="1000" step="1" inputmode="numeric" placeholder="เช่น 60" v-model.number="modalOptions.customPrice">
-              <p class="dish-req-note" style="color: #777;">ครัวจะตรวจสอบเมนูและราคา แล้วยืนยันว่าทำให้ได้หรือไม่ก่อนเริ่มปรุง</p>
-            </div>
             
             <!-- ส่วนเลือก กับข้าว หรือ ราดข้าว (ทุกเมนู ยกเว้น เครื่องดื่ม, ลาบ, ไก่ทอด, ส้มตำ, ข้าวผัด, ข้าวเปล่า) -->
             <div class="option-group" v-if="!isExemptDishType(selectedItem)">
@@ -326,10 +309,7 @@
               :disabled="!canAddToCart"
               @click="confirmAddToCart"
             >
-              <template v-if="!canAddToCart && isCustomRequest(selectedItem) && !isCustomRequestFilled">
-                กรุณาระบุชื่อเมนูและราคา
-              </template>
-              <template v-else-if="!canAddToCart && !isExemptDishType(selectedItem)">
+              <template v-if="!canAddToCart && !isExemptDishType(selectedItem)">
                 กรุณาเลือกกับข้าวหรือราดข้าว
               </template>
               <template v-else>
@@ -375,7 +355,7 @@ export default {
       searchQuery: '',
       cartItems: [],
       currentCategory: 'ขายดีที่สุด',
-      tabs: ['ขายดีที่สุด', 'ทั้งหมด', 'อาหารจานเดียว / ผัด', 'ส้มตำแซ่บซิ่ง', 'ลาบ / ยำ', 'ของทอด', 'อาหารตามสั่ง', 'เครื่องดื่ม'],
+      tabs: ['ขายดีที่สุด', 'ทั้งหมด', 'อาหารจานเดียว / ผัด', 'ส้มตำแซ่บซิ่ง', 'ลาบ / ยำ', 'ของทอด', 'เครื่องดื่ม'],
       
       userProfile: { address: '' },
 
@@ -420,7 +400,7 @@ export default {
   computed: {
     subtotal() { return this.cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0); },
     cartTotalCalories() {
-      return this.cartItems.reduce((sum, item) => sum + (this.isCustomRequest(item) ? 0 : (Number(item.calories) || 0) * item.qty), 0);
+      return this.cartItems.reduce((sum, item) => sum + ((Number(item.calories) || 0) * item.qty), 0);
     },
     filteredMenu() {
       const searchWord = this.searchQuery.trim().toLowerCase();
@@ -441,13 +421,8 @@ export default {
         return cats.includes(this.currentCategory);
       });
     },
-    isCustomRequestFilled() {
-      const price = Number(this.modalOptions.customPrice);
-      return !!(this.modalOptions.customName || '').trim() && Number.isInteger(price) && price >= 1 && price <= 1000;
-    },
     canAddToCart() {
       if (!this.selectedItem) return false;
-      if (this.isCustomRequest(this.selectedItem) && !this.isCustomRequestFilled) return false;
       if (!this.isExemptDishType(this.selectedItem)) {
         return !!this.modalOptions.dishType;
       }
@@ -456,13 +431,10 @@ export default {
     unitModalPrice() {
       if (!this.selectedItem) return 0;
       let addonTotal = this.modalOptions.addons.reduce((sum, addon) => sum + addon.price, 0);
-      const basePrice = this.isCustomRequest(this.selectedItem)
-        ? (Number(this.modalOptions.customPrice) || 0)
-        : this.selectedItem.price;
-      return basePrice + addonTotal;
+      return this.selectedItem.price + addonTotal;
     },
     unitModalCalories() {
-      if (!this.selectedItem || this.selectedItem.calories === undefined || this.isCustomRequest(this.selectedItem)) return 0;
+      if (!this.selectedItem || this.selectedItem.calories === undefined) return 0;
       let addonCal = this.modalOptions.addons.reduce((sum, addon) => sum + (addon.calories || 0), 0);
       return this.selectedItem.calories + addonCal;
     },
@@ -477,7 +449,7 @@ export default {
       return 'ยังไม่ระบุที่อยู่จัดส่ง';
     },
     availableAddons() {
-      if (!this.selectedItem || this.isCustomRequest(this.selectedItem)) return [];
+      if (!this.selectedItem) return [];
       const name = this.selectedItem.name;
       const cats = this.selectedItem.category || [];
 
@@ -708,7 +680,6 @@ export default {
               else if (catName.includes('ส้มตำ') || dbItem.category_id === 2) cats.push('ส้มตำแซ่บซิ่ง');
               else if (catName.includes('ลาบ') || catName.includes('ยำ') || dbItem.category_id === 3) cats.push('ลาบ / ยำ');
               else if (catName.includes('ของทอด') || dbItem.category_id === 4) cats.push('ของทอด');
-              else if (catName.includes('ตามสั่ง') || dbItem.category_id === 6) cats.push('อาหารตามสั่ง');
               else cats.push('อาหารจานเดียว / ผัด');
 
               const newAllergenIds = Array.isArray(dbItem.allergen_ids)
@@ -761,9 +732,6 @@ export default {
       }
     },
 
-    isCustomRequest(item) {
-      return !!item && (item.name || item.menu_name || '').includes('ระบุเมนูเอง');
-    },
     isExemptDishType(item) {
       if (!item) return true;
       const name = item.name || item.menu_name || '';
@@ -860,11 +828,9 @@ export default {
         dishType: null,
         spiceLevel: item.isSpicy ? 'เผ็ดกลาง' : null, 
         seafoodChoice: item.isSeafood ? 'รวม (หมึก+กุ้ง)' : null, 
-        addons: [],
-        note: '',
-        customName: '',
-        customPrice: null,
-        qty: 1
+        addons: [], 
+        note: '', 
+        qty: 1 
       };
       this.showItemModal = true;
     },
@@ -886,10 +852,6 @@ export default {
         seafoodChoice: this.modalOptions.seafoodChoice, 
         addons: [...this.modalOptions.addons], 
         note: this.modalOptions.note,
-        ...(this.isCustomRequest(this.selectedItem) && {
-          customName: this.modalOptions.customName.trim(),
-          customPrice: Number(this.modalOptions.customPrice)
-        }),
         allergen_ids: Array.isArray(this.selectedItem.allergen_ids) ? [...this.selectedItem.allergen_ids] : []
       });
       this.closeItemModal();

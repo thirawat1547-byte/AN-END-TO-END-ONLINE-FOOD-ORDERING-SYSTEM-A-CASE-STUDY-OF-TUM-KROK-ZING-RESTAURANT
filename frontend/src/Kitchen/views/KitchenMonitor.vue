@@ -4,7 +4,7 @@ import axios from 'axios'
 import { API_BASE } from '../../config/api'
 import { socket } from '../../config/socket'
 import { useSocketStore } from '../../store/socketStore'
-import { showWarning, showConfirm } from '../../utils/swal'
+import { showWarning } from '../../utils/swal'
 
 const socketStore = useSocketStore()
 const activeTab = ref('incoming')
@@ -14,17 +14,7 @@ const isLoading = ref(false)
 const isSocketConnected = computed(() => Boolean(socketStore.isConnected || (socket && socket.connected)))
 const newOrderNotification = ref(null)
 const selectedFilter = ref('today') // 'today' | 'all' (รีเซ็ตทุกวันเป็นค่าเริ่มต้น)
-const isDecidingMadeToOrder = ref(false)
-// ออเดอร์ที่ครัวกด "ทำไม่ได้" เอง ไม่ต้องเด้งเตือนว่าถูกยกเลิกซ้ำ
-const selfRejectedIds = new Set()
 let pollingTimer = null
-
-// ออเดอร์อาหารตามสั่งที่ยังรอครัวยืนยัน (PENDING) -> เด้งป๊อปอัพทีละออเดอร์ ตามลำดับที่เข้ามา
-const pendingMadeToOrder = computed(() => {
-  return incomingOrders.value
-    .filter(o => o.status === 'PENDING' && o.items.some(i => i.isMadeToOrder))
-    .sort((a, b) => a.id - b.id)[0] || null
-})
 
 const todayDateLabel = computed(() => {
   return new Intl.DateTimeFormat('th-TH', {
@@ -94,7 +84,7 @@ const onOrderStatusChanged = (order) => {
   // ออเดอร์ที่ครัวกำลังรอทำ/กำลังทำ ถูกยกเลิก (เช่น แอดมินตรวจแล้วไม่พบยอดโอน) -> แจ้งให้หยุดทำทันที
   const isCancelled = String(order?.status || '').toUpperCase() === 'CANCELLED'
   const wasInKitchen = incomingOrders.value.some(o => String(o.order_id ?? o.id) === String(order?.order_id))
-  if (isCancelled && wasInKitchen && !selfRejectedIds.has(Number(order?.order_id))) {
+  if (isCancelled && wasInKitchen) {
     showWarning(
       `ออเดอร์ #${order.order_id} ถูกยกเลิก`,
       'ไม่ต้องทำอาหารออเดอร์นี้ต่อ (เช่น ร้านตรวจแล้วไม่พบยอดโอนเงิน)',
@@ -159,9 +149,7 @@ const formatOrder = (order) => {
   let items = (order.order_items || order.items || []).map((oi) => ({
     qty: oi.quantity || 1,
     name: oi.menu?.menu_name || oi.menu?.name || oi.menu_name || `เมนู #${oi.menu_id}`,
-    note: extractNote(oi),
-    unitPrice: Number(oi.unit_price) || 0,
-    isMadeToOrder: (oi.menu?.category?.category_name || '').includes('ตามสั่ง') || oi.menu?.category_id === 6
+    note: extractNote(oi)
   }))
 
   // หากเป็นออเดอร์เดิมที่ไม่มีรายการอาหาร ให้สร้าง fallback จากยอดเงิน
@@ -199,7 +187,7 @@ const formatOrder = (order) => {
     orderType: order.order_type,
     time: `${diffMins} นาที`,
     timeStatus,
-    status: (order.status || '').toUpperCase(),
+    status: order.status,
     totalPrice: order.total_price,
     completedAt: createdDate.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
     items
@@ -270,43 +258,7 @@ const serveOrder = async (orderId, orderType) => {
   }
 }
 
-// 3. ครัวยืนยันอาหารตามสั่ง: ทำได้ -> เริ่มปรุง (COOKING) / ทำไม่ได้ -> ยกเลิกออเดอร์ (CANCELLED คืนสต็อกและแจ้งลูกค้า)
-const acceptMadeToOrder = async (order) => {
-  isDecidingMadeToOrder.value = true
-  try {
-    await axios.patch(`${API_BASE}/orders/${order.id}/status`, { status: 'COOKING' })
-    await fetchOrders()
-  } catch (err) {
-    console.error('ไม่สามารถยืนยันอาหารตามสั่งได้:', err)
-    alert('เกิดข้อผิดพลาดในการยืนยันออเดอร์')
-  } finally {
-    isDecidingMadeToOrder.value = false
-  }
-}
-
-const rejectMadeToOrder = async (order) => {
-  const result = await showConfirm(
-    `ยืนยันว่าทำออเดอร์ #${order.id} ไม่ได้?`,
-    'ออเดอร์นี้จะถูกยกเลิกทั้งออเดอร์ และระบบจะแจ้งลูกค้าทันที',
-    { confirmButtonText: 'ทำไม่ได้ ยกเลิกออเดอร์', cancelButtonText: 'กลับไปดูก่อน' }
-  )
-  if (!result.isConfirmed) return
-
-  isDecidingMadeToOrder.value = true
-  try {
-    selfRejectedIds.add(order.id)
-    await axios.patch(`${API_BASE}/orders/${order.id}/status`, { status: 'CANCELLED' })
-    await fetchOrders()
-  } catch (err) {
-    selfRejectedIds.delete(order.id)
-    console.error('ไม่สามารถยกเลิกออเดอร์อาหารตามสั่งได้:', err)
-    alert('เกิดข้อผิดพลาดในการยกเลิกออเดอร์')
-  } finally {
-    isDecidingMadeToOrder.value = false
-  }
-}
-
-// 4. ดึงออเดอร์กลับไปปรุงใหม่ (Pending)
+// 3. ดึงออเดอร์กลับไปปรุงใหม่ (Pending)
 const recallOrder = async (orderId) => {
   try {
     await axios.patch(`${API_BASE}/orders/${orderId}/status`, {
@@ -533,7 +485,6 @@ onBeforeUnmount(() => {
                   <div style="flex: 1;">
                     <div style="font-size: 16px; font-weight: 700; color: #2B2621; line-height: 1.35;">
                       {{ item.name }}
-                      <span v-if="item.isMadeToOrder" style="margin-left: 6px; font-size: 11px; font-weight: 700; color: #7C2D12; background-color: #FFEDD5; border: 1px solid #FDBA74; padding: 2px 8px; border-radius: 9999px; vertical-align: middle;">ตามสั่ง</span>
                     </div>
                     <div v-if="item.note" style="margin-top: 6px;">
                       <span style="background-color: #FEF3C7; color: #92400E; font-size: 12px; padding: 4px 10px; border-radius: 8px; border: 1px solid #FDE68A; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; line-height: 1.3;">
@@ -612,61 +563,6 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-    </div>
-
-    <!-- Popup ยืนยันอาหารตามสั่ง: ครัวต้องเลือกว่าทำได้หรือทำไม่ได้ก่อนเริ่มปรุง -->
-    <div
-      v-if="pendingMadeToOrder"
-      style="position: fixed; inset: 0; z-index: 1000; background-color: rgba(28, 25, 23, 0.55); display: flex; align-items: center; justify-content: center; padding: 16px;"
-    >
-      <div style="background-color: #FFFFFF; border-radius: 28px; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; padding: 28px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35); box-sizing: border-box;">
-        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
-          <span style="font-size: 30px;">🧑‍🍳</span>
-          <div>
-            <div style="font-size: 20px; font-weight: 800; color: #2B2621;">ออเดอร์อาหารตามสั่ง</div>
-            <div style="font-size: 14px; color: #6B7280;">#{{ pendingMadeToOrder.id }} • {{ pendingMadeToOrder.table }} • {{ pendingMadeToOrder.time }}</div>
-          </div>
-        </div>
-        <p style="font-size: 14px; color: #5C5246; margin: 12px 0 16px;">ตรวจสอบรายการและวัตถุดิบ แล้วยืนยันว่าครัวทำเมนูนี้ได้หรือไม่</p>
-
-        <div style="display: flex; flex-direction: column; gap: 10px;">
-          <div
-            v-for="(item, i) in pendingMadeToOrder.items"
-            :key="i"
-            :style="{
-              padding: '12px 14px',
-              borderRadius: '16px',
-              border: item.isMadeToOrder ? '2px solid #FDBA74' : '1px solid #EBE1D0',
-              backgroundColor: item.isMadeToOrder ? '#FFF7ED' : '#FAF8F5'
-            }"
-          >
-            <div style="display: flex; align-items: baseline; gap: 10px;">
-              <span style="font-size: 17px; font-weight: 800; color: #70A584;">{{ item.qty }}x</span>
-              <span style="font-size: 16px; font-weight: 700; color: #2B2621;">{{ item.name }}</span>
-              <span v-if="item.unitPrice" style="font-size: 13px; font-weight: 600; color: #6B7280; white-space: nowrap;">฿{{ item.unitPrice }}/จาน</span>
-              <span v-if="item.isMadeToOrder" style="margin-left: auto; font-size: 11px; font-weight: 700; color: #7C2D12; background-color: #FFEDD5; padding: 2px 8px; border-radius: 9999px; white-space: nowrap;">ตามสั่ง</span>
-            </div>
-            <div v-if="item.note" style="margin-top: 6px; font-size: 13px; color: #92400E;">📌 {{ item.note }}</div>
-          </div>
-        </div>
-
-        <div style="display: flex; gap: 12px; margin-top: 22px;">
-          <button
-            @click="rejectMadeToOrder(pendingMadeToOrder)"
-            :disabled="isDecidingMadeToOrder"
-            style="flex: 1; padding: 14px 0; border-radius: 18px; font-size: 15px; font-weight: 700; color: #B33939; background-color: #FEF2F2; border: 2px solid #FCA5A5; cursor: pointer;"
-          >
-            ✖ ทำไม่ได้
-          </button>
-          <button
-            @click="acceptMadeToOrder(pendingMadeToOrder)"
-            :disabled="isDecidingMadeToOrder"
-            style="flex: 1; padding: 14px 0; border-radius: 18px; font-size: 15px; font-weight: 700; color: white; background-color: #4B7B61; border: 2px solid #4B7B61; cursor: pointer;"
-          >
-            ✔ ทำได้ เริ่มปรุง
-          </button>
-        </div>
-      </div>
     </div>
   </div>
 </template>

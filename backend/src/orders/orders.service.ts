@@ -153,15 +153,8 @@ export class OrdersService implements OnModuleInit {
           throw new BadRequestException(`ขออภัย เมนู "${menu.menu_name}" ปิดรับออเดอร์ชั่วคราว`);
         }
 
-        // เมนูอาหารตามสั่งแบบระบุเมนูเอง: ใช้ชื่อและราคาที่ลูกค้ากรอก (ครัวจะกดยืนยันอีกครั้งที่จอ KDS)
-        const isCustomRequest = menu.menu_name.includes('ระบุเมนูเอง');
-        const customName = (item.custom_name || '').trim();
-        if (isCustomRequest && (!customName || !item.custom_price)) {
-          throw new BadRequestException(`กรุณาระบุชื่อเมนูและราคาสำหรับ "${menu.menu_name}"`);
-        }
-
-        const basePrice = isCustomRequest ? Number(item.custom_price) : Number(menu.price);
-
+        const basePrice = Number(menu.price);
+        
         // คำนวณราคา Option เสริม (ถ้ามี)
         let optionPriceSum = 0;
         const optionsList: any[] = [];
@@ -184,9 +177,6 @@ export class OrdersService implements OnModuleInit {
         let finalNotes = item.notes || '';
         if (dishType && !finalNotes.includes(dishType)) {
           finalNotes = finalNotes ? `${dishType} | ${finalNotes}` : dishType;
-        }
-        if (isCustomRequest) {
-          finalNotes = finalNotes ? `เมนู: ${customName} | ${finalNotes}` : `เมนู: ${customName}`;
         }
 
         // บันทึกข้อมูลรายการอาหาร พร้อมหมายเหตุตัวเลือกที่ลูกค้าเลือก (notes) และตาราง ORDER_ITEM_OPTIONS
@@ -560,7 +550,7 @@ export class OrdersService implements OnModuleInit {
       },
       include: {
         order_items: {
-          include: { menu: { include: { category: true } }, order_item_options: true },
+          include: { menu: true, order_item_options: true },
         },
         table: true,
         transaction: true,
