@@ -728,11 +728,23 @@ export class OrdersService implements OnModuleInit {
   async updateStatus(id: number, updateOrderStatusDto: UpdateOrderStatusDto) {
     const order = await this.findOne(id);
 
+    // บันทึกเวลาครัวเริ่มทำ/ทำเสร็จครั้งแรก ใช้คำนวณ "เวลาปรุงเฉลี่ย" ในแดชบอร์ด
+    const now = new Date();
+    const nextStatus = updateOrderStatusDto.status.toUpperCase();
+    const cookingTimes: { cooking_started_at?: Date; cooked_at?: Date } = {};
+    if (nextStatus === 'COOKING' && !order.cooking_started_at) {
+      cookingTimes.cooking_started_at = now;
+    }
+    if (['READY', 'SERVED'].includes(nextStatus) && !order.cooked_at) {
+      cookingTimes.cooked_at = now;
+    }
+
     const updated = await this.prisma.order.update({
       where: { order_id: id },
       data: {
         status: updateOrderStatusDto.status,
-        updated_at: new Date(),
+        updated_at: now,
+        ...cookingTimes,
       },
     });
 

@@ -149,6 +149,8 @@ model Order {
   rating           Int?          @db.TinyInt
   review_comment   String?       @db.Text
   reviewed_at      DateTime?
+  cooking_started_at DateTime? // เวลาที่ครัวกดเริ่มทำ (สถานะ COOKING ครั้งแรก)
+  cooked_at          DateTime? // เวลาที่ครัวทำเสร็จ (สถานะ READY/SERVED ครั้งแรก)
   created_at       DateTime      @default(now())
   updated_at       DateTime      @default(now()) @updatedAt
 

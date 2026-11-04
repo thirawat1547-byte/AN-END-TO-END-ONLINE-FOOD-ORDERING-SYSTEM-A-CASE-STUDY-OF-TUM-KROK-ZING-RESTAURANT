@@ -461,48 +461,20 @@ const salesGrowthPercent = computed(() => {
 })
 
 // คำนวณเวลาเฉลี่ยในการปรุงอาหารจากออเดอร์ในวันที่เลือก
+// ใช้เวลาจริงที่ครัวกดเริ่มทำ (cooking_started_at) ถึงทำเสร็จ (cooked_at)
+// ถ้าไม่มีออเดอร์ที่มีเวลาทั้งสองค่า จะคืน null แล้วการ์ดแสดง "–" (ไม่ใส่ตัวเลขสมมติ)
 const avgPrepTimeMinutes = computed(() => {
-  const completed = dayOrders.value.filter(o => {
-    const s = (o.status || '').toLowerCase()
-    return s === 'completed' || s === 'served' || s === 'done' || s === 'ready'
-  })
-  if (completed.length === 0) {
-    return validDayOrders.value.length > 0 ? 8.5 : null
+  const diffs = []
+  for (const o of dayOrders.value) {
+    if (!o.cooking_started_at || !o.cooked_at) continue
+    const start = new Date(o.cooking_started_at).getTime()
+    const end = new Date(o.cooked_at).getTime()
+    if (isNaN(start) || isNaN(end) || end < start) continue
+    diffs.push((end - start) / 60000)
   }
 
-  const validDiffs = []
-  for (const o of completed) {
-    if (!o.created_at) continue
-    const createdTime = new Date(o.created_at).getTime()
-    if (isNaN(createdTime)) continue
-
-    let finishTime = o.updated_at ? new Date(o.updated_at).getTime() : null
-    if (!finishTime || isNaN(finishTime) || finishTime <= createdTime) {
-      try {
-        const stored = localStorage.getItem(`kds_served_${o.order_id}`)
-        if (stored) {
-          const t = new Date(stored).getTime()
-          if (!isNaN(t) && t > createdTime) {
-            finishTime = t
-          }
-        }
-      } catch (e) {}
-    }
-
-    if (finishTime && finishTime > createdTime) {
-      const diffMinutes = (finishTime - createdTime) / 60000
-      if (diffMinutes >= 0.5 && diffMinutes <= 120) {
-        validDiffs.push(diffMinutes)
-      } else if (diffMinutes < 0.5) {
-        validDiffs.push(1)
-      }
-    } else {
-      validDiffs.push(8.5)
-    }
-  }
-
-  if (validDiffs.length === 0) return 8.5
-  const avg = validDiffs.reduce((sum, d) => sum + d, 0) / validDiffs.length
+  if (diffs.length === 0) return null
+  const avg = diffs.reduce((sum, d) => sum + d, 0) / diffs.length
   return Math.round(avg * 10) / 10
 })
 </script>
@@ -689,7 +661,7 @@ const avgPrepTimeMinutes = computed(() => {
               {{ avgPrepTimeMinutes }} <span class="text-sm font-normal text-slate-500">นาที</span>
             </template>
             <template v-else>
-              <span class="text-lg text-slate-400">N/A</span>
+              <span class="text-lg text-slate-400">–</span>
             </template>
           </div>
           <div class="flex items-center gap-1.5 mt-1 text-xs font-medium"
