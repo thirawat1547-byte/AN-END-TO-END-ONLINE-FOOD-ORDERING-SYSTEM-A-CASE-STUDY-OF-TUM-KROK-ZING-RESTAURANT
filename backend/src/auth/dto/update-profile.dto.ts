@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class UpdateProfileDto {
   @ApiProperty({ example: '0812345678', required: false })
@@ -16,4 +16,10 @@ export class UpdateProfileDto {
   @IsString()
   @IsOptional()
   email?: string;
+
+  @ApiProperty({ example: 'https://example.com/avatar.jpg', required: false, description: 'ลิงก์รูปโปรไฟล์ (ส่งค่าว่างเพื่อลบรูป)' })
+  @IsString()
+  @IsOptional()
+  @MaxLength(1000)
+  avatar_url?: string;
 }

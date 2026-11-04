@@ -141,7 +141,7 @@ export default {
             phone: dbUser.phone_number || stored.phone || '',
             email: dbUser.email || stored.email || '',
             address: dbUser.address || stored.address || '',
-            avatar: stored.avatar || ''
+            avatar: dbUser.avatar_url || stored.avatar || ''
           };
           localStorage.setItem('userProfile', JSON.stringify(this.userProfile));
         }
@@ -183,7 +183,8 @@ export default {
           await axios.patch(`${API_BASE}/auth/profile`, {
             phone_number: this.editForm.phone,
             address: this.editForm.address,
-            email: this.editForm.email
+            email: this.editForm.email,
+            avatar_url: (this.editForm.avatar || '').trim()
           }, {
             headers: { Authorization: `Bearer ${token}` }
           });

@@ -301,6 +301,7 @@ export class AuthService implements OnModuleInit {
       user: {
         user_id: user.user_id,
         username: user.username,
+        avatar: user.avatar_url || null,
         email: user.email,
         phone_number: user.phone_number,
         role: normalizedRole,
@@ -349,10 +350,17 @@ export class AuthService implements OnModuleInit {
           username: uniqueUsername,
           password: hashedPassword,
           email: cleanEmail || `${uniqueUsername}@${provider}.auth`,
+          avatar_url: dto.avatar || null,
           role: 'CUSTOMER',
         },
       });
       this.logger.log(`Created new social account: ${user.username} (${provider})`);
+    } else if (dto.avatar && !user.avatar_url) {
+      // บัญชีเดิมยังไม่มีรูป ให้ใช้รูปจาก Social (ไม่ทับรูปที่ผู้ใช้ตั้งเอง)
+      user = await this.prisma.user.update({
+        where: { user_id: user.user_id },
+        data: { avatar_url: dto.avatar },
+      });
     }
 
     const normalizedRole = (user.role || 'CUSTOMER').toUpperCase();
@@ -384,6 +392,7 @@ export class AuthService implements OnModuleInit {
       user: {
         user_id: user.user_id,
         username: user.username,
+        avatar: user.avatar_url || null,
         email: user.email,
         phone_number: user.phone_number,
         role: normalizedRole,
@@ -422,17 +431,24 @@ export class AuthService implements OnModuleInit {
           username: socialUsername,
           password: hashedPassword,
           email: profile.email || null,
+          avatar_url: profile.avatarUrl || null,
           role: 'CUSTOMER',
         },
       });
-    } else if (profile.email && !user.email) {
-      try {
-        user = await this.prisma.user.update({
-          where: { user_id: user.user_id },
-          data: { email: profile.email },
-        });
-      } catch (err) {
-        this.logger.warn(`Could not sync email for user #${user.user_id}: ${err.message}`);
+    } else {
+      // ซิงค์อีเมล/รูปโปรไฟล์จาก Social เฉพาะช่องที่ยังว่าง (ไม่ทับค่าที่ผู้ใช้ตั้งเอง)
+      const syncData: { email?: string; avatar_url?: string } = {};
+      if (profile.email && !user.email) syncData.email = profile.email;
+      if (profile.avatarUrl && !user.avatar_url) syncData.avatar_url = profile.avatarUrl;
+      if (Object.keys(syncData).length > 0) {
+        try {
+          user = await this.prisma.user.update({
+            where: { user_id: user.user_id },
+            data: syncData,
+          });
+        } catch (err) {
+          this.logger.warn(`Could not sync profile for user #${user.user_id}: ${err.message}`);
+        }
       }
     }
 
@@ -454,7 +470,7 @@ export class AuthService implements OnModuleInit {
       sub: user.user_id,
       username: user.username,
       name: profile.displayName || user.username,
-      avatar: profile.avatarUrl || null,
+      avatar: user.avatar_url || profile.avatarUrl || null,
       role: normalizedRole,
       session_id: sessionId,
     };
@@ -466,7 +482,7 @@ export class AuthService implements OnModuleInit {
         user_id: user.user_id,
         username: user.username,
         name: profile.displayName || user.username,
-        avatar: profile.avatarUrl || null,
+        avatar: user.avatar_url || profile.avatarUrl || null,
         email: user.email,
         phone_number: user.phone_number,
         role: normalizedRole,
@@ -484,6 +500,7 @@ export class AuthService implements OnModuleInit {
         email: true,
         phone_number: true,
         address: true,
+        avatar_url: true,
         role: true,
       },
     });
@@ -494,6 +511,8 @@ export class AuthService implements OnModuleInit {
 
     return {
       ...user,
+      // ชื่อ avatar ให้ตรงกับที่ frontend ใช้ใน userProfile (Navbar / Profile)
+      avatar: user.avatar_url || null,
       role: (user.role || 'CUSTOMER').toUpperCase(),
     };
   }
@@ -504,13 +523,18 @@ export class AuthService implements OnModuleInit {
 
     return this.prisma.user.update({
       where: { user_id: userId },
-      data: dto,
+      data: {
+        ...dto,
+        // ส่งค่าว่างมา = ลบรูปโปรไฟล์ออก
+        ...(dto.avatar_url !== undefined && { avatar_url: dto.avatar_url.trim() || null }),
+      },
       select: {
         user_id: true,
         username: true,
         email: true,
         phone_number: true,
         address: true,
+        avatar_url: true,
         role: true,
       },
     });
