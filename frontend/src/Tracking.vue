@@ -99,8 +99,8 @@
           <!-- สถานะ 3: ส่งมอบไรเดอร์แล้ว กำลังจัดส่ง -->
           <div v-else-if="currentStep === 3" class="rider-profile-box">
             <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop" alt="Rider" class="rider-img">
-            <h4 class="rider-name">สิริโชค คำมา (ไรเดอร์)</h4>
-            <p class="rider-vehicle">🛵 Honda Wave • 1กข 1234</p>
+            <h4 class="rider-name">{{ currentOrder?.riderName ? `${currentOrder.riderName} (ไรเดอร์)` : 'สิริโชค คำมา (ไรเดอร์)' }}</h4>
+            <p class="rider-vehicle">🛵 พนักงานนำส่งตำครกซิ่ง</p>
             <div class="rider-actions">
               <button class="action-btn call-btn" @click="callRider">
                 <span>📞</span> โทรหาคนขับ
@@ -626,7 +626,9 @@ export default {
             shippingFee: Math.max(0, Number(activeOrder.total_price) - subtotal),
             paymentMethod: activeOrder.payment_method || 'พร้อมเพย์',
             status: this.displayStatusText,
-            items: items
+            items: items,
+            riderName: activeOrder.rider?.name || activeOrder.rider?.username || activeOrder.delivery?.rider?.username || '',
+            riderPhone: activeOrder.rider?.phone || activeOrder.rider?.phone_number || activeOrder.delivery?.rider?.phone_number || '',
           };
 
           this.chatOrderIdRef = activeOrder.order_id;
@@ -662,7 +664,13 @@ export default {
       this.$router.push('/');
     },
     callRider() {
-      alert('กำลังโทรหาคุณสิริโชค (คนขับ)...');
+      const phone = this.currentOrder?.riderPhone;
+      const name = this.currentOrder?.riderName || 'สิริโชค';
+      if (phone) {
+        window.location.href = `tel:${phone}`;
+      } else {
+        alert(`กำลังโทรหาคุณ${name} (คนขับ)...`);
+      }
     },
     chatRider() {
       this.chat.open();

@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
+import { CategoriesModule } from './categories/categories.module';
 import { MenusModule } from './menus/menus.module';
 import { OrdersModule } from './orders/orders.module';
 import { TransactionsModule } from './transactions/transactions.module';
@@ -14,6 +16,8 @@ import { ChatbotModule } from './chatbot/chatbot.module';
 @Module({
   imports: [
     AuthModule,
+    UsersModule,
+    CategoriesModule,
     MenusModule,
     OrdersModule,
     TransactionsModule,

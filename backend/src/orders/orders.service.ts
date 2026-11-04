@@ -19,7 +19,6 @@ export class OrdersService implements OnModuleInit {
 
   async onModuleInit() {
     await this.ensureOrderChatTable();
-    await this.repairLegacyOrdersWithoutItems();
   }
 
   // สร้างตาราง ORDER_CHAT_MESSAGES สำหรับเก็บข้อความแชทระหว่างไรเดอร์และลูกค้า
@@ -37,90 +36,6 @@ export class OrdersService implements OnModuleInit {
       `);
     } catch (err) {
       this.logger.error('Failed to ensure ORDER_CHAT_MESSAGES table', err);
-    }
-  }
-
-  /**
-   * ซ่อมแซมออเดอร์ประวัติเดิมในฐานข้อมูลที่ไม่มีรายการอาหาร (order_items) ให้มีรายการอาหารตรงตามยอดเงิน
-   */
-  async repairLegacyOrdersWithoutItems() {
-    try {
-      const emptyOrders = await this.prisma.order.findMany({
-        where: {
-          order_items: { none: {} },
-        },
-        orderBy: { order_id: 'asc' },
-      });
-
-      if (emptyOrders.length === 0) return;
-
-      this.logger.log(`🔧 พบออเดอร์เดิมที่ไม่มีรายการอาหาร ${emptyOrders.length} รายการ กำลังซ่อมแซม...`);
-
-      const allMenus = await this.prisma.menu.findMany();
-      if (allMenus.length === 0) return;
-
-      const kapaoMoo = allMenus.find((m) => m.menu_name.includes('กะเพราหมู')) || allMenus[0];
-      const somtam = allMenus.find((m) => m.menu_name.includes('ส้มตำ')) || allMenus[0];
-      const chicken = allMenus.find((m) => m.menu_name.includes('ไก่ทอด')) || allMenus[0];
-      const yumTalay = allMenus.find((m) => m.menu_name.includes('ยำวุ้นเส้นทะเล')) || allMenus[0];
-      const friedRice = allMenus.find((m) => m.menu_name.includes('ข้าวผัด')) || allMenus[0];
-
-      for (const order of emptyOrders) {
-        const price = Number(order.total_price);
-        const itemsToInsert: { menu_id: number; quantity: number; unit_price: number; notes?: string }[] = [];
-
-        if (price === 40 || price <= 40) {
-          itemsToInsert.push({ menu_id: kapaoMoo.menu_id, quantity: 1, unit_price: 40, notes: 'เผ็ดกลาง' });
-        } else if (price === 50) {
-          itemsToInsert.push({ menu_id: chicken.menu_id, quantity: 1, unit_price: 50, notes: 'กรอบอร่อย' });
-        } else if (price === 70) {
-          itemsToInsert.push({ menu_id: yumTalay.menu_id, quantity: 1, unit_price: 70, notes: 'เผ็ดกลาง' });
-        } else if (price === 80) {
-          itemsToInsert.push({ menu_id: kapaoMoo.menu_id, quantity: 1, unit_price: 40, notes: 'เผ็ดกลาง' });
-          itemsToInsert.push({ menu_id: somtam.menu_id, quantity: 1, unit_price: 40, notes: 'พริก 2 เม็ด' });
-        } else if (price === 100) {
-          itemsToInsert.push({ menu_id: chicken.menu_id, quantity: 2, unit_price: 50, notes: 'เสิร์ฟพร้อมน้ำจิ้มแจ่ว' });
-        } else if (price === 130 || price === 140) {
-          itemsToInsert.push({ menu_id: yumTalay.menu_id, quantity: 1, unit_price: 70, notes: 'เผ็ดกลาง' });
-          itemsToInsert.push({ menu_id: kapaoMoo.menu_id, quantity: 1, unit_price: 40, notes: 'ราดข้าว' });
-          if (price === 140) {
-            itemsToInsert.push({ menu_id: somtam.menu_id, quantity: 1, unit_price: 30, notes: 'รสเด็ด' });
-          }
-        } else if (price === 200) {
-          itemsToInsert.push({ menu_id: friedRice.menu_id, quantity: 2, unit_price: 60, notes: 'กุ้งสด' });
-          itemsToInsert.push({ menu_id: yumTalay.menu_id, quantity: 1, unit_price: 70, notes: 'เผ็ดกลาง' });
-          itemsToInsert.push({ menu_id: kapaoMoo.menu_id, quantity: 1, unit_price: 10, notes: 'ข้าวเปล่า' });
-        } else if (price === 320) {
-          itemsToInsert.push({ menu_id: friedRice.menu_id, quantity: 2, unit_price: 60, notes: 'รวมมิตรทะเล' });
-          itemsToInsert.push({ menu_id: yumTalay.menu_id, quantity: 2, unit_price: 70, notes: 'เปรี้ยวเผ็ด' });
-          itemsToInsert.push({ menu_id: chicken.menu_id, quantity: 1, unit_price: 50, notes: 'สะโพกไก่ทอด' });
-          itemsToInsert.push({ menu_id: somtam.menu_id, quantity: 1, unit_price: 40, notes: 'ส้มตำไทย' });
-        } else {
-          const qty = Math.max(1, Math.round(price / 40));
-          itemsToInsert.push({
-            menu_id: kapaoMoo.menu_id,
-            quantity: qty,
-            unit_price: Number(kapaoMoo.price) || 40,
-            notes: 'คำสั่งซื้อจากระบบ',
-          });
-        }
-
-        for (const item of itemsToInsert) {
-          await this.prisma.orderItem.create({
-            data: {
-              order_id: order.order_id,
-              menu_id: item.menu_id,
-              quantity: item.quantity,
-              unit_price: item.unit_price,
-              notes: item.notes,
-            },
-          }).catch(() => {});
-        }
-      }
-
-      this.logger.log(`✅ ซ่อมแซมรายการอาหารให้ออเดอร์เดิม ${emptyOrders.length} รายการเรียบร้อยแล้ว`);
-    } catch (err) {
-      this.logger.warn('ไม่สามารถซ่อมแซมออเดอร์เดิมได้:', err?.message);
     }
   }
 
@@ -568,140 +483,10 @@ export class OrdersService implements OnModuleInit {
       orderBy: { order_id: 'desc' },
     });
 
-    return orders.map((order) => this.attachFallbackItemsIfEmpty(order));
-  }
-
-  /**
-   * สร้างรายการอาหารจำลอง (Fallback) ในกรณีที่เป็นออเดอร์เก่าที่ไม่มี order_items
-   */
-  private attachFallbackItemsIfEmpty(order: any) {
-    if (!order) return order;
-    if (!order.order_items || order.order_items.length === 0) {
-      const price = Number(order.total_price) || 0;
-      let fallbackItems: any[] = [];
-      if (price === 40 || price <= 40) {
-        fallbackItems = [
-          {
-            order_item_id: 90000 + order.order_id,
-            order_id: order.order_id,
-            menu_id: 1,
-            quantity: 1,
-            unit_price: 40,
-            notes: 'เผ็ดกลาง',
-            menu: { menu_id: 1, menu_name: 'ข้าวกะเพราหมูสับ', price: 40, image_url: null },
-          },
-        ];
-      } else if (price === 50) {
-        fallbackItems = [
-          {
-            order_item_id: 90000 + order.order_id,
-            order_id: order.order_id,
-            menu_id: 2,
-            quantity: 1,
-            unit_price: 50,
-            notes: 'กรอบอร่อย',
-            menu: { menu_id: 2, menu_name: 'ไก่ทอดสมุนไพร', price: 50, image_url: null },
-          },
-        ];
-      } else if (price === 70) {
-        fallbackItems = [
-          {
-            order_item_id: 90000 + order.order_id,
-            order_id: order.order_id,
-            menu_id: 3,
-            quantity: 1,
-            unit_price: 70,
-            notes: 'เผ็ดกลาง',
-            menu: { menu_id: 3, menu_name: 'ยำวุ้นเส้นรวมมิตรทะเล', price: 70, image_url: null },
-          },
-        ];
-      } else if (price === 80) {
-        fallbackItems = [
-          {
-            order_item_id: 90000 + order.order_id,
-            order_id: order.order_id,
-            menu_id: 1,
-            quantity: 1,
-            unit_price: 40,
-            notes: 'เผ็ดกลาง',
-            menu: { menu_id: 1, menu_name: 'ข้าวกะเพราหมูสับ', price: 40, image_url: null },
-          },
-          {
-            order_item_id: 90001 + order.order_id,
-            order_id: order.order_id,
-            menu_id: 4,
-            quantity: 1,
-            unit_price: 40,
-            notes: 'พริก 2 เม็ด',
-            menu: { menu_id: 4, menu_name: 'ส้มตำไทย', price: 40, image_url: null },
-          },
-        ];
-      } else if (price === 100) {
-        fallbackItems = [
-          {
-            order_item_id: 90000 + order.order_id,
-            order_id: order.order_id,
-            menu_id: 2,
-            quantity: 2,
-            unit_price: 50,
-            notes: 'เสิร์ฟพร้อมน้ำจิ้มแจ่ว',
-            menu: { menu_id: 2, menu_name: 'ไก่ทอดสมุนไพร', price: 50, image_url: null },
-          },
-        ];
-      } else if (price === 130 || price === 140) {
-        fallbackItems = [
-          {
-            order_item_id: 90000 + order.order_id,
-            order_id: order.order_id,
-            menu_id: 3,
-            quantity: 1,
-            unit_price: 70,
-            notes: 'เผ็ดกลาง',
-            menu: { menu_id: 3, menu_name: 'ยำวุ้นเส้นรวมมิตรทะเล', price: 70, image_url: null },
-          },
-          {
-            order_item_id: 90001 + order.order_id,
-            order_id: order.order_id,
-            menu_id: 1,
-            quantity: 1,
-            unit_price: 40,
-            notes: 'ราดข้าว',
-            menu: { menu_id: 1, menu_name: 'ข้าวกะเพราหมูสับ', price: 40, image_url: null },
-          },
-          ...(price === 140
-            ? [
-                {
-                  order_item_id: 90002 + order.order_id,
-                  order_id: order.order_id,
-                  menu_id: 4,
-                  quantity: 1,
-                  unit_price: 30,
-                  notes: 'รสเด็ด',
-                  menu: { menu_id: 4, menu_name: 'ส้มตำไทย', price: 30, image_url: null },
-                },
-              ]
-            : []),
-        ];
-      } else {
-        const qty = Math.max(1, Math.round(price / 50));
-        fallbackItems = [
-          {
-            order_item_id: 90000 + order.order_id,
-            order_id: order.order_id,
-            menu_id: 1,
-            quantity: qty,
-            unit_price: price || 50,
-            notes: 'คำสั่งซื้อจากระบบ',
-            menu: { menu_id: 1, menu_name: 'ข้าวกะเพราหมูสับ', price: price || 50, image_url: null },
-          },
-        ];
-      }
-      return {
-        ...order,
-        order_items: fallbackItems,
-      };
-    }
-    return order;
+    return orders.map((order) => ({
+      ...order,
+      order_items: order.order_items || [],
+    }));
   }
 
   // 3. ดึงประวัติคำสั่งซื้อเฉพาะของ User ที่ล็อกอิน (แยกตาม User อย่างแท้จริง)
@@ -718,12 +503,47 @@ export class OrdersService implements OnModuleInit {
         },
         table: true,
         transaction: true,
-        delivery: true,
+        delivery: {
+          include: {
+            rider: {
+              select: {
+                user_id: true,
+                username: true,
+                phone_number: true,
+                role: true,
+              },
+            },
+          },
+        },
       },
       orderBy: { order_id: 'desc' },
     });
 
-    return orders.map((order) => this.attachFallbackItemsIfEmpty(order));
+    return orders.map((order) => {
+      const rawRider = order.delivery?.rider || null;
+      const rider = rawRider
+        ? {
+            user_id: rawRider.user_id,
+            username: rawRider.username,
+            name: rawRider.username,
+            phone: rawRider.phone_number || '',
+            phone_number: rawRider.phone_number || '',
+            role: rawRider.role || 'RIDER',
+          }
+        : null;
+
+      return {
+        ...order,
+        order_items: order.order_items || [],
+        delivery: order.delivery
+          ? {
+              ...order.delivery,
+              rider,
+            }
+          : null,
+        rider,
+      };
+    });
   }
 
   // 3.1 ดึงคำสั่งซื้อเดลิเวอรี่ที่กำลังดำเนินการอยู่ (Active Order) ของ User รายนี้โดยเฉพาะ
@@ -745,6 +565,46 @@ export class OrdersService implements OnModuleInit {
       },
     }).catch(() => {});
 
+    const deliveryInclude = {
+      include: {
+        rider: {
+          select: {
+            user_id: true,
+            username: true,
+            phone_number: true,
+            role: true,
+          },
+        },
+      },
+    };
+
+    const formatActiveOrder = (order: any) => {
+      if (!order) return null;
+      const rawRider = order.delivery?.rider || null;
+      const rider = rawRider
+        ? {
+            user_id: rawRider.user_id,
+            username: rawRider.username,
+            name: rawRider.username,
+            phone: rawRider.phone_number || '',
+            phone_number: rawRider.phone_number || '',
+            role: rawRider.role || 'RIDER',
+          }
+        : null;
+
+      return {
+        ...order,
+        order_items: order.order_items || [],
+        delivery: order.delivery
+          ? {
+              ...order.delivery,
+              rider,
+            }
+          : null,
+        rider,
+      };
+    };
+
     // หากมีการระบุเลข Order ID เฉพาะเจาะจงที่เพิ่งสั่ง
     if (requestedOrderId && !isNaN(requestedOrderId)) {
       const specific = await this.prisma.order.findFirst({
@@ -759,7 +619,7 @@ export class OrdersService implements OnModuleInit {
           },
           table: true,
           transaction: true,
-          delivery: true,
+          delivery: deliveryInclude,
           user: {
             select: {
               user_id: true,
@@ -770,11 +630,11 @@ export class OrdersService implements OnModuleInit {
           },
         },
       });
-      if (specific) return specific;
+      if (specific) return formatActiveOrder(specific);
     }
 
     // ค้นหาออเดอร์เดลิเวอรี่ล่าสุดของ User นี้ ที่ยังอยู่ในขั้นตอนการจัดส่ง (ไม่เกิน 6 ชม.)
-    return this.prisma.order.findFirst({
+    const activeOrder = await this.prisma.order.findFirst({
       where: {
         user_id: userId,
         order_type: 'DELIVERY',
@@ -791,7 +651,7 @@ export class OrdersService implements OnModuleInit {
         },
         table: true,
         transaction: true,
-        delivery: true,
+        delivery: deliveryInclude,
         user: {
           select: {
             user_id: true,
@@ -803,6 +663,8 @@ export class OrdersService implements OnModuleInit {
       },
       orderBy: { order_id: 'desc' },
     });
+
+    return formatActiveOrder(activeOrder);
   }
 
   // 4. ดูรายละเอียดออร์เดอร์ตาม ID
@@ -815,7 +677,18 @@ export class OrdersService implements OnModuleInit {
         },
         table: true,
         transaction: true,
-        delivery: true,
+        delivery: {
+          include: {
+            rider: {
+              select: {
+                user_id: true,
+                username: true,
+                phone_number: true,
+                role: true,
+              },
+            },
+          },
+        },
         user: {
           select: { user_id: true, username: true, phone_number: true, address: true },
         },
@@ -826,7 +699,29 @@ export class OrdersService implements OnModuleInit {
       throw new NotFoundException(`ไม่พบคำสั่งซื้อรหัส #${id}`);
     }
 
-    return this.attachFallbackItemsIfEmpty(order);
+    const rawRider = order.delivery?.rider || null;
+    const rider = rawRider
+      ? {
+          user_id: rawRider.user_id,
+          username: rawRider.username,
+          name: rawRider.username,
+          phone: rawRider.phone_number || '',
+          phone_number: rawRider.phone_number || '',
+          role: rawRider.role || 'RIDER',
+        }
+      : null;
+
+    return {
+      ...order,
+      order_items: order.order_items || [],
+      delivery: order.delivery
+        ? {
+            ...order.delivery,
+            rider,
+          }
+        : null,
+      rider,
+    };
   }
 
   // 5. อัปเดตสถานะคำสั่งซื้อ
@@ -1115,11 +1010,16 @@ export class OrdersService implements OnModuleInit {
     const paid = available.filter((o) => this.isPaymentReadyForRider(o));
     const awaitingPayment = available.filter((o) => !this.isPaymentReadyForRider(o));
 
+    const formatOrder = (o: any) => ({
+      ...o,
+      order_items: o.order_items || [],
+    });
+
     return {
-      available: paid.map((o) => this.attachFallbackItemsIfEmpty(withFeeEstimate(o))),
-      awaiting_payment: awaitingPayment.map((o) => this.attachFallbackItemsIfEmpty(o)),
-      mine: mine ? this.attachFallbackItemsIfEmpty(mine) : null,
-      cooking: cooking.map((o) => this.attachFallbackItemsIfEmpty(o)),
+      available: paid.map((o) => formatOrder(withFeeEstimate(o))),
+      awaiting_payment: awaitingPayment.map((o) => formatOrder(o)),
+      mine: mine ? formatOrder(mine) : null,
+      cooking: cooking.map((o) => formatOrder(o)),
     };
   }
 

@@ -8,13 +8,18 @@ export class CreateTransactionDto {
   @IsNotEmpty()
   order_id: number;
 
-  @ApiProperty({ example: 130.00, description: 'ยอดเงินที่ชำระ' })
+  @ApiProperty({ example: 130.0, description: 'ยอดเงินที่ชำระ' })
   @IsNumber()
   @IsNotEmpty()
   amount: number;
 
-  @ApiProperty({ example: 'PROMPTPAY', description: 'วิธีชำระเงิน (CASH, PROMPTPAY)' })
+  @ApiProperty({ example: 'PROMPTPAY', description: 'วิธีชำระเงิน (CASH, PROMPTPAY, STRIPE, CREDIT_CARD)' })
   @IsString()
   @IsNotEmpty()
   payment_method: string;
+
+  @ApiPropertyOptional({ example: 'COMPLETED', description: 'สถานะการชำระเงิน (COMPLETED, PENDING)' })
+  @IsOptional()
+  @IsString()
+  payment_status?: string;
 }

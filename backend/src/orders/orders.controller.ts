@@ -25,6 +25,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrderChatMessageDto } from './dto/chat-message.dto';
 import { ReviewOrderDto } from './dto/review-order.dto';
+import { ActiveOrderResponseDto } from './dto/active-order-response.dto';
 
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -84,15 +85,23 @@ export class OrdersController {
   // ดึงออเดอร์เดลิเวอรี่ที่กำลัง active อยู่ของ User ปัจจุบัน (สำหรับ Live Tracking)
   @Get('my-active')
   @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth('JWT-auth')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'ดูคำสั่งซื้อที่กำลังจัดส่งแบบเรียลไทม์ของผู้ใช้งานปัจจุบัน' })
-  findMyActiveOrder(@Req() req: any, @Query('orderId') orderId?: string) {
+  @ApiOperation({ summary: 'ดูคำสั่งซื้อที่กำลังจัดส่งแบบเรียลไทม์ของผู้ใช้งานปัจจุบัน พร้อมข้อมูลไรเดอร์' })
+  @ApiQuery({ name: 'orderId', required: false, description: 'รหัสคำสั่งซื้อที่ต้องการเจาะจง' })
+  @ApiResponse({
+    status: 200,
+    description: 'ดึงข้อมูลคำสั่งซื้อที่กำลัง Active สำเร็จ พร้อมข้อมูลไรเดอร์ (หากยังไม่มีคนรับงาน rider จะเป็น null)',
+    type: ActiveOrderResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'ไม่ได้เข้าสู่ระบบหรือไม่ได้รับอนุญาต (Unauthorized)' })
+  findMyActiveOrder(@Req() req: any, @Query('orderId') orderId?: string): Promise<ActiveOrderResponseDto | null> {
     const rawUserId = req.user?.user_id || req.user?.userId || req.user?.id || req.user?.sub;
     const userId = Number(rawUserId);
     if (!userId || isNaN(userId) || userId <= 0) {
       return null;
     }
-    return this.ordersService.findActiveUserOrder(userId, orderId ? parseInt(orderId, 10) : undefined);
+    return this.ordersService.findActiveUserOrder(userId, orderId ? parseInt(orderId, 10) : undefined) as any;
   }
 
   // ดึงประวัติเฉพาะของ User ปัจจุบัน (ต้องวางไว้ก่อน @Get(':id'))
@@ -150,7 +159,10 @@ export class OrdersController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'ดูรายละเอียดคำสั่งซื้อตาม ID' })
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'ดูรายละเอียดคำสั่งซื้อตาม ID (ต้องเข้าสู่ระบบ)' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.ordersService.findOne(id);
   }

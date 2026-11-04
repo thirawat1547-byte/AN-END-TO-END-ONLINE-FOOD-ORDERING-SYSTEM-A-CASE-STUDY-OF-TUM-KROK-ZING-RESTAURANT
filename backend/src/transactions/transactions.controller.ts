@@ -1,6 +1,23 @@
 // src/transactions/transactions.controller.ts
-import { Controller, Post, Get, Patch, Body, Param, ParseIntPipe, UseGuards, Req, ForbiddenException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Body,
+  Param,
+  ParseIntPipe,
+  UseGuards,
+  Req,
+  ForbiddenException,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { TransactionsService } from './transactions.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { VerifyTransactionDto } from './dto/verify-transaction.dto';
@@ -9,10 +26,10 @@ import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 
-// อนุญาตเฉพาะพนักงานร้าน (ADMIN / KITCHEN)
+// อนุญาตเฉพาะพนักงานร้าน (ADMIN / KITCHEN / STAFF)
 function assertStaff(req: any) {
   const role = String(req?.user?.role || '').toUpperCase();
-  if (role !== 'ADMIN' && role !== 'KITCHEN') {
+  if (role !== 'ADMIN' && role !== 'KITCHEN' && role !== 'STAFF') {
     throw new ForbiddenException('เฉพาะผู้ดูแลร้านหรือพนักงานเท่านั้นที่ยืนยันการชำระเงินได้');
   }
 }
@@ -24,16 +41,23 @@ export class TransactionsController {
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN', 'STAFF')
+  @Roles('ADMIN', 'STAFF', 'CUSTOMER')
+  @ApiBearerAuth('JWT-auth')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'บันทึกการชำระเงินและปิดบิลออร์เดอร์ (ADMIN / STAFF)' })
-  create(@Body() createTransactionDto: CreateTransactionDto) {
-    return this.transactionsService.create(createTransactionDto);
+  @ApiOperation({ summary: 'บันทึกการชำระเงินของออร์เดอร์ (ADMIN / STAFF / CUSTOMER)' })
+  @ApiResponse({ status: 201, description: 'บันทึกการชำระเงินสำเร็จ' })
+  @ApiResponse({ status: 400, description: 'ข้อมูลไม่ถูกต้องหรือออเดอร์ปิดบิลแล้ว' })
+  @ApiResponse({ status: 401, description: 'ไม่ได้เข้าสู่ระบบหรือไม่ได้รับอนุญาต' })
+  @ApiResponse({ status: 403, description: 'ไม่มีสิทธิ์บันทึกการชำระเงินของคำสั่งซื้อผู้อื่น' })
+  @ApiResponse({ status: 404, description: 'ไม่พบคำสั่งซื้อ' })
+  create(@Body() createTransactionDto: CreateTransactionDto, @Req() req: any) {
+    return this.transactionsService.create(createTransactionDto, req.user);
   }
 
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
+  @ApiBearerAuth('JWT-auth')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'ดูประวัติรายการชำระเงินทั้งหมด (ADMIN)' })
   findAll() {
@@ -52,6 +76,7 @@ export class TransactionsController {
 
   @Get('promptpay/pending')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'รายการโอนพร้อมเพย์ที่รอแอดมินตรวจสอบ (ADMIN/KITCHEN)' })
   findPendingPromptPay(@Req() req: any) {
@@ -61,6 +86,7 @@ export class TransactionsController {
 
   @Patch(':id/verify')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'แอดมินยืนยัน/ปฏิเสธยอดโอนพร้อมเพย์ หลังตรวจสอบบัญชีธนาคาร (ADMIN/KITCHEN)' })
   @ApiParam({ name: 'id', type: Number, description: 'รหัสรายการชำระเงิน (transaction_id)' })
@@ -74,17 +100,42 @@ export class TransactionsController {
   }
 
   @Post('stripe/create-intent/:orderId')
-  @ApiOperation({ summary: 'สร้าง Stripe Payment Intent สำหรับคำนวณยอดชำระ' })
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'สร้าง Stripe Payment Intent สำหรับคำนวณยอดชำระ (ต้องยืนยันตัวตน)' })
   @ApiParam({ name: 'orderId', type: Number, description: 'รหัสคำสั่งซื้อ (Order ID)' })
   @ApiResponse({ status: 201, description: 'สร้าง Payment Intent สำเร็จ ได้รับ clientSecret' })
+  @ApiResponse({ status: 400, description: 'ยอดชำระไม่ถูกต้องหรือคำสั่งซื้อมีสถานะไม่ถูกต้อง' })
+  @ApiResponse({ status: 401, description: 'ไม่ได้เข้าสู่ระบบหรือไม่ได้รับอนุญาต (Unauthorized)' })
+  @ApiResponse({ status: 403, description: 'ไม่มีสิทธิ์เข้าถึงคำสั่งซื้อของผู้อื่น' })
   @ApiResponse({ status: 404, description: 'ไม่พบคำสั่งซื้อ' })
-  createStripeIntent(@Param('orderId', ParseIntPipe) orderId: number) {
-    return this.transactionsService.createStripeIntent(orderId);
+  @ApiResponse({ status: 500, description: 'ระบบชำระเงิน Stripe ยังไม่ได้ถูกตั้งค่าคีย์หรือมีข้อผิดพลาดภายใน' })
+  createStripeIntent(@Param('orderId', ParseIntPipe) orderId: number, @Req() req: any) {
+    return this.transactionsService.createStripeIntent(orderId, req.user);
+  }
+
+  @Post('stripe/confirm/:orderId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'ยืนยันสถานะการชำระเงินผ่าน Stripe จริง' })
+  @ApiParam({ name: 'orderId', type: Number, description: 'รหัสคำสั่งซื้อ (Order ID)' })
+  @ApiResponse({ status: 200, description: 'ยืนยันการชำระเงินสำเร็จ ปรับสถานะเป็น PAID' })
+  @ApiResponse({ status: 400, description: 'การชำระเงินยังไม่สำเร็จ หรือข้อมูลไม่ถูกต้อง' })
+  @ApiResponse({ status: 401, description: 'ไม่ได้เข้าสู่ระบบหรือไม่ได้รับอนุญาต' })
+  @ApiResponse({ status: 404, description: 'ไม่พบคำสั่งซื้อ' })
+  confirmStripePayment(
+    @Param('orderId', ParseIntPipe) orderId: number,
+    @Body('paymentIntentId') paymentIntentId?: string,
+  ) {
+    return this.transactionsService.confirmStripePayment(orderId, paymentIntentId);
   }
 
   @Post('stripe/confirm-test/:orderId')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'STAFF')
+  @ApiBearerAuth('JWT-auth')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'จำลองการชำระเงินผ่าน Stripe สำเร็จ (สำหรับทดสอบ Flow - ADMIN/STAFF)' })
   @ApiParam({ name: 'orderId', type: Number, description: 'รหัสคำสั่งซื้อ (Order ID)' })

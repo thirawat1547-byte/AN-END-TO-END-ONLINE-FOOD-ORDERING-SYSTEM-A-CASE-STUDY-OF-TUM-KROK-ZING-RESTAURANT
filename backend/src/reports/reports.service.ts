@@ -87,11 +87,16 @@ export class ReportsService {
       this.getReceipts(),
     ]);
 
-    const totalRevenue = (summaries as any[]).reduce(
+    // กรองออเดอร์ที่ถูกยกเลิก (CANCELLED) ออกจากการคำนวณยอดขายรวม
+    const activeSummaries = (summaries as any[]).filter(
+      (s: any) => String(s.status || '').toUpperCase() !== 'CANCELLED',
+    );
+
+    const totalRevenue = activeSummaries.reduce(
       (sum: number, s: any) => sum + Number(s.total_price || 0),
       0,
     );
-    const totalOrders = (summaries as any[]).length;
+    const totalOrders = activeSummaries.length;
 
     return {
       totalRevenue,

@@ -9,7 +9,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 @ApiTags('Reports & Database Views')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMIN')
+@Roles('ADMIN', 'KITCHEN')
 @Controller('reports')
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}

@@ -149,9 +149,9 @@ export class MenusController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'KITCHEN')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'แก้ไขข้อมูลเมนูอาหาร (เฉพาะ Admin)' })
+  @ApiOperation({ summary: 'แก้ไขข้อมูลเมนูอาหาร (Admin / Kitchen)' })
   @ApiParam({ name: 'id', description: 'รหัสเมนูอาหาร (menu_id)' })
   update(
     @Param('id', ParseIntPipe) id: number,
