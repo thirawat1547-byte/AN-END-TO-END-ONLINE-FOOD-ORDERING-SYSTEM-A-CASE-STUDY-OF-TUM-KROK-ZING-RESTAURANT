@@ -8,6 +8,9 @@ RUN npm install
 
 # คัดลอกโค้ดและทำการ Build
 COPY . .
+# รับ Stripe publishable key จาก docker-compose (build arg) ให้ Vite ฝังลงไฟล์
+ARG VITE_STRIPE_PUBLISHABLE_KEY
+ENV VITE_STRIPE_PUBLISHABLE_KEY=$VITE_STRIPE_PUBLISHABLE_KEY
 RUN npm run build
 
 # ขั้นตอนที่ 2: นำไฟล์ที่ Build เสร็จไปรันบน Nginx

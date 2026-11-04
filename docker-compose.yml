@@ -43,6 +43,8 @@ services:
       # --- Gemini AI Chatbot ---
       GEMINI_API_KEY: "${GEMINI_API_KEY}"
       GEMINI_MODEL: "${GEMINI_MODEL:-gemini-3.5-flash-lite}"
+      # --- Stripe ---
+      STRIPE_SECRET_KEY: "${STRIPE_SECRET_KEY}"
     depends_on:
       - mysql-db
     volumes:
@@ -53,6 +55,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # Vite ฝังค่านี้ลงไฟล์ตอน build ต้องส่งเป็น build arg
+        VITE_STRIPE_PUBLISHABLE_KEY: "${VITE_STRIPE_PUBLISHABLE_KEY}"
     container_name: tumkrokzing_frontend
     restart: always
     ports:
