@@ -3,6 +3,11 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import { API_BASE } from '../../config/api'
+import { getInitial, getStoredUserName } from '../../utils/avatar'
+
+// แสดงตัวอักษรย่อของผู้ใช้ที่ล็อกอินอยู่แทนรูปโปรไฟล์
+const kitchenUserName = getStoredUserName()
+const kitchenUserInitial = getInitial(kitchenUserName)
 
 const router = useRouter()
 const route = useRoute()
@@ -547,7 +552,7 @@ const confirmDeleteTable = async (table) => {
       <div style="display: flex; align-items: center; gap: 24px; color: rgba(255,255,255,0.9); font-size: 18px;">
         <button style="cursor: pointer; background: none; border: none; color: inherit;">🔔</button>
         <button style="width: 32px; height: 32px; border-radius: 9999px; overflow: hidden; border: 1px solid rgba(255,255,255,0.4); background: none; cursor: pointer; padding: 0;">
-          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover;" />
+          <span :title="kitchenUserName || 'ผู้ใช้งาน'" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: #fff;">{{ kitchenUserInitial }}</span>
         </button>
       </div>
     </header>

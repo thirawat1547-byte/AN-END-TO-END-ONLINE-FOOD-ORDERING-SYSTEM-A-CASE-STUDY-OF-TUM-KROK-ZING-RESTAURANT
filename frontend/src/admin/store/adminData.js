@@ -68,6 +68,16 @@ export const MENU_IMAGE_MAP = {
   'ข้าวเหนียว': imgKaon
 }
 
+// DB ไม่มีช่องเก็บไอคอนหมวดหมู่ จึงเลือกไอคอนจากชื่อหมวด ถ้าไม่ตรงใช้ไอคอนทั่วไป
+function categoryIcon(name = '') {
+  if (/ตำ/.test(name)) return '🌶️'
+  if (/ลาบ|ยำ|น้ำตก/.test(name)) return '🥗'
+  if (/ทอด/.test(name)) return '🍗'
+  if (/เครื่องดื่ม|น้ำ/.test(name)) return '🥤'
+  if (/ข้าว|ผัด|จานเดียว/.test(name)) return '🍳'
+  return '🍽️'
+}
+
 export const adminStore = reactive({
   // สถิติแชทบอทของวันที่เลือกในแดชบอร์ด (คำนวณจาก log จริงฝั่ง Backend)
   chatbotDayStats: {
@@ -79,568 +89,39 @@ export const adminStore = reactive({
     diffText: '',
     diffClass: 'text-slate-400'
   },
-  // ===== สถิติแดชบอร์ดที่ดึงจาก Backend จริง =====
+  // สถานะการโหลดข้อมูลจาก API: 'idle' | 'loading' | 'ready' | 'error'
+  loadStatus: 'idle',
+  // ชื่อข้อมูลที่โหลดไม่สำเร็จในรอบล่าสุด (เช่น ['เมนู', 'ออเดอร์'])
+  loadErrors: [],
+
+  // ===== สถิติแดชบอร์ด (คำนวณจากออเดอร์จริงใน recomputeDashboardStats) =====
   dashboardStats: {
-    grossSales: 1320,
-    totalOrders: 5,
-    activeTablesCount: 3,
-    totalTablesCount: 5,
-    avgCookingTime: 8.4
+    grossSales: 0,
+    totalOrders: 0,
+    activeTablesCount: 0,
+    totalTablesCount: 0
   },
 
-  users: [
-    { user_id: 1, username: 'admin', email: 'admin@tumkrokzing.com', phone_number: '0812345678', role: 'Admin' },
-    { user_id: 2, username: 'chef_somchai', email: 'kitchen@tumkrokzing.com', phone_number: '0891112233', role: 'Staff' },
-    { user_id: 3, username: 'waiter_nan', email: 'nan@tumkrokzing.com', phone_number: '0864445566', role: 'Staff' },
-    { user_id: 4, username: 'somporn_c', email: 'customer1@gmail.com', phone_number: '0957778899', role: 'Customer' }
-  ],
-
-  tables: [
-    { table_id: 1, table_number: 'T-01', capacity: 4, status: 'Occupied', activeOrderId: 101, elapsedMinutes: 24, currentBill: 460 },
-    { table_id: 2, table_number: 'T-02', capacity: 4, status: 'Empty', activeOrderId: null, elapsedMinutes: 0, currentBill: 0 },
-    { table_id: 3, table_number: 'T-03', capacity: 4, status: 'Occupied', activeOrderId: 103, elapsedMinutes: 12, currentBill: 890 },
-    { table_id: 4, table_number: 'T-04', capacity: 4, status: 'Billing', activeOrderId: 104, elapsedMinutes: 48, currentBill: 620 },
-    { table_id: 5, table_number: 'T-05', capacity: 4, status: 'Empty', activeOrderId: null, elapsedMinutes: 0, currentBill: 0 }
-  ],
-
-  categories: [
-    { category_id: 1, category_name: 'อาหารจานเดียว / ผัด', icon: '🍳' },
-    { category_id: 2, category_name: 'ส้มตำแซ่บซิ่ง', icon: '🌶️' },
-    { category_id: 3, category_name: 'ลาบ / ยำ', icon: '🥗' },
-    { category_id: 4, category_name: 'ของทอด', icon: '🍗' },
-    { category_id: 5, category_name: 'เครื่องดื่ม', icon: '🥤' }
-  ],
-
+  // ค่าเริ่มต้นเป็นค่าว่างทั้งหมด ข้อมูลจริงมาจาก API
+  users: [],
+  usersLoadStatus: 'idle',
+  tables: [],
+  categories: [],
   allergens: [...DEFAULT_ALLERGENS],
-
-  ingredients: [
-    { ingredient_id: 1, ingredient_name: 'มะละกอดิบขูด', quantity_in_stock: 18.5, unit: 'กิโลกรัม', reorder_level: 5.0, cost_per_unit: 35, last_updated: '2026-09-03 14:30' },
-    { ingredient_id: 2, ingredient_name: 'พริกสดจินดาแดง', quantity_in_stock: 4.2, unit: 'กิโลกรัม', reorder_level: 2.0, cost_per_unit: 120, last_updated: '2026-09-03 10:15' },
-    { ingredient_id: 3, ingredient_name: 'น้ำปลาร้าปรุงสุกสูตรแซ่บ', quantity_in_stock: 12.0, unit: 'ขวด (1L)', reorder_level: 3.0, cost_per_unit: 45, last_updated: '2026-09-02 18:00' },
-    { ingredient_id: 4, ingredient_name: 'ปูเค็ม/ปูดอง', quantity_in_stock: 1.8, unit: 'กิโลกรัม', reorder_level: 2.5, cost_per_unit: 180, last_updated: '2026-09-03 09:00' },
-    { ingredient_id: 5, ingredient_name: 'มะนาวแป้นสด', quantity_in_stock: 8.0, unit: 'กิโลกรัม', reorder_level: 3.0, cost_per_unit: 60, last_updated: '2026-09-03 12:00' },
-    { ingredient_id: 6, ingredient_name: 'เนื้อหมูสด / หมูสับ', quantity_in_stock: 14.5, unit: 'กิโลกรัม', reorder_level: 4.0, cost_per_unit: 150, last_updated: '2026-09-03 11:20' },
-    { ingredient_id: 7, ingredient_name: 'หมูกรอบสูตรเด็ด', quantity_in_stock: 4.0, unit: 'กิโลกรัม', reorder_level: 2.0, cost_per_unit: 220, last_updated: '2026-09-03 08:30' },
-    { ingredient_id: 8, ingredient_name: 'เนื้อไก่สะโพก', quantity_in_stock: 12.0, unit: 'กิโลกรัม', reorder_level: 4.0, cost_per_unit: 95, last_updated: '2026-09-03 08:30' },
-    { ingredient_id: 9, ingredient_name: 'ปีกไก่สด', quantity_in_stock: 8.5, unit: 'กิโลกรัม', reorder_level: 3.0, cost_per_unit: 90, last_updated: '2026-09-03 08:30' },
-    { ingredient_id: 10, ingredient_name: 'กุ้งสดแกะเปลือก', quantity_in_stock: 6.5, unit: 'กิโลกรัม', reorder_level: 2.0, cost_per_unit: 260, last_updated: '2026-09-03 07:45' },
-    { ingredient_id: 11, ingredient_name: 'ปลาหมึกสดหั่นชิ้น', quantity_in_stock: 5.0, unit: 'กิโลกรัม', reorder_level: 2.0, cost_per_unit: 240, last_updated: '2026-09-03 07:45' },
-    { ingredient_id: 12, ingredient_name: 'ไข่ไก่สด (เบอร์ 2)', quantity_in_stock: 90, unit: 'ฟอง', reorder_level: 30, cost_per_unit: 4.5, last_updated: '2026-09-03 09:15' },
-    { ingredient_id: 13, ingredient_name: 'ข้าวหอมมะลิแท้', quantity_in_stock: 30.0, unit: 'กิโลกรัม', reorder_level: 10.0, cost_per_unit: 45, last_updated: '2026-09-01 16:00' },
-    { ingredient_id: 14, ingredient_name: 'ผักคะน้าสด', quantity_in_stock: 6.0, unit: 'กิโลกรัม', reorder_level: 2.0, cost_per_unit: 50, last_updated: '2026-09-03 07:30' },
-    { ingredient_id: 15, ingredient_name: 'ใบกะเพราสด', quantity_in_stock: 2.5, unit: 'กิโลกรัม', reorder_level: 1.0, cost_per_unit: 60, last_updated: '2026-09-03 07:30' },
-    { ingredient_id: 16, ingredient_name: 'พริกแกงเผ็ดสูตรใต้', quantity_in_stock: 3.5, unit: 'กิโลกรัม', reorder_level: 1.0, cost_per_unit: 110, last_updated: '2026-09-02 14:00' },
-    { ingredient_id: 17, ingredient_name: 'วุ้นเส้นเหนียวนุ่ม', quantity_in_stock: 25, unit: 'ห่อ', reorder_level: 8, cost_per_unit: 15, last_updated: '2026-09-02 11:00' },
-    { ingredient_id: 18, ingredient_name: 'ถั่วลิสงคั่วบด', quantity_in_stock: 3.0, unit: 'กิโลกรัม', reorder_level: 1.0, cost_per_unit: 80, last_updated: '2026-09-02 15:00' },
-    { ingredient_id: 19, ingredient_name: 'ดอกเก๊กฮวยอบแห้ง', quantity_in_stock: 10, unit: 'ห่อ', reorder_level: 3, cost_per_unit: 40, last_updated: '2026-09-01 10:00' },
-    { ingredient_id: 20, ingredient_name: 'โค้ก (Coke)', quantity_in_stock: 48, unit: 'ขวด', reorder_level: 12, cost_per_unit: 12, last_updated: '2026-09-02 10:00' },
-    { ingredient_id: 21, ingredient_name: 'สไปรท์ (Sprite)', quantity_in_stock: 36, unit: 'ขวด', reorder_level: 12, cost_per_unit: 12, last_updated: '2026-09-02 10:00' },
-    { ingredient_id: 22, ingredient_name: 'น้ำดื่มสะอาด', quantity_in_stock: 60, unit: 'ขวด', reorder_level: 20, cost_per_unit: 5, last_updated: '2026-09-02 10:00' },
-    { ingredient_id: 23, ingredient_name: 'ข้าวเหนียว', quantity_in_stock: 30.0, unit: 'กิโลกรัม', reorder_level: 8.0, cost_per_unit: 40, last_updated: '2026-09-02 10:00' }
-  ],
-
-  menus: [
-    {
-      menu_id: 2,
-      category_id: 1,
-      menu_name: 'กระเพราหมู',
-      description: 'กะเพราหมูสับผัดพริกแห้ง หอมฟุ้ง อร่อยเด็ดสะใจ',
-      price: 40,
-      calories: 880,
-      is_available: true,
-      image_url: imgKapaomu,
-      allergen_ids: [],
-      total_sold: 145
-    },
-    {
-      menu_id: 3,
-      category_id: 1,
-      menu_name: 'กระเพราทะเล/หมึก/กุ้ง',
-      description: 'กะเพราซีฟู้ดสดใหม่ กุ้งปลาหมึกเด้ง เผ็ดร้อน ถึงเครื่อง',
-      price: 60,
-      calories: 695,
-      is_available: true,
-      image_url: imgKapaotaley,
-      allergen_ids: [1],
-      total_sold: 112
-    },
-    {
-      menu_id: 4,
-      category_id: 1,
-      menu_name: 'ข้าวผัดหมู',
-      description: 'ข้าวผัดหอมกรุ่นกระทะ เมล็ดข้าวร่วนสวย ใส่หมูนุ่ม',
-      price: 40,
-      calories: 950,
-      is_available: true,
-      image_url: imgKhaopadmu,
-      allergen_ids: [5],
-      total_sold: 98
-    },
-    {
-      menu_id: 5,
-      category_id: 1,
-      menu_name: 'ข้าวผัดทะเล/หมึก/กุ้ง',
-      description: 'รวมมิตรทะเลผัดข้าวหอมมะลิ รสชาติกลมกล่อม',
-      price: 60,
-      calories: 860,
-      is_available: true,
-      image_url: imgKhaopadtalay,
-      allergen_ids: [1, 5],
-      total_sold: 85
-    },
-    {
-      menu_id: 6,
-      category_id: 1,
-      menu_name: 'ผัดพริกแกงหมู',
-      description: 'พริกแกงเข้มข้นถึงเครื่องแกงใต้ ผัดถั่วฝักยาวและหมูนุ่ม',
-      price: 40,
-      calories: 810,
-      is_available: true,
-      image_url: imgPikkangmu,
-      allergen_ids: [],
-      total_sold: 76
-    },
-    {
-      menu_id: 7,
-      category_id: 1,
-      menu_name: 'ผัดพริกแกงทะเล/หมึก/กุ้ง',
-      description: 'ผัดพริกแกงรวมมิตรทะเล รสชาติจัดจ้านถึงใจ',
-      price: 60,
-      calories: 680,
-      is_available: true,
-      image_url: imgPrikkangtalay,
-      allergen_ids: [1],
-      total_sold: 68
-    },
-    {
-      menu_id: 8,
-      category_id: 1,
-      menu_name: 'ผัดคะน้าหมูกรอบ',
-      description: 'คะน้าสดกรอบผัดหมูกรอบชิ้นโต รสชาติกลมกล่อมหอมน้ำมันหอย',
-      price: 40,
-      calories: 920,
-      is_available: true,
-      image_url: imgKanamokrop,
-      allergen_ids: [],
-      total_sold: 120
-    },
-    {
-      menu_id: 9,
-      category_id: 1,
-      menu_name: 'ผัดคะน้าทะเล/หมึก/กุ้ง',
-      description: 'คะน้าสดกรอบผัดซีฟู้ดเนื้อแน่น ปรุงร้อนๆ จานต่อจาน',
-      price: 60,
-      calories: 650,
-      is_available: true,
-      image_url: imgKanatalay,
-      allergen_ids: [1],
-      total_sold: 55
-    },
-    {
-      menu_id: 10,
-      category_id: 1,
-      menu_name: 'ข้าวหมูกระเทียม',
-      description: 'หมูหมักนุ่มผัดกระเทียมพริกไทยดำหอมเตะจมูก',
-      price: 40,
-      calories: 790,
-      is_available: true,
-      image_url: imgMookratiem,
-      allergen_ids: [],
-      total_sold: 110
-    },
-    {
-      menu_id: 11,
-      category_id: 1,
-      menu_name: 'ข้าวไข่เจียวหมูสับ',
-      description: 'ไข่เจียวฟูกรอบนอกนุ่มใน หมูสับแน่นๆ ทอดร้อนๆ',
-      price: 40,
-      calories: 890,
-      is_available: true,
-      image_url: imgKaijeawmoosub,
-      allergen_ids: [5],
-      total_sold: 140
-    },
-    {
-      menu_id: 12,
-      category_id: 1,
-      menu_name: 'ข้าวไข่เจียวกุ้ง',
-      description: 'ไข่เจียวฟูใส่กุ้งสดเด้ง ทานคู่น้ำปลาพริกมะนาว',
-      price: 50,
-      calories: 810,
-      is_available: true,
-      image_url: imgKaikung,
-      allergen_ids: [1, 5],
-      total_sold: 95
-    },
-    {
-      menu_id: 13,
-      category_id: 2,
-      menu_name: 'ส้มตำปูปลาร้า',
-      description: 'ส้มตำปลาร้าต้มสุกสูตรเฉพาะ หอม นัว ถึงเครื่อง ปรุงรสตามสั่ง',
-      price: 40,
-      calories: 120,
-      is_available: true,
-      image_url: imgTumprara,
-      allergen_ids: [1],
-      total_sold: 195
-    },
-    {
-      menu_id: 14,
-      category_id: 2,
-      menu_name: 'ส้มตำไทย',
-      description: 'ตำไทยรสกลมกล่อม เปรี้ยวหวานกำลังดี โรยถั่วคั่วหอมสดใหม่',
-      price: 40,
-      calories: 240,
-      is_available: true,
-      image_url: imgTumtai,
-      allergen_ids: [2],
-      total_sold: 130
-    },
-    {
-      menu_id: 15,
-      category_id: 3,
-      menu_name: 'ลาบหมู',
-      description: 'หมูสับนุ่มคั่วสุกใหม่ ปรุงรสด้วยข้าวคั่วหอม พริกป่น มะนาวแท้',
-      price: 60,
-      calories: 360,
-      is_available: true,
-      image_url: imgLarbmoo,
-      allergen_ids: [],
-      total_sold: 125
-    },
-    {
-      menu_id: 16,
-      category_id: 3,
-      menu_name: 'ยำวุ้นเส้นทะเล',
-      description: 'วุ้นเส้นเหนียวนุ่มคลุกเคล้าน้ำยำรสแซ่บ กุ้ง ปลาหมึก หมูสับ',
-      price: 70,
-      calories: 410,
-      is_available: true,
-      image_url: imgYumtalay,
-      allergen_ids: [1],
-      total_sold: 140
-    },
-    {
-      menu_id: 17,
-      category_id: 4,
-      menu_name: 'ไก่ทอด (ปีก)',
-      description: 'ปีกไก่หมักเครื่องเทศสูตรเด็ด ทอดกรอบนอกนุ่มใน ไม่อมน้ำมัน',
-      price: 20,
-      calories: 540,
-      is_available: true,
-      image_url: imgWingchick,
-      allergen_ids: [],
-      total_sold: 180
-    },
-    {
-      menu_id: 18,
-      category_id: 4,
-      menu_name: 'ไก่ทอด (สะโพก)',
-      description: 'สะโพกไก่ทอดกรอบชิ้นใหญ่ เนื้อฉ่ำ หนังกรอบสะใจ',
-      price: 50,
-      calories: 680,
-      is_available: true,
-      image_url: imgChick,
-      allergen_ids: [],
-      total_sold: 160
-    },
-    {
-      menu_id: 19,
-      category_id: 5,
-      menu_name: 'น้ำเก๊กฮวย',
-      description: 'น้ำเก๊กฮวยต้มสมุนไพรแท้ หวานน้อย เย็นชื่นใจ ดับกระหายคลายร้อน',
-      price: 20,
-      calories: 110,
-      is_available: true,
-      image_url: imgGek,
-      allergen_ids: [],
-      total_sold: 150
-    },
-    {
-      menu_id: 20,
-      category_id: 5,
-      menu_name: 'โค้ก (Coke)',
-      description: 'โค้กแช่เย็นซ่าชื่นใจ เสิร์ฟพร้อมแก้วน้ำแข็ง',
-      price: 20,
-      calories: 140,
-      is_available: true,
-      image_url: imgCoke,
-      allergen_ids: [],
-      total_sold: 170
-    },
-    {
-      menu_id: 21,
-      category_id: 5,
-      menu_name: 'สไปรท์ (Sprite)',
-      description: 'น้ำอัดลมใสซ่า สดชื่น กลิ่นเลมอน-ไลม์ ดื่มแล้วสดชื่นทันที',
-      price: 20,
-      calories: 140,
-      is_available: true,
-      image_url: imgSprite,
-      allergen_ids: [],
-      total_sold: 90
-    },
-    {
-      menu_id: 22,
-      category_id: 5,
-      menu_name: 'น้ำเปล่า',
-      description: 'น้ำดื่มสะอาดบริสุทธิ์ แช่เย็นชื่นใจ',
-      price: 10,
-      calories: 0,
-      is_available: true,
-      image_url: imgWater,
-      allergen_ids: [],
-      total_sold: 210
-    },
-    {
-      menu_id: 23,
-      category_id: 1,
-      menu_name: 'ข้าวเปล่า',
-      description: 'ข้าวสวยหอมมะลิหุงสุก ร้อนๆ นุ่มอร่อย',
-      price: 10,
-      calories: 430,
-      is_available: true,
-      image_url: imgKao,
-      allergen_ids: [],
-      total_sold: 260
-    },
-    {
-      menu_id: 24,
-      category_id: 1,
-      menu_name: 'ข้าวเหนียว',
-      description: 'ข้าวเหนียวนุ่ม ร้อนๆ หอมอร่อย ทานคู่กับส้มตำ ลาบ ไก่ทอด',
-      price: 10,
-      calories: 340,
-      is_available: true,
-      image_url: imgKaon,
-      allergen_ids: [],
-      total_sold: 180
-    }
-  ],
-
-  menuIngredients: [
-    { menu_id: 1, ingredient_id: 6, quantity_used: 0.12 },
-    { menu_id: 1, ingredient_id: 15, quantity_used: 0.02 },
-    { menu_id: 1, ingredient_id: 2, quantity_used: 0.01 },
-    { menu_id: 1, ingredient_id: 13, quantity_used: 0.15 },
-    { menu_id: 2, ingredient_id: 10, quantity_used: 0.08 },
-    { menu_id: 2, ingredient_id: 11, quantity_used: 0.08 },
-    { menu_id: 2, ingredient_id: 15, quantity_used: 0.02 },
-    { menu_id: 2, ingredient_id: 13, quantity_used: 0.15 },
-    { menu_id: 3, ingredient_id: 6, quantity_used: 0.10 },
-    { menu_id: 3, ingredient_id: 12, quantity_used: 1 },
-    { menu_id: 3, ingredient_id: 13, quantity_used: 0.18 },
-    { menu_id: 5, ingredient_id: 10, quantity_used: 0.06 },
-    { menu_id: 5, ingredient_id: 11, quantity_used: 0.06 },
-    { menu_id: 5, ingredient_id: 12, quantity_used: 1 },
-    { menu_id: 5, ingredient_id: 13, quantity_used: 0.18 },
-    { menu_id: 6, ingredient_id: 6, quantity_used: 0.12 },
-    { menu_id: 6, ingredient_id: 16, quantity_used: 0.03 },
-    { menu_id: 6, ingredient_id: 13, quantity_used: 0.15 },
-    { menu_id: 7, ingredient_id: 10, quantity_used: 0.07 },
-    { menu_id: 7, ingredient_id: 11, quantity_used: 0.07 },
-    { menu_id: 7, ingredient_id: 16, quantity_used: 0.03 },
-    { menu_id: 7, ingredient_id: 13, quantity_used: 0.15 },
-    { menu_id: 8, ingredient_id: 7, quantity_used: 0.10 },
-    { menu_id: 8, ingredient_id: 14, quantity_used: 0.10 },
-    { menu_id: 8, ingredient_id: 13, quantity_used: 0.15 },
-    { menu_id: 9, ingredient_id: 10, quantity_used: 0.07 },
-    { menu_id: 9, ingredient_id: 11, quantity_used: 0.07 },
-    { menu_id: 9, ingredient_id: 14, quantity_used: 0.10 },
-    { menu_id: 9, ingredient_id: 13, quantity_used: 0.15 },
-    { menu_id: 10, ingredient_id: 6, quantity_used: 0.14 },
-    { menu_id: 10, ingredient_id: 13, quantity_used: 0.15 },
-    { menu_id: 11, ingredient_id: 12, quantity_used: 2 },
-    { menu_id: 11, ingredient_id: 6, quantity_used: 0.06 },
-    { menu_id: 11, ingredient_id: 13, quantity_used: 0.15 },
-    { menu_id: 12, ingredient_id: 12, quantity_used: 2 },
-    { menu_id: 12, ingredient_id: 10, quantity_used: 0.06 },
-    { menu_id: 12, ingredient_id: 13, quantity_used: 0.15 },
-    { menu_id: 13, ingredient_id: 1, quantity_used: 0.20 },
-    { menu_id: 13, ingredient_id: 2, quantity_used: 0.02 },
-    { menu_id: 13, ingredient_id: 3, quantity_used: 0.05 },
-    { menu_id: 13, ingredient_id: 4, quantity_used: 0.04 },
-    { menu_id: 13, ingredient_id: 5, quantity_used: 0.04 },
-    { menu_id: 14, ingredient_id: 1, quantity_used: 0.20 },
-    { menu_id: 14, ingredient_id: 2, quantity_used: 0.02 },
-    { menu_id: 14, ingredient_id: 5, quantity_used: 0.04 },
-    { menu_id: 14, ingredient_id: 18, quantity_used: 0.02 },
-    { menu_id: 15, ingredient_id: 6, quantity_used: 0.15 },
-    { menu_id: 15, ingredient_id: 5, quantity_used: 0.03 },
-    { menu_id: 15, ingredient_id: 2, quantity_used: 0.01 },
-    { menu_id: 16, ingredient_id: 17, quantity_used: 1 },
-    { menu_id: 16, ingredient_id: 10, quantity_used: 0.07 },
-    { menu_id: 16, ingredient_id: 11, quantity_used: 0.07 },
-    { menu_id: 16, ingredient_id: 6, quantity_used: 0.04 },
-    { menu_id: 16, ingredient_id: 5, quantity_used: 0.04 },
-    { menu_id: 17, ingredient_id: 9, quantity_used: 0.20 },
-    { menu_id: 18, ingredient_id: 8, quantity_used: 0.25 },
-    { menu_id: 19, ingredient_id: 19, quantity_used: 1 },
-    { menu_id: 20, ingredient_id: 20, quantity_used: 1 },
-    { menu_id: 21, ingredient_id: 21, quantity_used: 1 },
-    { menu_id: 22, ingredient_id: 22, quantity_used: 1 },
-    { menu_id: 23, ingredient_id: 13, quantity_used: 0.15 },
-    { menu_id: 24, ingredient_id: 23, quantity_used: 0.15 }
-  ],
-
-  promotions: [
-    {
-      promo_id: 1,
-      code: 'ZING50',
-      discount_type: 'Fixed',
-      discount_value: 50,
-      min_order_price: 300,
-      expiry_date: '2026-10-31',
-      is_active: true,
-      used_count: 38
-    },
-    {
-      promo_id: 2,
-      code: 'SEP10',
-      discount_type: 'Percentage',
-      discount_value: 10,
-      min_order_price: 200,
-      expiry_date: '2026-09-30',
-      is_active: true,
-      used_count: 64
-    },
-    {
-      promo_id: 3,
-      code: 'WELCOME100',
-      discount_type: 'Fixed',
-      discount_value: 100,
-      min_order_price: 500,
-      expiry_date: '2026-12-31',
-      is_active: true,
-      used_count: 15
-    },
-    {
-      promo_id: 4,
-      code: 'FREESHIP',
-      discount_type: 'Fixed',
-      discount_value: 30,
-      min_order_price: 250,
-      expiry_date: '2026-08-31',
-      is_active: false,
-      used_count: 89
-    }
-  ],
-
-  orders: [
-    {
-      order_id: 101,
-      user_id: 4,
-      customer_name: 'คุณสมพร (โต๊ะ T-01)',
-      table_id: 1,
-      order_type: 'In-store',
-      status: 'Cooking',
-      total_price: 300,
-      discount_applied: 50,
-      promo_code: 'ZING50',
-      created_at: '2026-09-03 18:35:10',
-      payment_method: 'PromptPay',
-      payment_status: 'Completed',
-      payment_slip_url: 'https://images.unsplash.com/photo-1607344645866-009c320c5ab8?w=400&auto=format&fit=crop&q=80',
-      items: [
-        { menu_id: 13, menu_name: 'ส้มตำปูปลาร้า', quantity: 2, price: 40, subtotal: 80, customization: { spicy: 'เผ็ดมาก (พริก 10 เม็ด)', no_msg: false, note: 'ใส่ปลาร้าเยอะๆ เปรี้ยวเค็ม' } },
-        { menu_id: 1, menu_name: 'กระเพราหมู', quantity: 2, price: 40, subtotal: 80, customization: { spicy: 'ปกติ', no_msg: false, note: 'ไข่ดาวไม่สุก' } },
-        { menu_id: 18, menu_name: 'ไก่ทอด (สะโพก)', quantity: 2, price: 50, subtotal: 100, customization: { spicy: 'ปกติ', no_msg: false, note: 'ทอดกรอบๆ' } },
-        { menu_id: 19, menu_name: 'น้ำเก๊กฮวย', quantity: 2, price: 20, subtotal: 40, customization: { spicy: '-', no_msg: false, note: 'หวานน้อย' } }
-      ]
-    },
-    {
-      order_id: 103,
-      user_id: null,
-      customer_name: 'ลูกค้าหน้าร้าน (โต๊ะ T-03)',
-      table_id: 3,
-      order_type: 'In-store',
-      status: 'Pending',
-      total_price: 480,
-      discount_applied: 0,
-      promo_code: null,
-      created_at: '2026-09-03 18:47:20',
-      payment_method: 'Credit Card',
-      payment_status: 'Completed',
-      payment_slip_url: null,
-      items: [
-        { menu_id: 16, menu_name: 'ยำวุ้นเส้นทะเล', quantity: 2, price: 70, subtotal: 140, customization: { spicy: 'เผ็ดกลาง', no_msg: true, note: 'ไม่ใส่ชูรส' } },
-        { menu_id: 18, menu_name: 'ไก่ทอด (สะโพก)', quantity: 2, price: 50, subtotal: 100, customization: { spicy: 'ปกติ', no_msg: false, note: '' } },
-        { menu_id: 15, menu_name: 'ลาบหมู', quantity: 2, price: 60, subtotal: 120, customization: { spicy: 'เผ็ดมาก', no_msg: false, note: 'ข้าวคั่วเยอะๆ' } },
-        { menu_id: 13, menu_name: 'ส้มตำปูปลาร้า', quantity: 2, price: 40, subtotal: 80, customization: { spicy: 'เผ็ดน้อย', no_msg: false, note: '' } },
-        { menu_id: 20, menu_name: 'โค้ก (Coke)', quantity: 2, price: 20, subtotal: 40, customization: { spicy: '-', no_msg: false, note: 'เย็นๆ' } }
-      ]
-    },
-    {
-      order_id: 104,
-      user_id: 4,
-      customer_name: 'คุณวิชัย (โต๊ะ T-04)',
-      table_id: 4,
-      order_type: 'In-store',
-      status: 'Served',
-      total_price: 340,
-      discount_applied: 0,
-      promo_code: null,
-      created_at: '2026-09-03 18:10:00',
-      payment_method: 'Cash',
-      payment_status: 'Pending',
-      payment_slip_url: null,
-      items: [
-        { menu_id: 1, menu_name: 'กระเพราหมู', quantity: 2, price: 40, subtotal: 80, customization: { spicy: 'ปกติ', no_msg: false, note: '' } },
-        { menu_id: 15, menu_name: 'ลาบหมู', quantity: 2, price: 60, subtotal: 120, customization: { spicy: 'เผ็ดกลาง', no_msg: false, note: '' } },
-        { menu_id: 4, menu_name: 'ข้าวผัดกุ้ง', quantity: 2, price: 50, subtotal: 100, customization: { spicy: 'ปกติ', no_msg: false, note: '' } },
-        { menu_id: 19, menu_name: 'น้ำเก๊กฮวย', quantity: 2, price: 20, subtotal: 40, customization: { spicy: '-', no_msg: false, note: '' } }
-      ]
-    },
-    {
-      order_id: 99,
-      user_id: 2,
-      customer_name: 'คุณกิตติศักดิ์ (Takeaway)',
-      table_id: null,
-      order_type: 'Takeaway',
-      status: 'Completed',
-      total_price: 180,
-      discount_applied: 0,
-      promo_code: null,
-      created_at: '2026-09-03 17:25:00',
-      payment_method: 'PromptPay',
-      payment_status: 'Completed',
-      payment_slip_url: 'https://images.unsplash.com/photo-1607344645866-009c320c5ab8?w=400&auto=format&fit=crop&q=80',
-      items: [
-        { menu_id: 13, menu_name: 'ส้มตำปูปลาร้า', quantity: 2, price: 40, subtotal: 80, customization: { spicy: 'เผ็ดกลาง', no_msg: false, note: 'แยกเส้น' } },
-        { menu_id: 17, menu_name: 'ไก่ทอด (ปีก)', quantity: 3, price: 20, subtotal: 60, customization: { spicy: 'ปกติ', no_msg: false, note: 'ทอดใหม่ๆ' } },
-        { menu_id: 20, menu_name: 'โค้ก (Coke)', quantity: 2, price: 20, subtotal: 40, customization: { spicy: '-', no_msg: false, note: 'แยกน้ำแข็ง' } }
-      ]
-    },
-    {
-      order_id: 98,
-      user_id: null,
-      customer_name: 'โต๊ะ T-05 (เสร็จสิ้น)',
-      table_id: 5,
-      order_type: 'In-store',
-      status: 'Completed',
-      total_price: 360,
-      discount_applied: 50,
-      promo_code: 'SEP10',
-      created_at: '2026-09-03 16:40:00',
-      payment_method: 'PromptPay',
-      payment_status: 'Completed',
-      payment_slip_url: 'https://images.unsplash.com/photo-1607344645866-009c320c5ab8?w=400&auto=format&fit=crop&q=80',
-      items: [
-        { menu_id: 16, menu_name: 'ยำวุ้นเส้นทะเล', quantity: 2, price: 70, subtotal: 140, customization: { spicy: 'เผ็ดมาก', no_msg: false, note: '' } },
-        { menu_id: 18, menu_name: 'ไก่ทอด (สะโพก)', quantity: 2, price: 50, subtotal: 100, customization: { spicy: 'ปกติ', no_msg: false, note: '' } },
-        { menu_id: 15, menu_name: 'ลาบหมู', quantity: 2, price: 60, subtotal: 120, customization: { spicy: 'เผ็ดกลาง', no_msg: false, note: '' } }
-      ]
-    }
-  ],
+  ingredients: [],
+  menus: [],
+  menuIngredients: [],
+  promotions: [],
+  orders: [],
 
   storeSettings: {
     storeName: 'ร้านตำครกซิ่ง (Tum Krok Zing)',
     tagline: 'แซ่บนัว ถึงใจ อาหารอีสานแท้รสเด็ด',
-    promptpayNumber: '095-423-8372',
-    promptpayName: 'นายธีรวัฒน์ แสนคำเฮียง (ตำครกซิ่ง)',
-    taxId: '0105566099881',
-    address: '123/45 ถนนแจ้งวัฒนะ แขวงทุ่งสองห้อง เขตหลักสี่ กรุงเทพมหานคร 10210',
-    phone: '02-987-6543, 081-234-5678',
+    promptpayNumber: '',
+    promptpayName: '',
+    taxId: '',
+    address: '',
+    phone: '',
     openTime: '10:30',
     closeTime: '22:00',
     isOpen: true,
@@ -658,15 +139,62 @@ export const adminStore = reactive({
 
   // ===== Centralized Admin Initialization =====
   async initAdminData() {
-    await Promise.allSettled([
-      this.fetchSettingsFromAPI(),
-      this.fetchMenusFromAPI(),
-      this.fetchInventoryFromAPI(),
-      this.fetchTablesFromAPI(),
-      this.fetchOrdersFromAPI(),
-      this.fetchPromotionsFromAPI()
-    ])
+    // แสดง "กำลังโหลด" เฉพาะรอบแรก รอบ polling ถัดไปไม่ต้องกระพริบหน้าจอ
+    if (this.loadStatus === 'idle') this.loadStatus = 'loading'
+
+    const tasks = [
+      ['ตั้งค่าร้าน', this.fetchSettingsFromAPI()],
+      ['หมวดหมู่', this.fetchCategoriesFromAPI()],
+      ['เมนู', this.fetchMenusFromAPI()],
+      ['วัตถุดิบ', this.fetchInventoryFromAPI()],
+      ['โต๊ะ', this.fetchTablesFromAPI()],
+      ['ออเดอร์', this.fetchOrdersFromAPI()],
+      ['โปรโมชัน', this.fetchPromotionsFromAPI()]
+    ]
+    const results = await Promise.allSettled(tasks.map(([, p]) => p))
+    this.loadErrors = tasks
+      .filter((_, i) => results[i].status === 'rejected' || results[i].value === false)
+      .map(([name]) => name)
+    this.loadStatus = this.loadErrors.length > 0 ? 'error' : 'ready'
+
     this.recomputeDashboardStats()
+  },
+
+  // ===== Categories API =====
+  async fetchCategoriesFromAPI() {
+    try {
+      const res = await fetch(`${API_BASE}/categories`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      if (Array.isArray(data)) {
+        this.categories = data.map(c => ({
+          category_id: c.category_id,
+          category_name: c.category_name,
+          icon: categoryIcon(c.category_name)
+        }))
+      }
+      return true
+    } catch (err) {
+      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API หมวดหมู่ได้:', err.message)
+      return false
+    }
+  },
+
+  // ===== Users API (ADMIN เท่านั้น) =====
+  async fetchUsersFromAPI() {
+    this.usersLoadStatus = 'loading'
+    try {
+      const res = await fetch(`${API_BASE}/users`, { headers: authHeaders() })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      this.users = Array.isArray(data) ? data : []
+      this.usersLoadStatus = 'ready'
+      return true
+    } catch (err) {
+      console.warn('⚠️ ไม่สามารถเชื่อมต่อ API ผู้ใช้งานได้:', err.message)
+      this.usersLoadStatus = 'error'
+      return false
+    }
   },
 
   recomputeDashboardStats() {
@@ -723,7 +251,7 @@ export const adminStore = reactive({
       const res = await fetch(`${API_BASE}/menus`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         // กรองเมนูที่ซ้ำซ้อนโดยแปลงชื่อให้อยู่ในรูปแบบทางการ
         const seen = new Set()
         const uniqueData = []
@@ -769,9 +297,7 @@ export const adminStore = reactive({
             allDbMenuIngredients.push(...m.ingredients)
           }
         }
-        if (allDbMenuIngredients.length > 0) {
-          this.menuIngredients = allDbMenuIngredients
-        }
+        this.menuIngredients = allDbMenuIngredients
       }
       console.log(`✅ โหลดเมนูจาก API สำเร็จ: ${this.menus.length} รายการ (พบสูตรอาหารในฐานข้อมูล ${this.menuIngredients.length} รายการ)`)
       return true
@@ -943,7 +469,7 @@ export const adminStore = reactive({
       const res = await fetch(`${API_BASE}/ingredients`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         this.ingredients = data.map(i => ({
           ingredient_id: i.ingredient_id || i.id,
           ingredient_name: i.name || i.ingredient_name,
@@ -955,8 +481,10 @@ export const adminStore = reactive({
         }))
       }
       console.log(`✅ โหลดคลังวัตถุดิบจาก API สำเร็จ: ${this.ingredients.length} รายการ`)
+      return true
     } catch (err) {
       console.warn('⚠️ ไม่สามารถเชื่อมต่อ API คลังวัตถุดิบได้:', err.message)
+      return false
     }
   },
 
@@ -1072,7 +600,7 @@ export const adminStore = reactive({
       const res = await fetch(`${API_BASE}/tables`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         this.tables = data.map(t => {
           const isOcc = (t.status === 'OCCUPIED' || t.status === 'Occupied')
           const activeOrder = this.orders.find(o => o.table_id === t.table_id && o.status !== 'Completed' && o.status !== 'PAID')
@@ -1088,8 +616,10 @@ export const adminStore = reactive({
         })
       }
       console.log(`✅ โหลดข้อมูลโต๊ะจาก API สำเร็จ: ${this.tables.length} โต๊ะ`)
+      return true
     } catch (err) {
       console.warn('⚠️ ไม่สามารถเชื่อมต่อ API โต๊ะอาหารได้:', err.message)
+      return false
     }
   },
 
@@ -1130,7 +660,7 @@ export const adminStore = reactive({
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         this.orders = data.map(o => {
           const rawItems = o.order_items || o.items || []
           const items = rawItems.map(oi => ({
@@ -1171,8 +701,10 @@ export const adminStore = reactive({
         })
       }
       console.log(`✅ โหลดรายการออเดอร์จาก API สำเร็จ: ${this.orders.length} ออเดอร์`)
+      return true
     } catch (err) {
       console.warn('⚠️ ไม่สามารถเชื่อมต่อ API ออเดอร์ได้:', err.message)
+      return false
     }
   },
 
@@ -1213,7 +745,7 @@ export const adminStore = reactive({
       const res = await fetch(`${API_BASE}/promotions`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         this.promotions = data.map(p => ({
           promo_id: p.promo_id || p.id,
           code: p.code,
@@ -1226,8 +758,10 @@ export const adminStore = reactive({
         }))
       }
       console.log(`✅ โหลดโปรโมชันจาก API สำเร็จ: ${this.promotions.length} รายการ`)
+      return true
     } catch (err) {
       console.warn('⚠️ ไม่สามารถเชื่อมต่อ API โปรโมชันได้:', err.message)
+      return false
     }
   },
 

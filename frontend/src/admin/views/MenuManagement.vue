@@ -52,7 +52,7 @@ function openAddModal() {
   isEditing.value = false
   form.value = {
     menu_id: null,
-    category_id: 1,
+    category_id: adminStore.categories[0]?.category_id ?? null,
     menu_name: '',
     description: '',
     price: 60,
@@ -144,7 +144,7 @@ function confirmDelete(menu) {
 
 function getCategoryName(catId) {
   const c = adminStore.categories.find(x => x.category_id === catId)
-  return c ? c.menu_name || c.category_name : 'ทั่วไป'
+  return c ? c.category_name : 'ไม่ระบุหมวดหมู่'
 }
 
 function getAllergenNames(ids) {

@@ -104,7 +104,8 @@
 
         <button class="logout-btn" type="button" @click="handleLogout">ออกจากระบบ</button>
         <div class="profile-avatar" @click="$router.push('/profile')" title="โปรไฟล์ของฉัน">
-          <img :src="authStore.userProfile?.avatar || defaultAvatar" alt="Profile" />
+          <img v-if="authStore.userProfile?.avatar" :src="authStore.userProfile.avatar" alt="Profile" />
+          <span v-else class="profile-initial">{{ avatarInitial }}</span>
         </div>
       </template>
 
@@ -125,6 +126,7 @@ import { useRoute, useRouter } from 'vue-router';
 import logoImg from '../assets/logo.png';
 import { authStore } from '../store/authStore';
 import { API_BASE } from '../config/api';
+import { getInitial } from '../utils/avatar';
 
 export default {
   name: 'CustomerNavbar',
@@ -145,7 +147,7 @@ export default {
 
     const showAddressDropdown = ref(false);
     const locationWrapper = ref(null);
-    const defaultAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop';
+    const avatarInitial = computed(() => getInitial(authStore.userProfile?.name || authStore.userProfile?.username));
     const isStoreOpen = ref(true);
 
     const isHomeActive = computed(() => route.path === '/');
@@ -213,7 +215,7 @@ export default {
     return {
       logoImg,
       authStore,
-      defaultAvatar,
+      avatarInitial,
       showAddressDropdown,
       locationWrapper,
       displayAddress,
@@ -611,6 +613,17 @@ export default {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.profile-avatar:has(.profile-initial) {
+  background: #eef7f1;
+}
+
+.profile-initial {
+  font-size: 15px;
+  font-weight: 600;
+  color: #2d5a43;
+  line-height: 1;
 }
 
 .role-shortcut-btn {

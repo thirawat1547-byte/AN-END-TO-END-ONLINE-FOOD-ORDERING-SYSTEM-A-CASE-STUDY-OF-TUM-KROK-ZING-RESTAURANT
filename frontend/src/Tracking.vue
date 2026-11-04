@@ -98,9 +98,9 @@
 
           <!-- สถานะ 3: ส่งมอบไรเดอร์แล้ว กำลังจัดส่ง -->
           <div v-else-if="currentStep === 3" class="rider-profile-box">
-            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop" alt="Rider" class="rider-img">
-            <h4 class="rider-name">{{ currentOrder?.riderName ? `${currentOrder.riderName} (ไรเดอร์)` : 'สิริโชค คำมา (ไรเดอร์)' }}</h4>
-            <p class="rider-vehicle">🛵 พนักงานนำส่งตำครกซิ่ง</p>
+            <div class="rider-img rider-initial">{{ currentOrder?.riderName ? currentOrder.riderName.charAt(0).toUpperCase() : '🛵' }}</div>
+            <h4 class="rider-name">{{ currentOrder?.riderName ? `${currentOrder.riderName} (ไรเดอร์)` : 'กำลังรอไรเดอร์รับงาน' }}</h4>
+            <p class="rider-vehicle">{{ currentOrder?.riderPhone ? `📞 ${currentOrder.riderPhone}` : '🛵 พนักงานนำส่งตำครกซิ่ง' }}</p>
             <div class="rider-actions">
               <button class="action-btn call-btn" @click="callRider">
                 <span>📞</span> โทรหาคนขับ
@@ -665,11 +665,10 @@ export default {
     },
     callRider() {
       const phone = this.currentOrder?.riderPhone;
-      const name = this.currentOrder?.riderName || 'สิริโชค';
       if (phone) {
         window.location.href = `tel:${phone}`;
       } else {
-        alert(`กำลังโทรหาคุณ${name} (คนขับ)...`);
+        alert('ยังไม่มีเบอร์โทรของไรเดอร์ กรุณาใช้ปุ่มข้อความแทน');
       }
     },
     chatRider() {
@@ -861,6 +860,7 @@ export default {
 /* Rider Card */
 .rider-profile-box { text-align: center; display: flex; flex-direction: column; align-items: center; margin-bottom: 20px; }
 .rider-img { width: 70px; height: 70px; border-radius: 50%; object-fit: cover; margin-bottom: 12px; border: 2px solid #557c61; }
+.rider-initial { display: flex; align-items: center; justify-content: center; background: #eef7f1; color: #2d5a43; font-size: 28px; font-weight: 700; }
 .rider-name { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 4px; }
 .rider-vehicle { font-size: 13px; color: #666; background: #f7f6f0; padding: 4px 12px; border-radius: 12px; }
 

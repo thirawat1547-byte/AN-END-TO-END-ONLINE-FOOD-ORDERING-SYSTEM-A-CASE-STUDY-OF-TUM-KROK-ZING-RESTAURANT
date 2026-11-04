@@ -263,6 +263,15 @@ onUnmounted(() => {
 
       <!-- Main Router View -->
       <main class="flex-1 p-4 md:p-8 overflow-y-auto max-w-7xl w-full mx-auto">
+        <!-- สถานะโหลดข้อมูลจาก API (แทนการแสดงข้อมูลตัวอย่าง) -->
+        <div v-if="adminStore.loadStatus === 'loading'" class="mb-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+          <span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-[#2d5a43] border-t-transparent"></span>
+          กำลังโหลดข้อมูลจากเซิร์ฟเวอร์...
+        </div>
+        <div v-else-if="adminStore.loadStatus === 'error'" class="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <span>⚠️ โหลดข้อมูลไม่สำเร็จ: {{ adminStore.loadErrors.join(', ') }} — ข้อมูลที่แสดงอาจไม่ครบ ระบบจะลองโหลดใหม่อัตโนมัติ</span>
+          <button class="rounded-lg bg-white px-3 py-1 text-xs font-bold text-red-700 border border-red-200 hover:bg-red-100" @click="adminStore.initAdminData()">ลองใหม่</button>
+        </div>
         <router-view />
       </main>
     </div>

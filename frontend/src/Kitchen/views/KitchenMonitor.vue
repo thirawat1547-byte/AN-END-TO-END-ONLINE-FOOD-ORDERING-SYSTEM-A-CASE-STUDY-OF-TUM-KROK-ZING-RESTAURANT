@@ -2,9 +2,14 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import axios from 'axios'
 import { API_BASE } from '../../config/api'
+import { getInitial, getStoredUserName } from '../../utils/avatar'
 import { socket } from '../../config/socket'
 import { useSocketStore } from '../../store/socketStore'
 import { showWarning } from '../../utils/swal'
+
+// แสดงตัวอักษรย่อของผู้ใช้ที่ล็อกอินอยู่แทนรูปโปรไฟล์
+const kitchenUserName = getStoredUserName()
+const kitchenUserInitial = getInitial(kitchenUserName)
 
 const socketStore = useSocketStore()
 const activeTab = ref('incoming')
@@ -146,40 +151,12 @@ const formatOrder = (order) => {
     timeStatus = 'warning'
   }
 
-  let items = (order.order_items || order.items || []).map((oi) => ({
+  // ออเดอร์ที่ไม่มีรายการอาหารจะส่ง items ว่าง แล้วหน้าจอแสดง "ไม่มีรายการอาหาร"
+  const items = (order.order_items || order.items || []).map((oi) => ({
     qty: oi.quantity || 1,
     name: oi.menu?.menu_name || oi.menu?.name || oi.menu_name || `เมนู #${oi.menu_id}`,
     note: extractNote(oi)
   }))
-
-  // หากเป็นออเดอร์เดิมที่ไม่มีรายการอาหาร ให้สร้าง fallback จากยอดเงิน
-  if (items.length === 0) {
-    const price = Number(order.total_price) || 0
-    let defaultName = 'ข้าวกะเพราหมูสับ'
-    let defaultQty = 1
-    if (price === 50) {
-      defaultName = 'ไก่ทอดสมุนไพร'
-    } else if (price === 70) {
-      defaultName = 'ยำวุ้นเส้นรวมมิตรทะเล'
-    } else if (price === 80) {
-      defaultName = 'ข้าวกะเพราหมูสับ + ส้มตำไทย'
-    } else if (price === 100) {
-      defaultName = 'ชุดปีกไก่ทอด (2 ที่)'
-      defaultQty = 2
-    } else if (price === 130 || price === 140) {
-      defaultName = 'ยำวุ้นเส้นทะเล + กะเพรา + ส้มตำ'
-    } else if (price > 0) {
-      defaultName = `รายการอาหารตามสั่ง (฿${price.toLocaleString()})`
-    }
-
-    items = [
-      {
-        qty: defaultQty,
-        name: defaultName,
-        note: order.order_type === 'DELIVERY' ? 'คำสั่งซื้อเดลิเวอรี' : 'คำสั่งซื้อหน้าร้าน'
-      }
-    ]
-  }
 
   return {
     id: order.order_id,
@@ -337,7 +314,7 @@ onBeforeUnmount(() => {
       <div style="display: flex; align-items: center; gap: 24px; color: rgba(255,255,255,0.9); font-size: 18px;">
         <button style="cursor: pointer; background: none; border: none; color: inherit;">🔔</button>
         <button style="width: 32px; height: 32px; border-radius: 9999px; overflow: hidden; border: 1px solid rgba(255,255,255,0.4); background: none; cursor: pointer; padding: 0;">
-          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover;" />
+          <span :title="kitchenUserName || 'ผู้ใช้งาน'" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: #fff;">{{ kitchenUserInitial }}</span>
         </button>
       </div>
     </header>
@@ -496,7 +473,7 @@ onBeforeUnmount(() => {
                 </div>
 
                 <div v-if="!order.items || order.items.length === 0" style="padding: 16px; background-color: rgba(0,0,0,0.03); border-radius: 12px; color: #78716C; text-align: center; font-size: 14px;">
-                  📋 รายการอาหารตามสั่ง (฿{{ order.totalPrice || '-' }})
+                  📋 ไม่มีรายการอาหาร (ยอด ฿{{ order.totalPrice || '-' }})
                 </div>
               </div>
             </div>
@@ -548,7 +525,7 @@ onBeforeUnmount(() => {
                 </div>
 
                 <div v-if="!order.items || order.items.length === 0" style="padding: 16px; background-color: rgba(0,0,0,0.03); border-radius: 12px; color: #78716C; text-align: center; font-size: 14px;">
-                  📋 รายการอาหารตามสั่ง (฿{{ order.totalPrice || '-' }})
+                  📋 ไม่มีรายการอาหาร (ยอด ฿{{ order.totalPrice || '-' }})
                 </div>
               </div>
             </div>

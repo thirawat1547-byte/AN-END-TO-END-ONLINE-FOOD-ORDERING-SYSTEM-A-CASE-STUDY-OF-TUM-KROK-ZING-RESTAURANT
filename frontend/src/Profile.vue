@@ -5,7 +5,8 @@
 
     <div class="content-wrapper profile-center">
       <div class="profile-avatar-large">
-        <img :src="userProfile.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop'" alt="User Profile">
+        <img v-if="userProfile.avatar" :src="userProfile.avatar" alt="User Profile">
+        <span v-else class="profile-initial-large">{{ avatarInitial }}</span>
       </div>
       
       <div class="profile-header">
@@ -78,6 +79,7 @@ import { API_BASE } from './config/api';
 import CustomerNavbar from './components/CustomerNavbar.vue';
 import { authStore } from './store/authStore';
 import { showSuccess } from './utils/swal';
+import { getInitial } from './utils/avatar';
 
 export default {
   components: {
@@ -100,6 +102,9 @@ export default {
     }
   },
   computed: {
+    avatarInitial() {
+      return getInitial(this.userProfile.name || this.userProfile.username);
+    },
     displayAddress() {
       const addr = this.userProfile?.address?.trim();
       if (this.isLoggedIn && addr && addr !== 'ตลาดปากเกร็ด นนทบุรี' && addr !== 'ตลาดปากเกร็ด') {
@@ -209,6 +214,7 @@ export default {
 
 .profile-avatar-large { width: 150px; height: 150px; border-radius: 50%; overflow: hidden; box-shadow: 0 8px 25px rgba(0,0,0,0.1); border: 4px solid white; position: relative; background: #e5e2d5; }
 .profile-avatar-large img { width: 100%; height: 100%; object-fit: cover; }
+.profile-initial-large { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #eef7f1; color: #2d5a43; font-size: 60px; font-weight: 600; }
 
 .profile-header { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; margin-bottom: 10px;}
 .profile-header h2 { font-size: 24px; color: #333; font-weight: 600; }

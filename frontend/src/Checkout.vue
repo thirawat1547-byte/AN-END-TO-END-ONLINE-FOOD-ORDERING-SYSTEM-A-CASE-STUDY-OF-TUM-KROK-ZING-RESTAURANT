@@ -169,15 +169,16 @@
 
           <!-- ตัวเลือกประเภทการชำระเงินหลัก 3 แบบ -->
           <div class="payment-methods-grid">
-            <!-- 1. บัตรเครดิต / เดบิต -->
-            <div 
-              class="payment-card" 
-              :class="{ active: selectedPayment === 'card' }" 
+            <!-- 1. บัตรเดบิต (แสดงเฉพาะเมื่อตั้งค่า Stripe key แล้ว) -->
+            <div
+              v-if="isCardPaymentEnabled"
+              class="payment-card"
+              :class="{ active: selectedPayment === 'card' }"
               @click="selectedPayment = 'card'"
             >
               <div class="pay-icon">💳</div>
-              <span class="pay-title">บัตรเครดิต/เดบิต</span>
-              <span class="pay-sub">Visa, Mastercard, JCB, AMEX</span>
+              <span class="pay-title">บัตรเดบิต</span>
+              <span class="pay-sub">ชำระผ่าน Stripe</span>
             </div>
 
             <!-- 2. พร้อมเพย์ -->
@@ -203,213 +204,32 @@
             </div>
           </div>
 
-          <!-- ฟอร์มกรอกข้อมูลบัตรเครดิต / เดบิต -->
+          <!-- ฟอร์มบัตรเดบิต (Stripe Elements: ข้อมูลบัตรส่งตรงไป Stripe ไม่ผ่านเซิร์ฟเวอร์ร้าน) -->
           <div v-if="selectedPayment === 'card'" class="card-checkout-container">
             <div class="card-container-header">
               <div class="card-header-left">
                 <span class="card-section-label">ข้อมูลบัตร (Card Information)</span>
-                <span class="card-instruction">กรุณาเลือกประเภทบัตรและกรอกข้อมูลให้ถูกต้อง</span>
-              </div>
-            </div>
-
-            <!-- ส่วนเลือกประเภทบัตรด้วยตนเอง (Manual Card Type Selector) -->
-            <div class="card-brand-selection-area">
-              <label class="brand-selection-label">เลือกประเภทบัตร (Select Card Type):</label>
-              <div class="card-brand-chips">
-                <!-- 1. VISA -->
-                <button 
-                  type="button" 
-                  class="brand-chip-btn" 
-                  :class="{ active: selectedCardBrand === 'visa' }"
-                  @click="selectCardBrand('visa')"
-                  title="ชำระด้วยบัตร VISA"
-                >
-                  <span class="card-logo-container">
-                    <svg class="card-brand-svg" viewBox="0 0 36 24" width="28" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect width="36" height="24" rx="3" fill="#0E4595"/>
-                      <path d="M14.6 16.5L16.2 7H18.2L16.6 16.5H14.6ZM24.4 7.2C24 7 23.3 6.8 22.5 6.8C20.3 6.8 18.7 8 18.7 9.7C18.7 10.9 19.8 11.6 20.7 12.1C21.6 12.5 21.9 12.8 21.9 13.3C21.9 14 21.1 14.3 20.3 14.3C19.3 14.3 18.7 14.1 18 13.8L17.6 15.8C18.2 16.1 19.3 16.3 20.4 16.3C22.8 16.3 24.3 15.1 24.3 13.3C24.3 12.2 23.6 11.3 22.3 10.7C21.5 10.3 21 10 21 9.5C21 9 21.5 8.6 22.5 8.6C23.2 8.6 23.8 8.8 24.3 9L24.4 7.2ZM28.7 7H27.1C26.5 7 26.1 7.2 25.8 7.8L22.1 16.5H24.3L24.8 15.2H27.5L27.8 16.5H29.8L28.7 7ZM25.4 13.6L26.5 10.4L27.1 13.6H25.4ZM12.6 7L10.5 13.5L10.2 12.1C9.8 10.8 8.4 9.2 6.9 8.3L8.8 16.5H11.1L14.7 7H12.6Z" fill="white"/>
-                      <path d="M8.8 8.3C7.3 8.9 5.9 9.9 4.9 10.8L5.1 11.7C6.1 11.4 8.1 10.8 9.5 10.4L8.8 8.3Z" fill="#F7B600"/>
-                    </svg>
-                  </span>
-                  <span class="chip-brand-title">VISA</span>
-                  <span class="chip-check" v-if="selectedCardBrand === 'visa'">✓</span>
-                </button>
-
-                <!-- 2. Mastercard -->
-                <button 
-                  type="button" 
-                  class="brand-chip-btn" 
-                  :class="{ active: selectedCardBrand === 'mastercard' }"
-                  @click="selectCardBrand('mastercard')"
-                  title="ชำระด้วยบัตร Mastercard"
-                >
-                  <span class="card-logo-container">
-                    <svg class="card-brand-svg" viewBox="0 0 36 24" width="28" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect width="36" height="24" rx="3" fill="#222222"/>
-                      <circle cx="13.5" cy="12" r="6.5" fill="#EB001B"/>
-                      <circle cx="22.5" cy="12" r="6.5" fill="#F79E1B"/>
-                      <path d="M18 7.3A6.47 6.47 0 0 0 14.5 12c0 1.8.7 3.5 1.9 4.7A6.47 6.47 0 0 0 21.5 12c0-1.8-.7-3.5-1.9-4.7A6.46 6.46 0 0 0 18 7.3z" fill="#FF5F00"/>
-                    </svg>
-                  </span>
-                  <span class="chip-brand-title">Mastercard</span>
-                  <span class="chip-check" v-if="selectedCardBrand === 'mastercard'">✓</span>
-                </button>
-
-                <!-- 3. JCB -->
-                <button 
-                  type="button" 
-                  class="brand-chip-btn" 
-                  :class="{ active: selectedCardBrand === 'jcb' }"
-                  @click="selectCardBrand('jcb')"
-                  title="ชำระด้วยบัตร JCB"
-                >
-                  <span class="card-logo-container">
-                    <svg class="card-brand-svg" viewBox="0 0 36 24" width="28" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect width="36" height="24" rx="3" fill="#FFFFFF"/>
-                      <rect x="0.5" y="0.5" width="35" height="23" rx="2.5" stroke="#CBD5E1" stroke-width="1"/>
-                      <rect x="4.5" y="4" width="8" height="16" rx="3" fill="#0066B2"/>
-                      <path d="M9.5 6v7.2a2.3 2.3 0 0 1-2.3 2.3H6v-1.6h1a.7.7 0 0 0 .7-.7V6h1.8z" fill="#FFFFFF"/>
-                      <rect x="14" y="4" width="8" height="16" rx="3" fill="#E60012"/>
-                      <path d="M19.8 9.5a2.2 2.2 0 0 0-1.5-.5c-1.1 0-2 .8-2 2.4 0 1.5.9 2.4 2 2.4.6 0 1.1-.2 1.5-.5v1.6c-.5.3-1.1.5-1.8.5-2.1 0-3.6-1.6-3.6-4s1.5-4 3.6-4c.7 0 1.3.2 1.8.5V9.5z" fill="#FFFFFF"/>
-                      <rect x="23.5" y="4" width="8" height="16" rx="3" fill="#008837"/>
-                      <path d="M25.5 6.5h2c1 0 1.7.4 1.7 1.3 0 .5-.3.9-.8 1.1.6.2 1 .7 1 1.3 0 .9-.7 1.5-1.8 1.5h-2.1V6.5zm1.5 2h.4c.3 0 .5-.2.5-.4s-.2-.4-.5-.4h-.4v.8zm0 2.2h.5c.3 0 .6-.2.6-.5s-.3-.5-.6-.5h-.5v1z" fill="#FFFFFF"/>
-                    </svg>
-                  </span>
-                  <span class="chip-brand-title">JCB</span>
-                  <span class="chip-check" v-if="selectedCardBrand === 'jcb'">✓</span>
-                </button>
-
-                <!-- 4. AMEX -->
-                <button 
-                  type="button" 
-                  class="brand-chip-btn" 
-                  :class="{ active: selectedCardBrand === 'amex' }"
-                  @click="selectCardBrand('amex')"
-                  title="ชำระด้วยบัตร American Express"
-                >
-                  <span class="card-logo-container">
-                    <svg class="card-brand-svg" viewBox="0 0 36 24" width="28" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect width="36" height="24" rx="3" fill="#006FCF"/>
-                      <path d="M5.5 15.5l3-7h2.2l3 7h-1.9l-.6-1.5H7.9l-.6 1.5H5.5zm3-3h2.1L9.6 10l-1.1 2.5z" fill="#FFFFFF"/>
-                      <text x="17.5" y="14.8" fill="#FFFFFF" font-family="'Impact', 'Arial Black', sans-serif" font-weight="900" font-size="8" letter-spacing="-0.3">AMEX</text>
-                    </svg>
-                  </span>
-                  <span class="chip-brand-title">AMEX</span>
-                  <span class="chip-check" v-if="selectedCardBrand === 'amex'">✓</span>
-                </button>
-
-                <!-- 5. UnionPay -->
-                <button 
-                  type="button" 
-                  class="brand-chip-btn" 
-                  :class="{ active: selectedCardBrand === 'unionpay' }"
-                  @click="selectCardBrand('unionpay')"
-                  title="ชำระด้วยบัตร UnionPay"
-                >
-                  <span class="card-logo-container">
-                    <svg class="card-brand-svg" viewBox="0 0 36 24" width="28" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect width="36" height="24" rx="3" fill="#FFFFFF"/>
-                      <rect x="0.5" y="0.5" width="35" height="23" rx="2.5" stroke="#CBD5E1" stroke-width="1"/>
-                      <g transform="skewX(-10) translate(3.5, 0)">
-                        <rect x="5.5" y="4.5" width="7" height="15" rx="2" fill="#E21B23"/>
-                        <rect x="13" y="4.5" width="7" height="15" rx="2" fill="#00457C"/>
-                        <rect x="20.5" y="4.5" width="7" height="15" rx="2" fill="#007B5F"/>
-                      </g>
-                      <text x="17.5" y="14.2" text-anchor="middle" fill="#FFFFFF" font-family="Arial, sans-serif" font-weight="bold" font-size="6" letter-spacing="-0.2">银联</text>
-                    </svg>
-                  </span>
-                  <span class="chip-brand-title">UnionPay</span>
-                  <span class="chip-check" v-if="selectedCardBrand === 'unionpay'">✓</span>
-                </button>
+                <span class="card-instruction">ร้านรับเฉพาะบัตรเดบิต ระบบจะตัดเงินผ่าน Stripe หลังกดยืนยันคำสั่งซื้อ</span>
               </div>
             </div>
 
             <div class="card-input-box">
-              <!-- หมายเลขบัตร -->
-              <div class="card-field-group">
-                <label>หมายเลขบัตร (Card number)</label>
-                <div class="card-number-wrapper">
-                  <input 
-                    type="text" 
-                    v-model="cardForm.number" 
-                    @input="onCardNumberInput"
-                    placeholder="•••• •••• •••• ••••" 
-                    maxlength="19"
-                    class="card-styled-input font-mono"
-                  >
-                  <span class="detected-badge" v-if="selectedCardBrand">{{ selectedCardBrand.toUpperCase() }}</span>
-                </div>
-              </div>
-
-              <!-- วันหมดอายุ และ CVC -->
-              <div class="card-row-split">
-                <div class="card-field-group">
-                  <label>วันหมดอายุ (MM / YY)</label>
-                  <input 
-                    type="text" 
-                    v-model="cardForm.expiry" 
-                    @input="onCardExpiryInput"
-                    placeholder="MM / YY (เช่น 12/28)" 
-                    maxlength="5"
-                    class="card-styled-input font-mono"
-                  >
-                </div>
-                <div class="card-field-group">
-                  <label>รหัสความปลอดภัย CVC / CVV</label>
-                  <div class="cvc-wrapper">
-                    <input 
-                      type="password" 
-                      v-model="cardForm.cvc" 
-                      placeholder="123" 
-                      maxlength="4"
-                      class="card-styled-input font-mono"
-                    >
-                    <span class="cvc-hint" title="รหัส 3-4 หลักด้านหลังบัตร">🔒</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- ชื่อบนบัตร -->
               <div class="card-field-group">
                 <label>ชื่อผู้ถือบัตร (Cardholder name)</label>
-                <input 
-                  type="text" 
-                  v-model="cardForm.name" 
-                  placeholder="ระบุชื่อภาษาอังกฤษตามหน้าบัตร" 
+                <input
+                  type="text"
+                  v-model="cardholderName"
+                  placeholder="ชื่อ-นามสกุลภาษาอังกฤษตามบัตร"
                   class="card-styled-input"
                 >
               </div>
 
-              <!-- Billing Address (Country / ZIP) -->
-              <div class="card-row-split">
-                <div class="card-field-group">
-                  <label>ประเทศ / ภูมิภาค (Country or region)</label>
-                  <select v-model="cardForm.country" class="card-styled-input">
-                    <option value="TH">ไทย (Thailand)</option>
-                    <option value="US">United States</option>
-                    <option value="JP">Japan</option>
-                    <option value="SG">Singapore</option>
-                    <option value="MY">Malaysia</option>
-                    <option value="CN">China</option>
-                  </select>
-                </div>
-                <div class="card-field-group">
-                  <label>รหัสไปรษณีย์ (ZIP / Postal code)</label>
-                  <input 
-                    type="text" 
-                    v-model="cardForm.zip" 
-                    placeholder="เช่น 10220" 
-                    maxlength="10"
-                    class="card-styled-input font-mono"
-                  >
-                </div>
+              <div class="card-field-group">
+                <label>หมายเลขบัตร / วันหมดอายุ / CVC</label>
+                <div id="stripe-card-element" class="card-styled-input stripe-card-element"></div>
+                <span v-if="stripeLoadError" class="stripe-error-text">{{ stripeLoadError }}</span>
+                <span v-else-if="cardElementError" class="stripe-error-text">{{ cardElementError }}</span>
               </div>
-
-              <!-- Checkbox บันทึกบัตร -->
-              <label class="save-card-checkbox">
-                <input type="checkbox" v-model="cardForm.saveCard">
-                <span>บันทึกบัตรนี้สำหรับการสั่งอาหารครั้งต่อไป (Save this card)</span>
-              </label>
             </div>
           </div>
 
@@ -689,19 +509,11 @@
       </div>
     </div>
 
-    <!-- Modal จำลองการตัดบัตรและ 3D-Secure / Digital Wallet Authorization -->
+    <!-- Modal แสดงสถานะระหว่างตัดบัตรผ่าน Stripe -->
     <div v-if="isCardProcessingModalOpen" class="card-processing-backdrop">
       <div class="card-processing-card">
         <div class="processing-top-badge">
-          <span v-if="cardProcessingBrand === 'apple_pay'"> Apple Pay</span>
-          <span v-else-if="cardProcessingBrand === 'link'">🟢 Stripe Link</span>
-          <span v-else-if="cardProcessingBrand === 'grabpay'">GrabPay</span>
-          <span v-else-if="cardProcessingBrand === 'wechat'">WeChat Pay</span>
-          <span v-else-if="cardProcessingBrand === 'klarna'">Klarna</span>
-          <span v-else-if="cardProcessingBrand === 'afterpay'">Afterpay</span>
-          <span v-else-if="cardProcessingBrand === 'direct_debit'">Direct Debit</span>
-          <span v-else-if="cardProcessingBrand === 'ideal'">iDEAL / OXXO</span>
-          <span v-else>💳 {{ detectedCardBrand.toUpperCase() }} Card</span>
+          <span>💳 บัตรเดบิต (Stripe)</span>
         </div>
 
         <div class="processing-icon-area">
@@ -726,7 +538,7 @@
         </div>
 
         <div class="processing-footer-badge">
-          <span>🔒 3D-Secure 2.0 • PCI-DSS Certified Bank Gateway</span>
+          <span>🔒 ข้อมูลบัตรส่งตรงไปที่ Stripe ร้านไม่ได้เก็บเลขบัตร</span>
         </div>
       </div>
     </div>
@@ -889,6 +701,11 @@ import CustomerNavbar from './components/CustomerNavbar.vue';
 import { authStore } from './store/authStore';
 import { usePromotionStore } from './store/promotionStore';
 import { showSuccess, showError } from './utils/swal';
+import { isCardPaymentEnabled, loadStripe } from './utils/stripe';
+
+// Stripe instance / card element ไม่ต้องเป็น reactive จึงเก็บไว้นอก data()
+let stripe = null;
+let cardElement = null;
 
 // คำนวณรหัส CRC16 สำหรับ PromptPay EMVCo
 function crc16(data) {
@@ -933,24 +750,19 @@ export default {
       authStore,
       promotionStore: usePromotionStore(),
       isLoggedIn: false,
-      selectedPayment: 'card',
+      selectedPayment: isCardPaymentEnabled ? 'card' : 'qr',
+      isCardPaymentEnabled,
       serverPromptpayNumber: '',
       serverPromptpayName: '',
       serverVatRate: null,
-      selectedCardBrand: 'visa',
-      cardForm: {
-        number: '',
-        expiry: '',
-        cvc: '',
-        name: '',
-        country: 'TH',
-        zip: '',
-        saveCard: false
-      },
+      cardholderName: '',
+      cardElementError: '',
+      stripeLoadError: '',
+      // ออเดอร์ที่สร้างแล้วแต่ตัดบัตรไม่สำเร็จ เก็บไว้ให้ลองจ่ายซ้ำโดยไม่สร้างออเดอร์ใหม่
+      pendingCardOrder: null,
       isCardProcessingModalOpen: false,
       cardProcessingStep: 'authorizing',
       cardProcessingMessage: '',
-      cardProcessingBrand: 'visa',
       userProfile: {
         name: '',
         phone: '',
@@ -1092,7 +904,17 @@ export default {
       return this.serverPromptpayName || adminStore?.storeSettings?.promptpayName || 'ร้านตำครกซิ่ง';
     }
   },
+  watch: {
+    selectedPayment(val) {
+      if (val === 'card') this.mountCardElement();
+      else this.destroyCardElement();
+    }
+  },
+  beforeUnmount() {
+    this.destroyCardElement();
+  },
   async mounted() {
+    if (this.selectedPayment === 'card') this.mountCardElement();
     this.isLoggedIn = !!localStorage.getItem('access_token') || localStorage.getItem('isLoggedIn') === 'true';
     const profileData = localStorage.getItem('userProfile');
     if (profileData) {
@@ -1825,72 +1647,101 @@ async validateAndCheckout() {
       return (num % 1 === 0) ? num.toLocaleString() : num.toFixed(2);
     },
 
-    selectCardBrand(brand) {
-      this.selectedCardBrand = brand;
-    },
-
-    detectCardBrand(number) {
-      const clean = (number || '').replace(/\D/g, '');
-      if (/^4/.test(clean)) return 'visa';
-      if (/^(5[1-5]|2[2-7])/.test(clean)) return 'mastercard';
-      if (/^35/.test(clean)) return 'jcb';
-      if (/^3[47]/.test(clean)) return 'amex';
-      if (/^62/.test(clean)) return 'unionpay';
-      return null;
-    },
-
-    onCardNumberInput(e) {
-      let val = e.target.value.replace(/\D/g, '').substring(0, 16);
-      val = val.replace(/(.{4})/g, '$1 ').trim();
-      this.cardForm.number = val;
-      const detected = this.detectCardBrand(val);
-      if (detected) {
-        this.selectedCardBrand = detected;
+    async mountCardElement() {
+      this.stripeLoadError = '';
+      try {
+        stripe = await loadStripe();
+      } catch (err) {
+        this.stripeLoadError = 'ไม่สามารถโหลดระบบชำระเงินด้วยบัตรได้ กรุณาเลือกวิธีชำระเงินอื่นครับ';
+        return;
       }
+      await this.$nextTick();
+      const mountPoint = document.getElementById('stripe-card-element');
+      if (!mountPoint || this.selectedPayment !== 'card' || cardElement) return;
+
+      cardElement = stripe.elements({ locale: 'th' }).create('card', {
+        hidePostalCode: true,
+        style: {
+          base: { fontFamily: 'Prompt, sans-serif', fontSize: '15px', color: '#334155', '::placeholder': { color: '#94a3b8' } },
+          invalid: { color: '#ef4444' }
+        }
+      });
+      cardElement.on('change', (e) => {
+        this.cardElementError = e.error ? e.error.message : '';
+      });
+      cardElement.mount(mountPoint);
     },
 
-    onCardExpiryInput(e) {
-      let val = e.target.value.replace(/\D/g, '').substring(0, 4);
-      if (val.length >= 3) {
-        val = val.substring(0, 2) + '/' + val.substring(2);
+    destroyCardElement() {
+      if (cardElement) {
+        cardElement.destroy();
+        cardElement = null;
       }
-      this.cardForm.expiry = val;
+      this.cardElementError = '';
     },
 
     async processCardPayment() {
-      const cleanNum = (this.cardForm.number || '').replace(/\D/g, '');
-      if (!cleanNum || cleanNum.length < 14) {
-        alert('กรุณากรอกหมายเลขบัตรเครดิต / เดบิตให้ครบถ้วน (14-16 หลัก) ครับ');
+      if (this.isSubmitting) return;
+      if (!stripe || !cardElement) {
+        await showError('ระบบชำระเงินด้วยบัตรยังไม่พร้อม', this.stripeLoadError || 'กรุณารอสักครู่แล้วลองใหม่ครับ');
         return;
       }
-      if (!this.cardForm.expiry || this.cardForm.expiry.length < 4) {
-        alert('กรุณากรอกวันหมดอายุของบัตร (MM/YY) ครับ');
-        return;
-      }
-      if (!this.cardForm.cvc || this.cardForm.cvc.length < 3) {
-        alert('กรุณากรอกรหัส CVC / CVV หลังบัตรครับ');
-        return;
-      }
-      if (!this.cardForm.name || !this.cardForm.name.trim()) {
-        alert('กรุณากรอกชื่อผู้ถือบัตรภาษาอังกฤษครับ');
+      if (!this.cardholderName.trim()) {
+        alert('กรุณากรอกชื่อผู้ถือบัตรครับ');
         return;
       }
 
-      const brand = (this.selectedCardBrand || 'Card').toUpperCase();
-      this.cardProcessingBrand = this.selectedCardBrand || 'visa';
+      const token = localStorage.getItem('access_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      this.isSubmitting = true;
       this.isCardProcessingModalOpen = true;
       this.cardProcessingStep = 'authorizing';
-      this.cardProcessingMessage = `กำลังเชื่อมต่อระบบความปลอดภัย ${brand} (3D-Secure 2.0)...`;
+      this.cardProcessingMessage = 'กำลังสร้างคำสั่งซื้อ...';
 
-      setTimeout(() => {
+      let order = this.pendingCardOrder;
+      try {
+        if (!order) {
+          order = await this.createOrder();
+          this.pendingCardOrder = order;
+        }
+
+        this.cardProcessingMessage = 'กำลังเชื่อมต่อ Stripe เพื่อยืนยันบัตร...';
+        const intentRes = await axios.post(`${API_BASE}/transactions/stripe/create-intent/${order.order_id}`, {}, { headers });
+        const clientSecret = intentRes.data?.clientSecret;
+        if (!clientSecret) throw new Error('ไม่ได้รับข้อมูลการชำระเงินจากเซิร์ฟเวอร์');
+
+        // Stripe จะเปิดหน้ายืนยัน 3D Secure เองถ้าธนาคารต้องการ
+        const result = await stripe.confirmCardPayment(clientSecret, {
+          payment_method: {
+            card: cardElement,
+            billing_details: { name: this.cardholderName.trim() }
+          }
+        });
+        if (result.error) throw new Error(result.error.message);
+
+        this.cardProcessingMessage = 'กำลังบันทึกผลการชำระเงิน...';
+        await axios.post(`${API_BASE}/transactions/stripe/confirm/${order.order_id}`, {
+          paymentIntentId: result.paymentIntent.id
+        }, { headers });
+
         this.cardProcessingStep = 'success';
-        this.cardProcessingMessage = `ตัดบัตร ${brand} (•••• ${cleanNum.slice(-4)}) เรียบร้อยแล้ว`;
-        setTimeout(() => {
-          this.isCardProcessingModalOpen = false;
-          const label = `Credit Card (${brand} •••• ${cleanNum.slice(-4)})`;
-          this.processOrderCompletion(label);
-        }, 1000);
-      }, 1500);
+        this.cardProcessingMessage = 'ตัดเงินจากบัตรเรียบร้อยแล้ว';
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        this.isCardProcessingModalOpen = false;
+
+        await this.finishOrder(order, 'ชำระเงินด้วยบัตรเรียบร้อย ทางร้านได้รับคำสั่งซื้อแล้วครับ');
+      } catch (error) {
+        console.error('ชำระเงินด้วยบัตรไม่สำเร็จ:', error);
+        this.isCardProcessingModalOpen = false;
+        const rawMsg = error.response?.data?.message || error.message || 'เกิดข้อผิดพลาดในการชำระเงิน';
+        const errMsg = Array.isArray(rawMsg) ? rawMsg.join(', ') : rawMsg;
+        const hint = order
+          ? `<br><span style="color: #64748b; font-size: 0.9rem;">ออเดอร์ #${order.order_id} ยังไม่ถูกตัดเงิน กดยืนยันอีกครั้งเพื่อลองใหม่ หรือเปลี่ยนเป็นวิธีชำระเงินอื่นได้ครับ</span>`
+          : '';
+        await showError('ชำระเงินไม่สำเร็จ', `${errMsg}${hint}`, { isHtml: true });
+      } finally {
+        this.isSubmitting = false;
+      }
     },
 
     async confirmOrder() {
@@ -1932,117 +1783,129 @@ async validateAndCheckout() {
       }
     },
 
+    // สร้างออเดอร์ใน Backend แล้วคืนออเดอร์ที่ได้ (โยน error ถ้า API ไม่ส่งเลขออเดอร์กลับมา)
+    async createOrder() {
+      const token = localStorage.getItem('access_token');
+      let dbMenus = [];
+      try {
+        const menuRes = await axios.get(`${API_BASE}/menus`);
+        dbMenus = menuRes.data || [];
+      } catch (e) {
+        console.warn('ไม่สามารถดึงข้อมูลเมนูเพื่อเทียบรหัสได้:', e);
+      }
+
+      const orderPayload = {
+        order_type: 'DELIVERY',
+        user_id: (this.authStore?.userProfile?.user_id && !isNaN(Number(this.authStore.userProfile.user_id)))
+          ? Number(this.authStore.userProfile.user_id)
+          : undefined,
+        promo_id: this.appliedPromo?.promo_id ? Number(this.appliedPromo.promo_id) : undefined,
+        promo_code: this.appliedPromo?.code || undefined,
+        subtotal: Number(this.subtotal || 0),
+        discount_amount: Number(this.discountAmount || 0),
+        delivery_fee: Number(this.shippingFee || 0),
+        delivery_address: this.userProfile.address || undefined,
+        delivery_phone: this.userProfile.phone || undefined,
+        delivery_lat: this.deliveryLat ? Number(this.deliveryLat) : undefined,
+        delivery_lng: this.deliveryLng ? Number(this.deliveryLng) : undefined,
+        items: this.cartItems.map(item => {
+          const cleanItemName = (item.name || '').trim().toLowerCase();
+          const matched = dbMenus.find(m => {
+            const dbName = (m.name || m.menu_name || '').trim().toLowerCase();
+            return dbName === cleanItemName || dbName.includes(cleanItemName) || cleanItemName.includes(dbName);
+          });
+
+          const realMenuId = matched?.menu_id ?? matched?.id ?? item.id ?? item.menu_id ?? (dbMenus[0]?.menu_id || dbMenus[0]?.id || 10);
+
+          const options = [];
+          const structuredOptions = [];
+
+          if (item.dishType) {
+            options.push(item.dishType);
+            if (matched?.option_groups) {
+              for (const grp of matched.option_groups) {
+                const opt = grp.options?.find(o => o.option_name === item.dishType);
+                if (opt) structuredOptions.push({ option_id: opt.option_id, option_name: opt.option_name, price: Number(opt.price) });
+              }
+            }
+          }
+
+          if (item.spiceLevel) {
+            options.push(item.spiceLevel);
+            if (matched?.option_groups) {
+              for (const grp of matched.option_groups) {
+                const opt = grp.options?.find(o => o.option_name === item.spiceLevel);
+                if (opt) structuredOptions.push({ option_id: opt.option_id, option_name: opt.option_name, price: Number(opt.price) });
+              }
+            }
+          }
+
+          if (item.seafoodChoice) options.push(item.seafoodChoice);
+
+          if (item.addons && item.addons.length > 0) {
+            options.push('ส่วนเสริม: ' + item.addons.map(a => a.name).join(', '));
+            if (matched?.option_groups) {
+              for (const addon of item.addons) {
+                for (const grp of matched.option_groups) {
+                  const opt = grp.options?.find(o => o.option_name === addon.name);
+                  if (opt) structuredOptions.push({ option_id: opt.option_id, option_name: opt.option_name, price: Number(opt.price) });
+                }
+              }
+            }
+          }
+
+          if (item.note) options.push('โน้ต: ' + item.note);
+
+          return {
+            menu_id: Number(realMenuId),
+            quantity: Number(item.qty || item.quantity || 1),
+            notes: options.join(' | '),
+            dish_type: item.dishType || undefined,
+            options: structuredOptions.length > 0 ? structuredOptions : undefined
+          };
+        })
+      };
+
+      if (this.vatAmount > 0) {
+        const taxInfo = `[รวม VAT ${this.vatRate}%: B${this.formatCurrency(this.vatAmount)}]`;
+        if (orderPayload.items.length > 0) {
+          orderPayload.items[0].notes = orderPayload.items[0].notes ? `${orderPayload.items[0].notes} | ${taxInfo}` : taxInfo;
+        }
+      }
+
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const response = await axios.post(`${API_BASE}/orders`, orderPayload, { headers });
+
+      const createdOrder = response.data;
+      if (!createdOrder?.order_id) {
+        throw new Error('ระบบไม่ได้ส่งเลขออเดอร์กลับมา กรุณาตรวจสอบประวัติการสั่งซื้อก่อนสั่งใหม่ หรือติดต่อร้านครับ');
+      }
+
+      // ส่งสัญญาณ WebSocket แจ้งเตือนห้องครัวแบบ Real-time ทันที
+      try {
+        socket.emit('place_order', createdOrder);
+      } catch (socketErr) {
+        console.warn('ไม่สามารถส่งสัญญาณ socket place_order:', socketErr);
+      }
+
+      return createdOrder;
+    },
+
     async processOrderCompletion(customPaymentMethod = null) {
       if (this.isSubmitting) return;
 
       const token = localStorage.getItem('access_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
       this.isSubmitting = true;
 
       try {
-        let dbMenus = [];
-        try {
-          const menuRes = await axios.get(`${API_BASE}/menus`);
-          dbMenus = menuRes.data || [];
-        } catch (e) {
-          console.warn('ไม่สามารถดึงข้อมูลเมนูเพื่อเทียบรหัสได้:', e);
-        }
-
-        const orderPayload = {
-          order_type: 'DELIVERY',
-          user_id: (this.authStore?.userProfile?.user_id && !isNaN(Number(this.authStore.userProfile.user_id)))
-            ? Number(this.authStore.userProfile.user_id)
-            : undefined,
-          promo_id: this.appliedPromo?.promo_id ? Number(this.appliedPromo.promo_id) : undefined,
-          promo_code: this.appliedPromo?.code || undefined,
-          subtotal: Number(this.subtotal || 0),
-          discount_amount: Number(this.discountAmount || 0),
-          delivery_fee: Number(this.shippingFee || 0),
-          delivery_address: this.userProfile.address || undefined,
-          delivery_phone: this.userProfile.phone || undefined,
-          delivery_lat: this.deliveryLat ? Number(this.deliveryLat) : undefined,
-          delivery_lng: this.deliveryLng ? Number(this.deliveryLng) : undefined,
-          items: this.cartItems.map(item => {
-            const cleanItemName = (item.name || '').trim().toLowerCase();
-            const matched = dbMenus.find(m => {
-              const dbName = (m.name || m.menu_name || '').trim().toLowerCase();
-              return dbName === cleanItemName || dbName.includes(cleanItemName) || cleanItemName.includes(dbName);
-            });
-
-            const realMenuId = matched?.menu_id ?? matched?.id ?? item.id ?? item.menu_id ?? (dbMenus[0]?.menu_id || dbMenus[0]?.id || 10);
-
-            const options = [];
-            const structuredOptions = [];
-
-            if (item.dishType) {
-              options.push(item.dishType);
-              if (matched?.option_groups) {
-                for (const grp of matched.option_groups) {
-                  const opt = grp.options?.find(o => o.option_name === item.dishType);
-                  if (opt) structuredOptions.push({ option_id: opt.option_id, option_name: opt.option_name, price: Number(opt.price) });
-                }
-              }
-            }
-
-            if (item.spiceLevel) {
-              options.push(item.spiceLevel);
-              if (matched?.option_groups) {
-                for (const grp of matched.option_groups) {
-                  const opt = grp.options?.find(o => o.option_name === item.spiceLevel);
-                  if (opt) structuredOptions.push({ option_id: opt.option_id, option_name: opt.option_name, price: Number(opt.price) });
-                }
-              }
-            }
-
-            if (item.seafoodChoice) options.push(item.seafoodChoice);
-
-            if (item.addons && item.addons.length > 0) {
-              options.push('ส่วนเสริม: ' + item.addons.map(a => a.name).join(', '));
-              if (matched?.option_groups) {
-                for (const addon of item.addons) {
-                  for (const grp of matched.option_groups) {
-                    const opt = grp.options?.find(o => o.option_name === addon.name);
-                    if (opt) structuredOptions.push({ option_id: opt.option_id, option_name: opt.option_name, price: Number(opt.price) });
-                  }
-                }
-              }
-            }
-
-            if (item.note) options.push('โน้ต: ' + item.note);
-
-            return {
-              menu_id: Number(realMenuId),
-              quantity: Number(item.qty || item.quantity || 1),
-              notes: options.join(' | '),
-              dish_type: item.dishType || undefined,
-              options: structuredOptions.length > 0 ? structuredOptions : undefined
-            };
-          })
-        };
-
-        if (this.vatAmount > 0) {
-          const taxInfo = `[รวม VAT ${this.vatRate}%: B${this.formatCurrency(this.vatAmount)}]`;
-          if (orderPayload.items.length > 0) {
-            orderPayload.items[0].notes = orderPayload.items[0].notes ? `${orderPayload.items[0].notes} | ${taxInfo}` : taxInfo;
-          }
-        }
-
-        const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        const response = await axios.post(`${API_BASE}/orders`, orderPayload, { headers });
-
-        const createdOrder = response.data;
-        const orderId = createdOrder?.order_id || createdOrder?.id || ('TRX-' + Math.floor(1000 + Math.random() * 9000));
-
-        // ส่งสัญญาณ WebSocket แจ้งเตือนห้องครัวแบบ Real-time ทันที
-        try {
-          socket.emit('place_order', createdOrder);
-        } catch (socketErr) {
-          console.warn('ไม่สามารถส่งสัญญาณ socket place_order:', socketErr);
-        }
+        // ถ้าเคยสร้างออเดอร์ไว้ตอนจ่ายบัตรไม่สำเร็จ ให้ใช้ออเดอร์เดิม ไม่สร้างซ้ำ
+        const createdOrder = this.pendingCardOrder || await this.createOrder();
 
         // บันทึกข้อมูล Transaction ลงในฐานข้อมูลจริง
         const isPromptPay = this.selectedPayment === 'qr';
         let promptPayNotified = false;
-        if (createdOrder?.order_id && isPromptPay) {
+        if (isPromptPay) {
           // PromptPay: แจ้งโอนแล้ว -> สถานะ "รอร้านตรวจสอบยอด" (แอดมินเป็นคนยืนยันว่าเงินเข้าจริง)
           try {
             await axios.post(`${API_BASE}/transactions/promptpay/notify/${createdOrder.order_id}`, {}, { headers });
@@ -2050,72 +1913,70 @@ async validateAndCheckout() {
           } catch (txnErr) {
             console.warn('แจ้งโอนพร้อมเพย์ไม่สำเร็จ:', txnErr);
           }
-        } else if (createdOrder?.order_id) {
+        } else {
           try {
-            const paymentLabel = customPaymentMethod || (this.selectedPayment === 'qr' ? 'PromptPay' : (this.selectedPayment === 'card' ? 'Credit Card' : 'Cash'));
-            const paymentStatus = (this.selectedPayment === 'cash') ? 'PENDING' : 'COMPLETED';
-
+            // เงินสด: บันทึกเป็นรอชำระ (เก็บเงินปลายทาง)
             await axios.post(`${API_BASE}/transactions`, {
               order_id: createdOrder.order_id,
               amount: Number(this.total),
-              payment_method: paymentLabel,
-              payment_status: paymentStatus
-            });
+              payment_method: customPaymentMethod || 'Cash',
+              payment_status: 'PENDING'
+            }, { headers });
           } catch (txnErr) {
             console.warn('บันทึก transaction ไม่สำเร็จ:', txnErr);
           }
         }
-
-        try {
-          const gpsPayload = {
-            lat: this.deliveryLat,
-            lng: this.deliveryLng,
-            address: this.userProfile.address,
-            name: this.userProfile.name,
-            phone: this.userProfile.phone,
-            order_id: createdOrder?.order_id
-          };
-          localStorage.setItem('latest_order_gps', JSON.stringify(gpsPayload));
-          localStorage.setItem('latest_delivery_gps', JSON.stringify(gpsPayload));
-          this.promotionStore.clearSelectedCoupon();
-        } catch (e) {}
 
         const successNote = isPromptPay
           ? (promptPayNotified
               ? 'แจ้งโอนเงินเรียบร้อย ทางร้านกำลังตรวจสอบยอดเงินเข้าบัญชีครับ'
               : 'ได้รับออเดอร์แล้ว แต่แจ้งโอนไม่สำเร็จ กรุณาแจ้งร้านพร้อมเลขออเดอร์นี้ครับ')
           : 'ทางร้านได้รับคำสั่งซื้อเรียบร้อยแล้วครับ';
-        await showSuccess(
-          'สั่งซื้อสำเร็จ!',
-          `เลขออเดอร์: <b style="color: #2e7d32; font-size: 1.15rem;">#${orderId}</b><br><span style="color: #64748b; font-size: 0.9rem;">${successNote}</span>`,
-          {
-            confirmButtonText: 'ไปหน้าติดตามออเดอร์',
-            timer: 2500,
-            showConfirmButton: true
-          }
-        );
-
-        sessionStorage.removeItem('cartData');
-        localStorage.removeItem('cartData');
-        sessionStorage.removeItem('currentOrder');
-        localStorage.removeItem('orderHistoryList');
-        if (createdOrder?.order_id) {
-          sessionStorage.setItem('active_tracking_order_id', String(createdOrder.order_id));
-        }
-        this.cartItems = [];
-
-        if (createdOrder?.order_id) {
-          this.$router.push({ path: '/tracking', query: { orderId: String(createdOrder.order_id) } });
-        } else {
-          this.$router.push('/tracking');
-        }
+        await this.finishOrder(createdOrder, successNote);
       } catch (error) {
         console.error('บันทึกคำสั่งซื้อไม่สำเร็จ:', error);
-        const errMsg = error.response?.data?.message || 'เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ';
+        const errMsg = error.response?.data?.message || error.message || 'เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ';
         await showError('ไม่สามารถสั่งซื้อได้', Array.isArray(errMsg) ? errMsg.join(', ') : errMsg);
       } finally {
         this.isSubmitting = false;
       }
+    },
+
+    // ล้างตะกร้า แจ้งเลขออเดอร์ และพาไปหน้าติดตามออเดอร์
+    async finishOrder(createdOrder, successNote) {
+      this.pendingCardOrder = null;
+      try {
+        const gpsPayload = {
+          lat: this.deliveryLat,
+          lng: this.deliveryLng,
+          address: this.userProfile.address,
+          name: this.userProfile.name,
+          phone: this.userProfile.phone,
+          order_id: createdOrder.order_id
+        };
+        localStorage.setItem('latest_order_gps', JSON.stringify(gpsPayload));
+        localStorage.setItem('latest_delivery_gps', JSON.stringify(gpsPayload));
+        this.promotionStore.clearSelectedCoupon();
+      } catch (e) {}
+
+      await showSuccess(
+        'สั่งซื้อสำเร็จ!',
+        `เลขออเดอร์: <b style="color: #2e7d32; font-size: 1.15rem;">#${createdOrder.order_id}</b><br><span style="color: #64748b; font-size: 0.9rem;">${successNote}</span>`,
+        {
+          confirmButtonText: 'ไปหน้าติดตามออเดอร์',
+          timer: 2500,
+          showConfirmButton: true
+        }
+      );
+
+      sessionStorage.removeItem('cartData');
+      localStorage.removeItem('cartData');
+      sessionStorage.removeItem('currentOrder');
+      localStorage.removeItem('orderHistoryList');
+      sessionStorage.setItem('active_tracking_order_id', String(createdOrder.order_id));
+      this.cartItems = [];
+
+      this.$router.push({ path: '/tracking', query: { orderId: String(createdOrder.order_id) } });
     }
   }
 }
@@ -2466,6 +2327,19 @@ async validateAndCheckout() {
 .card-styled-input:focus {
   border-color: #557c61;
   box-shadow: 0 0 0 3px rgba(85, 124, 97, 0.12);
+}
+.stripe-card-element.StripeElement--focus {
+  border-color: #557c61;
+  box-shadow: 0 0 0 3px rgba(85, 124, 97, 0.12);
+}
+.stripe-card-element.StripeElement--invalid {
+  border-color: #ef4444;
+}
+.stripe-error-text {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #ef4444;
 }
 .card-number-wrapper, .cvc-wrapper {
   position: relative;
