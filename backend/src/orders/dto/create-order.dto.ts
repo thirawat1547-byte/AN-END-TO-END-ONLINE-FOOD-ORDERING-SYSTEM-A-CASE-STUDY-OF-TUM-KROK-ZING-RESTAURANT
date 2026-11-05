@@ -3,6 +3,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -81,11 +82,12 @@ export class CreateOrderDto {
 
   @ApiPropertyOptional({
     example: 'DINE_IN',
-    enum: ['DINE_IN', 'TAKEAWAY', 'DELIVERY'],
-    description: 'ประเภทการสั่งซื้อ',
+    enum: ['DINE_IN', 'DELIVERY'],
+    description: 'ประเภทการสั่งซื้อ (ร้านไม่มีแบบสั่งกลับบ้าน สั่งออนไลน์ = DELIVERY)',
     default: 'DINE_IN',
   })
   @IsString()
+  @IsIn(['DINE_IN', 'DELIVERY'], { message: 'order_type ต้องเป็น DINE_IN หรือ DELIVERY' })
   @IsOptional()
   order_type?: string;
 

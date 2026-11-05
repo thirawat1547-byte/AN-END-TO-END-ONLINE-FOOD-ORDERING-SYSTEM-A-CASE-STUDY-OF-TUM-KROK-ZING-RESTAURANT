@@ -126,7 +126,7 @@ export class TransactionsService implements OnModuleInit, OnModuleDestroy {
       //    - ถ้าครัวกำลังปรุง (COOKING), ปรุงเสร็จแล้ว (READY) หรือกำลังนำส่ง (IN_DELIVERY) ให้คงสถานะเดิม
       //    - ถ้าจัดส่งสำเร็จแล้ว (DELIVERED) ให้ปรับเป็น COMPLETED
       // - หากเป็นออเดอร์ทานที่ร้าน (มี table_id): ปรับเป็น PAID และคืนโต๊ะว่างเมื่อปิดบิลหมด
-      // - กรณีอื่นๆ (เช่น ซื้อกลับบ้านที่รับของเรียบร้อย): ปรับเป็น COMPLETED
+      // - กรณีอื่นๆ (เช่น ออเดอร์ที่ปิดงานเรียบร้อย): ปรับเป็น COMPLETED
       let nextStatus = order.status;
 
       if (finalPaymentStatus === 'COMPLETED') {
@@ -768,7 +768,7 @@ export class TransactionsService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ==========================================================
-  // ยกเลิกออเดอร์เดลิเวอรี/สั่งกลับบ้านที่สร้างรายการจ่าย Stripe แล้วไม่จ่ายภายใน 15 นาที
+  // ยกเลิกออเดอร์เดลิเวอรีที่สร้างรายการจ่าย Stripe แล้วไม่จ่ายภายใน 15 นาที
   // (ไม่แตะออเดอร์ที่โต๊ะ เงินสด หรือพร้อมเพย์แบบแอดมินตรวจสลิป)
   // ==========================================================
   private async cancelExpiredStripeOrders() {

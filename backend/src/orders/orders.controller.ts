@@ -67,7 +67,7 @@ export class OrdersController {
   @ApiOperation({ summary: 'ดูรายการคำสั่งซื้อทั้งหมด (ADMIN / STAFF / RIDER)' })
   @ApiQuery({ name: 'status', required: false, description: 'กรองตามสถานะ (PENDING, COOKING, READY, IN_DELIVERY, DELIVERED, COMPLETED)' })
   @ApiQuery({ name: 'tableId', required: false, type: Number, description: 'กรองตามหมายเลขโต๊ะ' })
-  @ApiQuery({ name: 'orderType', required: false, description: 'กรองตามประเภท (DELIVERY, DINE_IN, TAKEAWAY)' })
+  @ApiQuery({ name: 'orderType', required: false, description: 'กรองตามประเภท (DELIVERY, DINE_IN)' })
   @ApiQuery({ name: 'date', required: false, description: 'กรองตามวันที่ (YYYY-MM-DD หรือ today)' })
   findAll(
     @Query('status') status?: string,

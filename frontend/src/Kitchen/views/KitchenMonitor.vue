@@ -188,7 +188,8 @@ const formatOrder = (order) => {
 
   return {
     id: order.order_id,
-    table: order.table?.table_number ? `โต๊ะ ${order.table.table_number}` : (order.order_type === 'DELIVERY' ? '🛵 เดลิเวอรี' : '🥡 สั่งกลับบ้าน'),
+    // ไม่มีโต๊ะ = สั่งผ่านเว็บออนไลน์ ถือเป็นเดลิเวอรีทุกกรณี
+    table: order.table?.table_number ? `โต๊ะ ${order.table.table_number}` : '🛵 เดลิเวอรี',
     customerName,
     orderType: order.order_type,
     time: `รอ ${diffMins} นาที`,

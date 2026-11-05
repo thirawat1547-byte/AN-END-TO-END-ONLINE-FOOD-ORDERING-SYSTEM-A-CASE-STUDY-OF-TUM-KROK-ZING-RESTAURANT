@@ -118,7 +118,7 @@ export class ActiveOrderResponseDto {
   @ApiPropertyOptional({ example: 4, description: 'รหัสลูกค้าผู้สั่ง' })
   user_id?: number | null;
 
-  @ApiProperty({ example: 'DELIVERY', description: 'ประเภทคำสั่งซื้อ (DELIVERY / DINE_IN / TAKEAWAY)' })
+  @ApiProperty({ example: 'DELIVERY', description: 'ประเภทคำสั่งซื้อ (DELIVERY / DINE_IN)' })
   order_type: string;
 
   @ApiProperty({ example: 'IN_DELIVERY', description: 'สถานะคำสั่งซื้อ (PENDING, PAID, COOKING, READY, IN_DELIVERY, COMPLETED)' })
