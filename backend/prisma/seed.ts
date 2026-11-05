@@ -797,7 +797,11 @@ async function main() {
         delivery_fee_per_km: 10.00,
         max_delivery_km: 15.00,
         min_order_delivery: 100.00,
-        base_rider_fee: 40.00,
+        base_rider_fee: 15.00,
+        rider_fee_step_km: 2.00,
+        rider_fee_per_step: 5.00,
+        fuel_tank_liters: 8.10,
+        fuel_daily_amount: 300.00,
         vat_rate: 7.00,
       },
     });
@@ -810,7 +814,10 @@ async function main() {
         delivery_fee_per_km: 10.00,
         max_delivery_km: 15.00,
         min_order_delivery: 100.00,
-        base_rider_fee: 40.00,
+        // ค่ารอบไรเดอร์สูตรใหม่: ฿15 + ฿5 ทุก ๆ 2 กม.
+        base_rider_fee: 15.00,
+        rider_fee_step_km: 2.00,
+        rider_fee_per_step: 5.00,
       },
     });
     console.log('✅ อัปเดตการตั้งค่าค่าจัดส่งและค่ารอบไรเดอร์เรียบร้อยแล้ว (Store Settings)');
@@ -912,6 +919,32 @@ async function main() {
     }
   }
   console.log(`✅ บันทึกกลุ่มตัวเลือกและท็อปปิ้งพร้อมราคาให้ ${seededOptionGroupsCount} เมนูเรียบร้อยแล้ว`);
+
+  // 10. เติมข้อมูลให้คอลัมน์ใหม่ของรายการเก่า (รันซ้ำได้ทุก deploy ไม่ทับข้อมูลที่ตั้งค่าแล้ว)
+  // 10.1 รายการจ่ายเงินที่สำเร็จแล้วแต่ยังไม่มีเวลาจ่าย → ใช้เวลาสร้างออเดอร์แทน
+  const backfilledPaidAt = await prisma.$executeRaw`
+    UPDATE TRANSACTIONS t
+    JOIN ORDERS o ON o.order_id = t.order_id
+    SET t.paid_at = o.created_at, t.created_at = o.created_at
+    WHERE t.paid_at IS NULL AND UPPER(t.payment_status) = 'COMPLETED'
+  `;
+  // 10.2 งานส่งเงินสดที่ส่งเสร็จก่อนมีระบบนำส่งเงิน → ถือว่านำส่งร้านแล้ว (ไม่ให้ขึ้นยอดค้างย้อนหลัง)
+  const backfilledCash = await prisma.$executeRaw`
+    UPDATE DELIVERIES d
+    JOIN (
+      SELECT order_id, MAX(amount) AS amount
+      FROM TRANSACTIONS
+      WHERE UPPER(payment_method) LIKE '%CASH%'
+      GROUP BY order_id
+    ) t ON t.order_id = d.order_id
+    SET d.cash_amount = t.amount,
+        d.cash_status = 'CONFIRMED',
+        d.cash_confirmed_at = d.delivered_at
+    WHERE d.cash_status = 'NONE'
+      AND d.delivery_status = 'DELIVERED'
+      AND d.delivered_at < '2026-11-06'
+  `;
+  console.log(`✅ เติมเวลาจ่ายเงินย้อนหลัง ${backfilledPaidAt} รายการ, ปิดยอดเงินสดไรเดอร์ย้อนหลัง ${backfilledCash} งาน`);
 
   console.log('🎉 Seeding ข้อมูลพื้นฐานเสร็จสิ้นสมบูรณ์!');
 }

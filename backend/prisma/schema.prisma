@@ -10,17 +10,21 @@ datasource db {
 }
 
 model User {
-  user_id      Int      @id @default(autoincrement())
-  username     String   @unique @db.VarChar(100)
-  password     String   @db.VarChar(255)
-  email        String?  @db.VarChar(150)
-  phone_number String?  @db.VarChar(15)
-  address      String?  @db.VarChar(255)
-  avatar_url   String?  @db.VarChar(1000)
-  role         String   @default("Customer") @db.VarChar(20)
+  user_id           Int       @id @default(autoincrement())
+  username          String    @unique @db.VarChar(100)
+  password          String    @db.VarChar(255)
+  email             String?   @db.VarChar(150)
+  phone_number      String?   @db.VarChar(15)
+  address           String?   @db.VarChar(255)
+  avatar_url        String?   @db.VarChar(1000)
+  role              String    @default("Customer") @db.VarChar(20)
+  phone_verified_at DateTime? // เวลาที่ยืนยัน OTP เบอร์โทรสำเร็จ (ตอนสมัคร)
 
-  orders     Order[]
-  deliveries Delivery[]
+  orders                    Order[]
+  deliveries                Delivery[]           @relation("RiderDeliveries")
+  cash_confirmed_deliveries Delivery[]           @relation("CashConfirmedBy")
+  ingredient_purchases      IngredientPurchase[]
+  fuel_logs                 FuelLog[]
 
   @@map("USERS")
 }
@@ -81,29 +85,29 @@ model Menu {
 }
 
 model MenuOptionGroup {
-  group_id    Int          @id @default(autoincrement())
+  group_id    Int     @id @default(autoincrement())
   menu_id     Int
-  group_name  String       @db.VarChar(100)
-  is_required Boolean      @default(false)
-  min_select  Int          @default(0)
-  max_select  Int          @default(1)
+  group_name  String  @db.VarChar(100)
+  is_required Boolean @default(false)
+  min_select  Int     @default(0)
+  max_select  Int     @default(1)
 
-  menu        Menu         @relation(fields: [menu_id], references: [menu_id], onDelete: Cascade)
-  options     MenuOption[]
+  menu    Menu         @relation(fields: [menu_id], references: [menu_id], onDelete: Cascade)
+  options MenuOption[]
 
   @@index([menu_id])
   @@map("MENU_OPTION_GROUPS")
 }
 
 model MenuOption {
-  option_id        Int               @id @default(autoincrement())
+  option_id        Int     @id @default(autoincrement())
   group_id         Int
-  option_name      String            @db.VarChar(100)
-  additional_price Decimal           @default(0.00) @db.Decimal(10, 2)
-  is_available     Boolean           @default(true)
+  option_name      String  @db.VarChar(100)
+  additional_price Decimal @default(0.00) @db.Decimal(10, 2)
+  is_available     Boolean @default(true)
 
-  group            MenuOptionGroup   @relation(fields: [group_id], references: [group_id], onDelete: Cascade)
-  selected_items   OrderItemOption[]
+  group          MenuOptionGroup   @relation(fields: [group_id], references: [group_id], onDelete: Cascade)
+  selected_items OrderItemOption[]
 
   @@index([group_id])
   @@map("MENU_OPTIONS")
@@ -133,26 +137,27 @@ model MenuAllergen {
 }
 
 model Order {
-  order_id         Int           @id @default(autoincrement())
-  user_id          Int?
-  table_id         Int?
-  promo_id         Int?
-  order_type       String        @db.VarChar(20)
-  status           String        @db.VarChar(30)
-  subtotal         Decimal       @default(0.00) @db.Decimal(10, 2)
-  discount_amount  Decimal       @default(0.00) @db.Decimal(10, 2)
-  delivery_fee     Decimal       @default(0.00) @db.Decimal(10, 2)
-  total_price      Decimal       @db.Decimal(10, 2)
-  delivery_address String?       @db.VarChar(255)
-  delivery_phone   String?       @db.VarChar(20)
-  order_notes      String?       @db.Text
-  rating           Int?          @db.TinyInt
-  review_comment   String?       @db.Text
-  reviewed_at      DateTime?
+  order_id           Int       @id @default(autoincrement())
+  user_id            Int?
+  table_id           Int?
+  promo_id           Int?
+  order_type         String    @db.VarChar(20)
+  status             String    @db.VarChar(30)
+  subtotal           Decimal   @default(0.00) @db.Decimal(10, 2)
+  discount_amount    Decimal   @default(0.00) @db.Decimal(10, 2)
+  delivery_fee       Decimal   @default(0.00) @db.Decimal(10, 2)
+  total_price        Decimal   @db.Decimal(10, 2)
+  delivery_address   String?   @db.VarChar(255)
+  delivery_landmark  String?   @db.VarChar(255) // จุดสังเกต เช่น ตึกสีฟ้า หน้าเซเว่น
+  delivery_phone     String?   @db.VarChar(20)
+  order_notes        String?   @db.Text
+  rating             Int?      @db.TinyInt
+  review_comment     String?   @db.Text
+  reviewed_at        DateTime?
   cooking_started_at DateTime? // เวลาที่ครัวกดเริ่มทำ (สถานะ COOKING ครั้งแรก)
   cooked_at          DateTime? // เวลาที่ครัวทำเสร็จ (สถานะ READY/SERVED ครั้งแรก)
-  created_at       DateTime      @default(now())
-  updated_at       DateTime      @default(now()) @updatedAt
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @default(now()) @updatedAt
 
   user        User?         @relation(fields: [user_id], references: [user_id])
   table       Table?        @relation(fields: [table_id], references: [table_id])
@@ -185,14 +190,14 @@ model OrderItem {
 }
 
 model OrderItemOption {
-  item_option_id Int         @id @default(autoincrement())
+  item_option_id Int     @id @default(autoincrement())
   order_item_id  Int
   option_id      Int?
-  option_name    String      @db.VarChar(100)
-  price          Decimal     @default(0.00) @db.Decimal(10, 2)
+  option_name    String  @db.VarChar(100)
+  price          Decimal @default(0.00) @db.Decimal(10, 2)
 
-  order_item     OrderItem   @relation(fields: [order_item_id], references: [order_item_id], onDelete: Cascade)
-  option         MenuOption? @relation(fields: [option_id], references: [option_id], onDelete: SetNull)
+  order_item OrderItem   @relation(fields: [order_item_id], references: [order_item_id], onDelete: Cascade)
+  option     MenuOption? @relation(fields: [option_id], references: [option_id], onDelete: SetNull)
 
   @@index([order_item_id])
   @@index([option_id])
@@ -200,55 +205,128 @@ model OrderItemOption {
 }
 
 model Delivery {
-  delivery_id      Int       @id @default(autoincrement())
-  order_id         Int       @unique
-  rider_id         Int?
-  delivery_status  String    @default("WAITING_RIDER") @db.VarChar(30)
-  customer_name    String    @db.VarChar(100)
-  customer_phone   String    @db.VarChar(20)
-  delivery_address String    @db.VarChar(255)
-  customer_lat     Decimal?  @db.Decimal(10, 7)
-  customer_lng     Decimal?  @db.Decimal(10, 7)
-  distance_km      Decimal   @default(0.00) @db.Decimal(5, 2)
-  rider_fee        Decimal   @default(40.00) @db.Decimal(10, 2)
-  proof_image_url  String?   @db.VarChar(255)
-  assigned_at      DateTime?
-  picked_up_at     DateTime?
-  delivered_at     DateTime?
+  delivery_id       Int       @id @default(autoincrement())
+  order_id          Int       @unique
+  rider_id          Int?
+  delivery_status   String    @default("WAITING_RIDER") @db.VarChar(30)
+  customer_name     String    @db.VarChar(100)
+  customer_phone    String    @db.VarChar(20)
+  delivery_address  String    @db.VarChar(255)
+  delivery_landmark String?   @db.VarChar(255) // จุดสังเกต (คัดลอกจาก ORDERS ให้ไรเดอร์เห็น)
+  customer_lat      Decimal?  @db.Decimal(10, 7)
+  customer_lng      Decimal?  @db.Decimal(10, 7)
+  distance_km       Decimal   @default(0.00) @db.Decimal(5, 2)
+  rider_fee         Decimal   @default(15.00) @db.Decimal(10, 2)
+  proof_image_url   String?   @db.VarChar(255)
+  assigned_at       DateTime?
+  picked_up_at      DateTime?
+  delivered_at      DateTime?
 
-  order            Order     @relation(fields: [order_id], references: [order_id], onDelete: Cascade)
-  rider            User?     @relation(fields: [rider_id], references: [user_id], onDelete: SetNull)
+  // เงินสดที่ไรเดอร์เก็บจากลูกค้า: NONE (ไม่ใช่เงินสด) → PENDING (ค้างนำส่ง)
+  // → SUBMITTED (ไรเดอร์กดนำส่งแล้ว รอแอดมิน) → CONFIRMED (แอดมินยืนยันรับเงิน)
+  cash_amount       Decimal   @default(0.00) @db.Decimal(10, 2)
+  cash_status       String    @default("NONE") @db.VarChar(20)
+  cash_submitted_at DateTime?
+  cash_confirmed_at DateTime?
+  cash_confirmed_by Int?
+
+  order          Order @relation(fields: [order_id], references: [order_id], onDelete: Cascade)
+  rider          User? @relation("RiderDeliveries", fields: [rider_id], references: [user_id], onDelete: SetNull)
+  cash_confirmer User? @relation("CashConfirmedBy", fields: [cash_confirmed_by], references: [user_id], onDelete: SetNull)
 
   @@index([rider_id])
   @@index([delivery_status])
+  @@index([cash_status])
+  @@index([cash_confirmed_by])
   @@map("DELIVERIES")
 }
 
 model Transaction {
-  transaction_id Int     @id @default(autoincrement())
-  order_id       Int
-  amount         Decimal @db.Decimal(10, 2)
-  payment_method String  @db.VarChar(50)
-  payment_status String  @db.VarChar(20)
+  transaction_id           Int       @id @default(autoincrement())
+  order_id                 Int
+  amount                   Decimal   @db.Decimal(10, 2)
+  payment_method           String    @db.VarChar(50)
+  payment_status           String    @db.VarChar(20)
+  stripe_payment_intent_id String?   @db.VarChar(255) // ใช้จับคู่ตอน Stripe webhook แจ้งผล
+  stripe_fee               Decimal   @default(0.00) @db.Decimal(10, 2) // ค่าธรรมเนียม Stripe จริง (บาท)
+  created_at               DateTime  @default(now())
+  paid_at                  DateTime? // เวลาที่สถานะเป็น COMPLETED
 
   order Order @relation(fields: [order_id], references: [order_id])
 
   @@index([order_id])
   @@index([payment_status])
+  @@index([paid_at])
+  @@index([stripe_payment_intent_id])
   @@map("TRANSACTIONS")
 }
 
 model Ingredient {
   ingredient_id Int      @id @default(autoincrement())
   name          String   @map("ingredient_name") @db.VarChar(100)
-  quantity      Decimal  @map("quantity_in_stock") @default(0) @db.Decimal(10, 2)
+  quantity      Decimal  @default(0) @map("quantity_in_stock") @db.Decimal(10, 2)
   unit          String   @db.VarChar(50)
-  min_quantity  Decimal  @map("reorder_level") @default(5) @db.Decimal(10, 2)
-  updated_at    DateTime @map("last_updated") @default(now()) @updatedAt
+  min_quantity  Decimal  @default(5) @map("reorder_level") @db.Decimal(10, 2)
+  updated_at    DateTime @default(now()) @updatedAt @map("last_updated")
 
   menu_ingredients MenuIngredient[]
+  purchases        IngredientPurchase[]
 
   @@map("INGREDIENTS")
+}
+
+// ประวัติการสั่งซื้อวัตถุดิบเพิ่ม (รายจ่ายวัตถุดิบในแดชบอร์ด) — กดสั่งแล้วสต็อกบวกทันที
+// เก็บชื่อวัตถุดิบไว้ด้วย เพื่อให้ประวัติรายจ่ายยังอยู่แม้ลบวัตถุดิบออกจากคลัง
+model IngredientPurchase {
+  purchase_id     Int      @id @default(autoincrement())
+  ingredient_id   Int?
+  ingredient_name String   @db.VarChar(100)
+  quantity        Decimal  @db.Decimal(10, 2)
+  unit            String   @db.VarChar(50)
+  total_price     Decimal  @db.Decimal(10, 2) // ราคาต่อหน่วย = total_price ÷ quantity
+  purchased_by    Int?
+  purchased_at    DateTime @default(now())
+
+  ingredient Ingredient? @relation(fields: [ingredient_id], references: [ingredient_id], onDelete: SetNull)
+  purchaser  User?       @relation(fields: [purchased_by], references: [user_id], onDelete: SetNull)
+
+  @@index([ingredient_id])
+  @@index([purchased_by])
+  @@index([purchased_at])
+  @@map("INGREDIENT_PURCHASES")
+}
+
+// ค่าน้ำมันรถส่งของร้าน วันละ 1 แถว — amount คิด 300 บาท/วันตายตัว
+// liters = min(amount ÷ price_per_liter, fuel_tank_liters) ใช้แสดงผลเท่านั้น
+model FuelLog {
+  fuel_log_id     Int      @id @default(autoincrement())
+  log_date        DateTime @unique @db.Date
+  price_per_liter Decimal  @db.Decimal(6, 2)
+  liters          Decimal  @db.Decimal(5, 2)
+  amount          Decimal  @default(300.00) @db.Decimal(10, 2)
+  recorded_by     Int?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now()) @updatedAt
+
+  recorder User? @relation(fields: [recorded_by], references: [user_id], onDelete: SetNull)
+
+  @@index([recorded_by])
+  @@map("FUEL_LOGS")
+}
+
+// รหัส OTP ยืนยันเบอร์โทรตอนสมัคร (เก็บแบบ hash ไม่เก็บรหัสจริง)
+model PhoneOtp {
+  otp_id      Int       @id @default(autoincrement())
+  phone       String    @db.VarChar(15)
+  otp_hash    String    @db.VarChar(255)
+  purpose     String    @default("REGISTER") @db.VarChar(20)
+  expires_at  DateTime
+  attempts    Int       @default(0)
+  verified_at DateTime?
+  created_at  DateTime  @default(now())
+
+  @@index([phone, purpose])
+  @@map("PHONE_OTPS")
 }
 
 model MenuIngredient {
@@ -373,12 +451,19 @@ model StoreSetting {
   delivery_fee_per_km Decimal  @default(10.00) @db.Decimal(10, 2)
   max_delivery_km     Decimal  @default(15.00) @db.Decimal(5, 2)
   min_order_delivery  Decimal  @default(100.00) @db.Decimal(10, 2)
-  base_rider_fee      Decimal  @default(40.00) @db.Decimal(10, 2)
+  // ค่ารอบไรเดอร์ = base_rider_fee + rider_fee_per_step × floor(กม. ÷ rider_fee_step_km)
+  base_rider_fee      Decimal  @default(15.00) @db.Decimal(10, 2)
+  rider_fee_step_km   Decimal  @default(2.00) @db.Decimal(5, 2)
+  rider_fee_per_step  Decimal  @default(5.00) @db.Decimal(10, 2)
+  // สูตรเดิม (เลิกใช้หลัง BE เปลี่ยนสูตร) — ยังไม่ลบคอลัมน์ เพราะ db push --accept-data-loss จะลบข้อมูลทันที
   rider_free_km       Decimal  @default(3.00) @db.Decimal(5, 2)
   rider_fee_per_km    Decimal  @default(7.00) @db.Decimal(10, 2)
+  // ค่าน้ำมันรถส่งของร้าน
+  fuel_tank_liters    Decimal  @default(8.10) @db.Decimal(5, 2)
+  fuel_daily_amount   Decimal  @default(300.00) @db.Decimal(10, 2)
   store_lat           Decimal? @db.Decimal(10, 7)
   store_lng           Decimal? @db.Decimal(10, 7)
-  vat_rate           Decimal? @default(7.00) @db.Decimal(5, 2)
+  vat_rate            Decimal? @default(7.00) @db.Decimal(5, 2)
   updated_at          DateTime @default(now()) @updatedAt
 
   @@map("STORE_SETTINGS")
