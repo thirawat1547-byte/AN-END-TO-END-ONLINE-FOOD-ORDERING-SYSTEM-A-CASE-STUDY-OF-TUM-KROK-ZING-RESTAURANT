@@ -69,7 +69,7 @@
               <div class="dot"></div>
               <div class="content" :class="{ 'text-muted': currentStep < 3 }">
                 <h4>กำลังจัดส่ง</h4>
-                <p v-if="currentStep >= 3">กำลังมุ่งหน้าไปส่งที่: {{ userProfile.address }}</p>
+                <p v-if="currentStep >= 3">กำลังมุ่งหน้าไปส่งที่: {{ currentOrder.address || userProfile.address }}</p>
               </div>
             </div>
 
@@ -218,6 +218,7 @@
             <div class="eta-text-group">
               <span class="eta-label">เวลาที่คาดว่าจะมาถึง</span>
               <span class="eta-time">{{ estimatedTimeText }}</span>
+              <span v-if="estimatedArrivalText" class="eta-label">{{ estimatedArrivalText }}</span>
             </div>
           </div>
 
@@ -225,16 +226,16 @@
             <div class="price-row">
               <span>จัดส่งถึง:</span>
               <span style="text-align:right; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                {{ userProfile.name }}
+                {{ currentOrder.recipientName || '-' }}
               </span>
             </div>
             <div class="price-row">
               <span>เบอร์ติดต่อ:</span>
-              <span>{{ userProfile.phone }}</span>
+              <span>{{ currentOrder.recipientPhone || '-' }}</span>
             </div>
             <div class="price-row">
               <span>ยอดชำระ:</span>
-              <span style="font-weight: 700; color: #557c61;">B{{ currentOrder.total }}</span>
+              <span style="font-weight: 700; color: #557c61;">฿{{ baht(currentOrder.total) }}</span>
             </div>
           </div>
 
@@ -280,7 +281,7 @@
           <div class="r-item" v-for="(item, index) in currentOrder.items" :key="index">
             <div class="r-item-main">
               <div class="r-item-name"><span class="r-qty">{{ item.qty }}x</span> {{ item.name }}</div>
-              <div class="r-item-price">B{{ item.price * item.qty }}</div>
+              <div class="r-item-price">฿{{ baht(item.price * item.qty) }}</div>
             </div>
             <div class="r-item-sub" v-if="item.options">
               <span>{{ item.options }}</span>
@@ -297,16 +298,16 @@
         <div class="receipt-summary">
           <div class="r-summary-row">
             <span>ยอดรวมอาหาร</span>
-            <span>B{{ currentOrder.subtotal }}</span>
+            <span>฿{{ baht(currentOrder.subtotal) }}</span>
           </div>
           <div class="r-summary-row">
             <span>ค่าจัดส่ง</span>
             <span v-if="currentOrder.shippingFee === 0" style="color: #557c61; font-weight: 600;">ฟรี</span>
-            <span v-else>B{{ currentOrder.shippingFee }}</span>
+            <span v-else>฿{{ baht(currentOrder.shippingFee) }}</span>
           </div>
           <div class="r-summary-row r-total-row">
             <span>ยอดชำระสุทธิ</span>
-            <span>B{{ currentOrder.total }}</span>
+            <span>฿{{ baht(currentOrder.total) }}</span>
           </div>
         </div>
       </div>
@@ -406,6 +407,13 @@ import OrderChatPanel from './components/OrderChatPanel.vue';
 import { authStore } from './store/authStore';
 import { useOrderChat } from './composables/useOrderChat';
 
+// ค่าประมาณเวลาจัดส่ง (นาที / กม.ต่อชม.)
+const ETA_COOK_MIN = 15;            // เวลาปรุงโดยประมาณต่อออเดอร์
+const ETA_RIDER_PICKUP_MIN = 5;     // ไรเดอร์มารับอาหารที่ร้าน
+const ETA_RIDER_SPEED_KMH = 25;     // ความเร็วเฉลี่ยมอเตอร์ไซค์ในเมือง
+const ETA_MIN_TRAVEL_MIN = 5;       // ใกล้แค่ไหนก็ใช้อย่างน้อยเท่านี้
+const ETA_FALLBACK_TRAVEL_MIN = 15; // ใช้เมื่อไม่รู้ระยะทาง (ไม่มีพิกัด)
+
 export default {
   components: {
     CustomerNavbar,
@@ -430,6 +438,7 @@ export default {
       showReceiptModal: false,
       rawStatus: 'PENDING',
       pollingTimer: null,
+      nowTs: Date.now(),
       // ระบบรีวิวให้ดาวก่อนกลับหน้าร้าน (Review & Rating)
       selectedRating: 0,
       hoverRating: 0,
@@ -466,7 +475,7 @@ export default {
     },
     mapUrl() {
       if (!this.hasActiveOrder) return '';
-      const address = this.userProfile.address || 'ตลาดปากเกร็ด นนทบุรี'; 
+      const address = this.currentOrder?.address || this.userProfile.address || 'ตลาดปากเกร็ด นนทบุรี';
       const encodedAddress = encodeURIComponent(address);
       return `https://maps.google.com/maps?q=${encodedAddress}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
     },
@@ -506,11 +515,48 @@ export default {
       if (this.rawStatus === 'CANCELLED') return 'badge-cancelled';
       return 'badge-pending';
     },
+    // เวลาเดินทางจากร้านถึงลูกค้า: ระยะทางจริง ÷ ความเร็วเฉลี่ยมอเตอร์ไซค์ในเมือง
+    travelMinutes() {
+      const km = Number(this.currentOrder?.distanceKm || 0);
+      if (!(km > 0)) return ETA_FALLBACK_TRAVEL_MIN;
+      return Math.max(ETA_MIN_TRAVEL_MIN, Math.ceil((km / ETA_RIDER_SPEED_KMH) * 60));
+    },
+    // นาทีที่เหลือโดยประมาณ คิดตามขั้นตอนที่ออเดอร์อยู่ตอนนี้ (null = ส่งถึงแล้ว/ยกเลิก)
+    etaMinutes() {
+      const o = this.currentOrder;
+      if (!o) return null;
+      const elapsedSince = (iso) => (iso ? (this.nowTs - new Date(iso).getTime()) / 60000 : 0);
+      switch (this.rawStatus) {
+        case 'COMPLETED':
+        case 'DELIVERED':
+        case 'CANCELLED':
+          return null;
+        case 'IN_DELIVERY':
+          // ไรเดอร์รับงานแล้วแต่ยังไม่ได้รับอาหาร (ยังไม่มี picked_up_at): รอไรเดอร์มาร้าน + เดินทาง
+          if (!o.pickedUpAt) return ETA_RIDER_PICKUP_MIN + this.travelMinutes;
+          // รับอาหารออกจากร้านแล้ว: เหลือเวลาเดินทางลบเวลาที่วิ่งมาแล้ว
+          return Math.max(2, Math.ceil(this.travelMinutes - elapsedSince(o.pickedUpAt)));
+        case 'READY':
+          return ETA_RIDER_PICKUP_MIN + this.travelMinutes;
+        case 'COOKING': {
+          const cookLeft = Math.max(3, Math.ceil(ETA_COOK_MIN - elapsedSince(o.cookingStartedAt)));
+          return cookLeft + ETA_RIDER_PICKUP_MIN + this.travelMinutes;
+        }
+        default:
+          return ETA_COOK_MIN + ETA_RIDER_PICKUP_MIN + this.travelMinutes;
+      }
+    },
     estimatedTimeText() {
-      if (this.rawStatus === 'COMPLETED' || this.rawStatus === 'DELIVERED') return 'ส่งถึงแล้ว';
-      if (this.rawStatus === 'READY' || this.rawStatus === 'IN_DELIVERY') return '10-15 นาที';
-      if (this.rawStatus === 'COOKING') return '20-25 นาที';
-      return '25-35 นาที';
+      if (this.rawStatus === 'CANCELLED') return 'ออเดอร์ถูกยกเลิก';
+      if (this.etaMinutes === null) return 'ส่งถึงแล้ว';
+      return `${this.etaMinutes}-${this.etaMinutes + 5} นาที`;
+    },
+    estimatedArrivalText() {
+      if (this.etaMinutes === null) return '';
+      const arrive = new Date(this.nowTs + this.etaMinutes * 60000);
+      const clock = arrive.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+      const km = Number(this.currentOrder?.distanceKm || 0);
+      return km > 0 ? `ถึงประมาณ ${clock} น. • ระยะ ${km.toFixed(1)} กม.` : `ถึงประมาณ ${clock} น.`;
     },
     ratingLabel() {
       switch (this.selectedRating) {
@@ -551,6 +597,7 @@ export default {
 
     // 3. เริ่มต้น Polling อัปเดตสถานะแบบ Real-Time ทุก 2.5 วินาที
     this.pollingTimer = setInterval(() => {
+      this.nowTs = Date.now();
       if (this.authStore.isLoggedIn) {
         this.fetchLatestOrder(true);
       }
@@ -562,6 +609,9 @@ export default {
     }
   },
   methods: {
+    baht(v) {
+      return Number(v || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    },
     getStepClass(step) {
       if (this.currentStep > step) return 'completed';
       if (this.currentStep === step) return 'active';
@@ -629,6 +679,14 @@ export default {
             items: items,
             riderName: activeOrder.rider?.name || activeOrder.rider?.username || activeOrder.delivery?.rider?.username || '',
             riderPhone: activeOrder.rider?.phone || activeOrder.rider?.phone_number || activeOrder.delivery?.rider?.phone_number || '',
+            // ข้อมูลผู้รับตามที่กรอกตอนสั่ง (ไม่ใช่โปรไฟล์ของคนที่ล็อกอินอยู่)
+            recipientName: activeOrder.delivery?.customer_name || activeOrder.user?.username || this.userProfile.name,
+            recipientPhone: activeOrder.delivery_phone || activeOrder.delivery?.customer_phone || activeOrder.user?.phone_number || '',
+            address: activeOrder.delivery_address || activeOrder.delivery?.delivery_address || this.userProfile.address,
+            // ใช้คำนวณเวลาที่คาดว่าจะถึง
+            distanceKm: Number(activeOrder.delivery?.distance_km || 0),
+            cookingStartedAt: activeOrder.cooking_started_at || null,
+            pickedUpAt: activeOrder.delivery?.picked_up_at || null,
           };
 
           this.chatOrderIdRef = activeOrder.order_id;
