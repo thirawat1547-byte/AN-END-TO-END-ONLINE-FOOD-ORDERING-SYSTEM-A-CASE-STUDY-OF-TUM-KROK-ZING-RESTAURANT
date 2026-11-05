@@ -16,6 +16,33 @@ const getStoredProfile = () => {
   }
 };
 
+// อ่าน role จาก JWT ที่เซิร์ฟเวอร์ออกให้ (ค่าเดียวกับที่ backend ใช้ตรวจสิทธิ์)
+// ใช้เป็นหลัก เพราะ userProfile ใน localStorage ถูกหน้าอื่นเขียนทับได้
+const getTokenRole = () => {
+  try {
+    const token = localStorage.getItem('access_token');
+    const part = token ? token.split('.')[1] : '';
+    if (!part) return '';
+    const json = decodeURIComponent(
+      atob(part.replace(/-/g, '+').replace(/_/g, '/'))
+        .split('')
+        .map((c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0'))
+        .join('')
+    );
+    return String(JSON.parse(json)?.role || '').toUpperCase();
+  } catch (e) {
+    return '';
+  }
+};
+
+// บันทึกโปรไฟล์ลง localStorage แบบรวมกับของเดิม (ไม่ทำให้ role / user_id ที่ได้ตอนล็อกอินหายไป)
+export const saveStoredProfile = (partial = {}) => {
+  const merged = { ...getStoredProfile(), ...partial };
+  if (merged.role) merged.role = String(merged.role).toUpperCase();
+  localStorage.setItem('userProfile', JSON.stringify(merged));
+  return merged;
+};
+
 let sessionMonitorTimer = null;
 
 export const authStore = reactive({
@@ -29,7 +56,7 @@ export const authStore = reactive({
 
   get role() {
     if (!this.isLoggedIn) return 'GUEST';
-    return (this.userProfile?.role || 'CUSTOMER').toUpperCase();
+    return (getTokenRole() || this.userProfile?.role || 'CUSTOMER').toUpperCase();
   },
 
   get isAdmin() {
@@ -79,11 +106,7 @@ export const authStore = reactive({
   },
 
   updateProfile(profile) {
-    this.userProfile = { ...this.userProfile, ...profile };
-    if (this.userProfile.role) {
-      this.userProfile.role = this.userProfile.role.toUpperCase();
-    }
-    localStorage.setItem('userProfile', JSON.stringify(this.userProfile));
+    this.userProfile = saveStoredProfile({ ...this.userProfile, ...profile });
   },
 
   // 🛑 ฟังก์ชันดักจับเมื่อเซสชันถูกปิดกั้นเพราะมีอุปกรณ์อื่นเข้าสู่ระบบ

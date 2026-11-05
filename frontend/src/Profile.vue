@@ -77,7 +77,7 @@
 import axios from 'axios';
 import { API_BASE } from './config/api';
 import CustomerNavbar from './components/CustomerNavbar.vue';
-import { authStore } from './store/authStore';
+import { authStore, saveStoredProfile } from './store/authStore';
 import { showSuccess } from './utils/swal';
 import { getInitial } from './utils/avatar';
 
@@ -143,7 +143,7 @@ export default {
             address: dbUser.address || stored.address || '',
             avatar: dbUser.avatar_url || stored.avatar || ''
           };
-          localStorage.setItem('userProfile', JSON.stringify(this.userProfile));
+          saveStoredProfile(this.userProfile);
         }
       } catch (err) {
         console.warn('ดึงโปรไฟล์จาก Backend ไม่สำเร็จ:', err);

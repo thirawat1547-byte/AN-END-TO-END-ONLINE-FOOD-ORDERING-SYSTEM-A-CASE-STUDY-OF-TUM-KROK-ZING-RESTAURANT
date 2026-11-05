@@ -732,7 +732,7 @@ import { adminStore } from './admin/store/adminData.js';
 import { API_BASE } from './config/api';
 import { socket } from './config/socket';
 import CustomerNavbar from './components/CustomerNavbar.vue';
-import { authStore } from './store/authStore';
+import { authStore, saveStoredProfile } from './store/authStore';
 import { usePromotionStore } from './store/promotionStore';
 import { showSuccess, showError } from './utils/swal';
 import { isCardPaymentEnabled, loadStripe } from './utils/stripe';
@@ -998,7 +998,7 @@ export default {
           if (profileRes.data.username && !this.userProfile.name) {
             this.userProfile.name = profileRes.data.username;
           }
-          localStorage.setItem('userProfile', JSON.stringify(this.userProfile));
+          saveStoredProfile(this.userProfile);
         }
       } catch (err) {
         console.warn('ซิงค์ข้อมูลโปรไฟล์จาก Backend ไม่สำเร็จ:', err);
@@ -1411,7 +1411,7 @@ export default {
         this.userProfile.phone = rawPhone;
         this.userProfile.address = rawAddress;
         this.saveLandmark();
-        localStorage.setItem('userProfile', JSON.stringify(this.userProfile));
+        saveStoredProfile(this.userProfile);
         if (authStore && typeof authStore.updateProfile === 'function') {
           authStore.updateProfile(this.userProfile);
         }
@@ -1644,7 +1644,7 @@ export default {
       }
       this.gpsNotice = this.pinnedByGps ? 'บันทึกที่อยู่แล้ว (ใช้ตำแหน่งตามหมุดที่ปักไว้)' : 'ปักหมุดพิกัดตามที่อยู่เรียบร้อยแล้ว';
       this.saveLandmark();
-      localStorage.setItem('userProfile', JSON.stringify(this.userProfile));
+      saveStoredProfile(this.userProfile);
       try {
         const gpsData = {
           lat: this.deliveryLat,
