@@ -807,20 +807,21 @@ async function main() {
     });
     console.log('✅ สร้างการตั้งค่าร้านค้าเริ่มต้นเรียบร้อยแล้ว (Store Settings)');
   } else {
-    await prisma.storeSetting.update({
-      where: { id: 1 },
+    // ไม่เขียนทับค่าที่แอดมินแก้ในหน้าตั้งค่า (seed รันทุกครั้งที่ deploy)
+    // ย้ายเฉพาะร้านที่ยังใช้ค่ารอบสูตรเดิม (฿40) ไปเป็นสูตรใหม่ ฿15 + ฿5 ทุก ๆ 2 กม. ครั้งเดียว
+    const migrated = await prisma.storeSetting.updateMany({
+      where: { id: 1, base_rider_fee: 40 },
       data: {
-        base_delivery_fee: 20.00,
-        delivery_fee_per_km: 10.00,
-        max_delivery_km: 15.00,
-        min_order_delivery: 100.00,
-        // ค่ารอบไรเดอร์สูตรใหม่: ฿15 + ฿5 ทุก ๆ 2 กม.
         base_rider_fee: 15.00,
         rider_fee_step_km: 2.00,
         rider_fee_per_step: 5.00,
       },
     });
-    console.log('✅ อัปเดตการตั้งค่าค่าจัดส่งและค่ารอบไรเดอร์เรียบร้อยแล้ว (Store Settings)');
+    console.log(
+      migrated.count > 0
+        ? '✅ ย้ายค่ารอบไรเดอร์เป็นสูตรใหม่แล้ว (Store Settings)'
+        : 'ℹ️ มีการตั้งค่าร้านอยู่แล้ว ไม่เขียนทับ (Store Settings)',
+    );
   }
 
   // 9. Seed กลุ่มตัวเลือกและท็อปปิ้ง (MENU_OPTION_GROUPS & MENU_OPTIONS)
