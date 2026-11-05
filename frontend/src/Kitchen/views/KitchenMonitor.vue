@@ -137,6 +137,28 @@ const extractNote = (oi) => {
   return parts.join(' | ')
 }
 
+const formatClock = (d) => d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
+
+const PAY_CHANNEL_LABEL = { CARD: 'บัตร', PROMPTPAY: 'พร้อมเพย์', STRIPE: 'Stripe', CASH: 'เงินสด' }
+
+// สถานะชำระเงินจากรายการ TRANSACTIONS ของออเดอร์ (tone ใช้เลือกสีป้าย)
+const getPaymentInfo = (order) => {
+  const txns = Array.isArray(order.transaction) ? order.transaction : []
+  const channelOf = (t) => PAY_CHANNEL_LABEL[String(t?.payment_method || '').toUpperCase()] || t?.payment_method || ''
+  const paid = txns.find(t => String(t.payment_status || '').toUpperCase() === 'COMPLETED')
+  if (paid) return { label: `ชำระแล้ว • ${channelOf(paid)}`, tone: 'paid' }
+
+  const latest = txns[txns.length - 1]
+  if (latest && /cash/i.test(latest.payment_method || '')) {
+    return { label: 'เก็บเงินปลายทาง (เงินสด)', tone: 'cash' }
+  }
+  if (latest && String(latest.payment_status || '').toUpperCase() === 'PENDING') {
+    return { label: `รอชำระ • ${channelOf(latest)}`, tone: 'pending' }
+  }
+  if (order.table_id) return { label: 'ยังไม่ชำระ (จ่ายตอนเช็คบิล)', tone: 'pending' }
+  return { label: 'ยังไม่ชำระ', tone: 'pending' }
+}
+
 // แปลงรูปแบบออเดอร์จาก Backend เข้า Component
 const formatOrder = (order) => {
   const createdDate = new Date(order.created_at)
@@ -158,15 +180,26 @@ const formatOrder = (order) => {
     note: extractNote(oi)
   }))
 
+  const customerName =
+    order.delivery?.customer_name || order.user?.username || (order.table_id ? '' : 'ลูกค้าหน้าร้าน')
+  const landmark = order.delivery_landmark || order.delivery?.delivery_landmark || ''
+  // เวลาเสร็จใช้เวลาที่ครัวกดเสร็จจริง ถ้าไม่มี (ออเดอร์เก่า) ใช้เวลาอัปเดตล่าสุด
+  const doneDate = order.cooked_at ? new Date(order.cooked_at) : (order.updated_at ? new Date(order.updated_at) : createdDate)
+
   return {
     id: order.order_id,
-    table: order.table?.table_number ? `โต๊ะ ${order.table.table_number}` : (order.order_type === 'DELIVERY' ? '🛵 เดลิเวอรี' : `ออเดอร์ #${order.order_id}`),
+    table: order.table?.table_number ? `โต๊ะ ${order.table.table_number}` : (order.order_type === 'DELIVERY' ? '🛵 เดลิเวอรี' : '🥡 สั่งกลับบ้าน'),
+    customerName,
     orderType: order.order_type,
-    time: `${diffMins} นาที`,
+    time: `รอ ${diffMins} นาที`,
     timeStatus,
+    orderedAt: formatClock(createdDate),
     status: order.status,
-    totalPrice: order.total_price,
-    completedAt: createdDate.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+    totalPrice: Number(order.total_price || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    payment: getPaymentInfo(order),
+    orderNote: (order.order_notes || '').trim(),
+    landmark,
+    completedAt: formatClock(doneDate),
     items
   }
 }
@@ -429,11 +462,15 @@ onBeforeUnmount(() => {
           >
             <!-- Card Header -->
             <div>
-              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
-                <div style="font-size: 20px; font-weight: 700; color: #3A332C;">
-                  {{ order.table }}
+              <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px;">
+                <div style="min-width: 0;">
+                  <div class="kds-order-no">#{{ order.id }}</div>
+                  <div style="font-size: 20px; font-weight: 700; color: #3A332C;">
+                    {{ order.table }}
+                  </div>
+                  <div v-if="order.customerName" class="kds-customer">👤 {{ order.customerName }}</div>
                 </div>
-                
+
                 <div
                   :style="{
                     padding: '6px 14px',
@@ -450,6 +487,16 @@ onBeforeUnmount(() => {
                   <span style="font-size: 11px;">⏱</span>
                   <span>{{ order.time }}</span>
                 </div>
+              </div>
+
+              <div class="kds-meta">
+                <span>🕒 สั่ง {{ order.orderedAt }}</span>
+                <span>💰 ฿{{ order.totalPrice }}</span>
+                <span class="kds-pay" :class="`kds-pay--${order.payment.tone}`">{{ order.payment.label }}</span>
+              </div>
+              <div v-if="order.orderNote || order.landmark" class="kds-notes">
+                <div v-if="order.orderNote">📝 {{ order.orderNote }}</div>
+                <div v-if="order.landmark">📍 จุดสังเกต: {{ order.landmark }}</div>
               </div>
 
               <!-- Item List -->
@@ -505,9 +552,23 @@ onBeforeUnmount(() => {
             style="background-color: rgba(243, 235, 221, 0.8); border-radius: 28px; padding: 24px; display: flex; flex-direction: column; justify-content: space-between; min-height: 380px; border: 1px solid #EBE1D0; box-sizing: border-box;"
           >
             <div>
-              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
-                <div style="font-size: 18px; font-weight: 700; color: #3A332C;">{{ order.table }}</div>
-                <span style="font-size: 12px; color: #6B7280;">เสร็จสิ้น {{ order.completedAt }}</span>
+              <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px;">
+                <div style="min-width: 0;">
+                  <div class="kds-order-no">#{{ order.id }}</div>
+                  <div style="font-size: 18px; font-weight: 700; color: #3A332C;">{{ order.table }}</div>
+                  <div v-if="order.customerName" class="kds-customer">👤 {{ order.customerName }}</div>
+                </div>
+                <span style="font-size: 12px; color: #6B7280; white-space: nowrap;">เสร็จสิ้น {{ order.completedAt }}</span>
+              </div>
+
+              <div class="kds-meta">
+                <span>🕒 สั่ง {{ order.orderedAt }}</span>
+                <span>💰 ฿{{ order.totalPrice }}</span>
+                <span class="kds-pay" :class="`kds-pay--${order.payment.tone}`">{{ order.payment.label }}</span>
+              </div>
+              <div v-if="order.orderNote || order.landmark" class="kds-notes">
+                <div v-if="order.orderNote">📝 {{ order.orderNote }}</div>
+                <div v-if="order.landmark">📍 จุดสังเกต: {{ order.landmark }}</div>
               </div>
 
               <div style="display: flex; flex-direction: column; gap: 14px;">
@@ -543,3 +604,66 @@ onBeforeUnmount(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.kds-order-no {
+  font-size: 13px;
+  font-weight: 800;
+  color: #4B7B61;
+  letter-spacing: 0.3px;
+}
+.kds-customer {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #5C5246;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kds-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #5C5246;
+}
+.kds-pay {
+  padding: 2px 10px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+}
+.kds-pay--paid {
+  background-color: #DCFCE7;
+  color: #166534;
+  border-color: #BBF7D0;
+}
+.kds-pay--cash {
+  background-color: #FFEDD5;
+  color: #9A3412;
+  border-color: #FED7AA;
+}
+.kds-pay--pending {
+  background-color: #FEE2E2;
+  color: #991B1B;
+  border-color: #FECACA;
+}
+.kds-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background-color: #FFFBEB;
+  border: 1px dashed #FCD34D;
+  color: #78350F;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  word-break: break-word;
+}
+</style>
