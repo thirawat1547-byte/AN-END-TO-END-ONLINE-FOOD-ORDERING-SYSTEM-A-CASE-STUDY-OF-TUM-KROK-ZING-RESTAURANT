@@ -139,27 +139,6 @@
           บันทึกแล้ว {{ fuelSummary.recorded_days }} วัน
           <template v-if="fuelSummary.unrecorded_days"> • ประมาณอัตโนมัติ {{ fuelSummary.unrecorded_days }} วัน</template>
         </p>
-        <form @submit.prevent="saveFuel" class="pt-2 border-t border-slate-100 space-y-1.5">
-          <label class="block font-bold text-slate-700">ราคาน้ำมันวันนี้ (บาท/ลิตร)</label>
-          <div class="flex gap-2">
-            <input
-              v-model.number="fuelPrice"
-              type="number"
-              min="0.01"
-              step="0.01"
-              placeholder="เช่น 35.50"
-              class="flex-1 min-w-0 px-2 py-1.5 rounded-lg bg-slate-50 border border-slate-200"
-            />
-            <button :disabled="fuelSaving || !(fuelPrice > 0)" class="px-3 py-1.5 rounded-lg bg-[#2d5a43] text-white font-bold disabled:bg-slate-300">
-              {{ fuelSaving ? '…' : 'บันทึก' }}
-            </button>
-          </div>
-          <p class="text-slate-500">
-            <template v-if="fuelPrice > 0">฿{{ money(fuelDaily) }} ได้ <b>{{ fuelPreviewLiters.toFixed(2) }}</b> ลิตร (เต็มถัง {{ fuelTank }} ลิตร)</template>
-            <template v-else-if="todayFuel">วันนี้บันทึกแล้ว: ฿{{ money(todayFuel.price_per_liter) }}/ลิตร • {{ Number(todayFuel.liters).toFixed(2) }} ลิตร • ฿{{ money(todayFuel.amount) }}</template>
-            <template v-else>คิดค่าน้ำมันตายตัว ฿{{ money(fuelDaily) }}/วัน (วันที่ร้านเปิด)</template>
-          </p>
-        </form>
       </div>
     </div>
 
@@ -292,8 +271,6 @@ const riders = ref([])
 const deliveries = ref([])
 const purchases = ref([])
 const fuelSummary = ref(null)
-const todayFuel = ref(null)
-const settings = ref({})
 
 const money = (v) => {
   const n = Number(v || 0)
@@ -337,13 +314,6 @@ const cashOutstanding = computed(() =>
   [...cashOf('PENDING'), ...cashOf('SUBMITTED')].reduce((s, d) => s + Number(d.cash_amount || 0), 0)
 )
 
-// ---------- ค่าน้ำมัน ----------
-const fuelPrice = ref(null)
-const fuelSaving = ref(false)
-const fuelDaily = computed(() => Number(settings.value.fuel_daily_amount ?? 300))
-const fuelTank = computed(() => Number(settings.value.fuel_tank_liters ?? 8.1))
-const fuelPreviewLiters = computed(() => (fuelPrice.value > 0 ? Math.min(fuelDaily.value / fuelPrice.value, fuelTank.value) : 0))
-
 const loadFinance = async () => {
   const { from, to, group } = range.value
   const [f, r, p, fs] = await Promise.allSettled([
@@ -366,41 +336,11 @@ const loadCash = async () => {
   } catch (e) {}
 }
 
-const loadFuelToday = async () => {
-  try {
-    const t = todayStr()
-    const { data } = await axios.get(`${API_BASE}/expenses/fuel`, { params: { from: t, to: t } })
-    todayFuel.value = Array.isArray(data) && data.length ? data[0] : null
-  } catch (e) {}
-}
-
-const loadSettings = async () => {
-  try {
-    const { data } = await axios.get(`${API_BASE}/settings`)
-    settings.value = data || {}
-  } catch (e) {}
-}
-
 const loadAll = async () => {
   loading.value = true
   error.value = ''
-  await Promise.all([loadFinance(), loadCash(), loadFuelToday()])
+  await Promise.all([loadFinance(), loadCash()])
   loading.value = false
-}
-
-const saveFuel = async () => {
-  if (!(fuelPrice.value > 0)) return
-  fuelSaving.value = true
-  try {
-    await axios.post(`${API_BASE}/expenses/fuel`, { price_per_liter: Number(fuelPrice.value), log_date: todayStr() })
-    fuelPrice.value = null
-    await Promise.all([loadFuelToday(), loadFinance()])
-    showSuccess('บันทึกค่าน้ำมันแล้ว', `วันนี้คิดค่าน้ำมัน ฿${money(fuelDaily.value)}`)
-  } catch (err) {
-    showError('บันทึกค่าน้ำมันไม่สำเร็จ', errMsg(err, 'กรุณาลองใหม่อีกครั้ง'))
-  } finally {
-    fuelSaving.value = false
-  }
 }
 
 const cashBusy = ref(false)
@@ -449,7 +389,6 @@ watch(range, () => {
 
 let timer = null
 onMounted(() => {
-  loadSettings()
   loadAll()
   socket.on('cash_submitted', onCashSubmitted)
   socket.on('order_status_updated', onOrderUpdated)
