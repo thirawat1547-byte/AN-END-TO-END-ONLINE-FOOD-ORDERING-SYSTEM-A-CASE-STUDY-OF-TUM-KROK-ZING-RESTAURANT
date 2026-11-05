@@ -68,11 +68,13 @@
                   <p class="text-[11px] text-emerald-700 font-bold">พร้อมส่ง • {{ timeAgo(o.updated_at) }}</p>
                 </div>
                 <div class="text-right">
-                  <p class="font-extrabold text-emerald-700"><span class="num">+฿{{ money(o.delivery?.rider_fee ?? 40) }}</span></p>
+                  <p class="font-extrabold text-emerald-700"><span class="num">{{ feeText(o.delivery) }}</span></p>
                   <p class="text-[10px] text-slate-400">ค่ารอบ • {{ distanceText(o) }}</p>
                 </div>
               </div>
+              <p v-if="feeBreakdown(o.delivery)" class="text-[11px] text-emerald-800 bg-emerald-50 rounded-lg px-2 py-1">💰 {{ feeBreakdown(o.delivery) }}</p>
               <p class="text-sm text-slate-700 line-clamp-2">📍 {{ addressOf(o) }}</p>
+              <p v-if="landmarkOf(o)" class="text-xs text-slate-500 line-clamp-1">🏷️ จุดสังเกต: {{ landmarkOf(o) }}</p>
               <p class="text-xs text-slate-500">
                 👤 {{ customerOf(o) }} • {{ itemCount(o) }} ชิ้น • <span class="num">฿{{ money(o.total_price) }}</span>
                 <span v-if="isCash(o)" class="text-amber-700 font-bold"> • เก็บเงินสด</span>
@@ -145,7 +147,8 @@
             <div class="flex items-center justify-between">
               <div>
                 <h2 class="font-black">ออเดอร์ #{{ myJob.order_id }}</h2>
-                <p class="text-xs text-slate-500">ค่ารอบ <span class="num">฿{{ money(myJob.delivery?.rider_fee) }}</span> • {{ distanceText(myJob) }}</p>
+                <p class="text-xs text-slate-500">ค่ารอบ <span class="num">{{ feeText(myJob.delivery, false) }}</span> • {{ distanceText(myJob) }}</p>
+                <p v-if="feeBreakdown(myJob.delivery)" class="text-[11px] text-emerald-700">{{ feeBreakdown(myJob.delivery) }}</p>
               </div>
               <span class="text-xs font-bold px-2 py-1 rounded-lg" :class="isDelivering ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'">
                 {{ isDelivering ? 'กำลังนำส่ง' : 'รอรับอาหารที่ร้าน' }}
@@ -195,17 +198,58 @@
 
       <!-- ================= รายได้ ================= -->
       <template v-else>
-        <section class="grid grid-cols-2 gap-3">
-          <div class="bg-white rounded-2xl border border-slate-200 p-4">
-            <p class="text-xs text-slate-500">วันนี้</p>
-            <p class="text-2xl font-black text-emerald-700"><span class="num">฿{{ money(todayStats.earnings) }}</span></p>
-            <p class="text-xs text-slate-500">{{ todayStats.trips }} รอบ</p>
+        <section class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div v-for="s in periodStats" :key="s.label" class="bg-white rounded-2xl border border-slate-200 p-4">
+            <p class="text-xs text-slate-500">{{ s.label }}</p>
+            <p class="text-2xl font-black" :class="s.accent ? 'text-emerald-700' : ''"><span class="num">฿{{ money(s.earnings) }}</span></p>
+            <p class="text-xs text-slate-500">{{ s.trips }} รอบ</p>
           </div>
-          <div class="bg-white rounded-2xl border border-slate-200 p-4">
-            <p class="text-xs text-slate-500">ทั้งหมด</p>
-            <p class="text-2xl font-black"><span class="num">฿{{ money(earnings.total_earnings) }}</span></p>
-            <p class="text-xs text-slate-500">{{ earnings.total_trips }} รอบ</p>
+        </section>
+
+        <!-- เงินสดที่ต้องนำส่งร้าน -->
+        <section class="bg-white rounded-2xl border p-4 space-y-3" :class="cashPending.length ? 'border-amber-300' : 'border-slate-200'">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h2 class="text-sm font-bold">💵 เงินสดที่ต้องนำส่งร้าน</h2>
+              <p class="text-2xl font-black text-amber-700"><span class="num">฿{{ money(cashPendingTotal) }}</span></p>
+              <p class="text-xs text-slate-500">
+                ค้างนำส่ง {{ cashPending.length }} งาน
+                <template v-if="cashSubmittedTotal"> • รอแอดมินยืนยัน <span class="num">฿{{ money(cashSubmittedTotal) }}</span></template>
+              </p>
+            </div>
+            <button
+              v-if="cashPending.length"
+              @click="submitCash"
+              :disabled="busy || !selectedCashIds.length"
+              class="shrink-0 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold disabled:bg-slate-300"
+            >
+              นำส่งเงินแล้ว ({{ selectedCashIds.length }})
+            </button>
           </div>
+          <p v-if="!cashTrips.length" class="text-sm text-slate-500">ยังไม่มีงานเก็บเงินสด</p>
+          <div v-if="cashPending.length" class="flex items-center gap-2 text-xs">
+            <button @click="toggleAllCash" class="font-bold text-amber-700 underline">
+              {{ allCashSelected ? 'ยกเลิกเลือกทั้งหมด' : 'เลือกทั้งหมด' }}
+            </button>
+            <span class="text-slate-400">เลือกงานที่นำเงินส่งร้านแล้ว</span>
+          </div>
+          <ul class="divide-y divide-slate-100 -mx-4">
+            <li v-for="t in cashTrips" :key="t.delivery_id" class="px-4 py-2 flex items-center gap-3 text-sm">
+              <input
+                type="checkbox"
+                class="w-4 h-4 accent-amber-500"
+                :disabled="cashStatusOf(t) !== 'PENDING'"
+                :checked="selectedCashIds.includes(t.delivery_id)"
+                @change="toggleCash(t.delivery_id)"
+              />
+              <div class="min-w-0 flex-1">
+                <p class="font-bold">#{{ t.order_id }} <span class="font-normal text-slate-500">{{ t.customer_name }}</span></p>
+                <p class="text-xs text-slate-500">{{ formatDate(t.delivered_at) }}</p>
+              </div>
+              <span class="num font-bold">฿{{ money(t.cash_amount) }}</span>
+              <span class="shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-lg" :class="cashBadge(t).cls">{{ cashBadge(t).text }}</span>
+            </li>
+          </ul>
         </section>
         <section class="bg-white rounded-2xl border border-slate-200">
           <h2 class="text-sm font-bold p-4 pb-2">ประวัติการส่ง</h2>
@@ -218,6 +262,7 @@
                   <span v-if="Number(t.distance_km) > 0" class="font-normal text-slate-400">• {{ Number(t.distance_km).toFixed(1) }} กม.</span>
                 </p>
                 <p class="text-xs text-slate-500 truncate">{{ formatDate(t.delivered_at) }} • {{ t.delivery_address }}</p>
+                <p v-if="feeBreakdown(t)" class="text-[11px] text-slate-400">{{ feeBreakdown(t) }}</p>
               </div>
               <span class="shrink-0 font-bold text-emerald-700"><span class="num">+฿{{ money(t.rider_fee) }}</span></span>
             </li>
@@ -243,8 +288,11 @@
           :disabled="!!myJob || busy"
           class="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold disabled:bg-slate-300"
         >
-          🛵 รับงานนี้ (<span class="num">+฿{{ money(detailOrder.delivery?.rider_fee ?? 40) }}</span>)
+          🛵 รับงานนี้ (<span class="num">{{ feeText(detailOrder.delivery) }}</span>)
         </button>
+        <p v-if="isClaimable(detailOrder) && feeBreakdown(detailOrder.delivery)" class="text-center text-xs text-emerald-700">
+          {{ feeBreakdown(detailOrder.delivery) }}
+        </p>
         <p v-else-if="isAwaitingPayment(detailOrder)" class="text-center text-xs text-slate-600 font-bold">
           รอร้านยืนยันการชำระเงิน — รับงานได้เมื่อร้านยืนยันยอดแล้ว
         </p>
@@ -319,11 +367,49 @@ const steps = ['รับงานแล้ว', 'กำลังนำส่ง
 const isDelivering = computed(() => myJob.value?.delivery?.delivery_status === 'DELIVERING')
 const stepIndex = computed(() => (isDelivering.value ? 1 : 0))
 
-const todayStats = computed(() => {
-  const today = new Date().toDateString()
-  const trips = earnings.value.trips.filter((t) => t.delivered_at && new Date(t.delivered_at).toDateString() === today)
-  return { trips: trips.length, earnings: trips.reduce((s, t) => s + Number(t.rider_fee || 0), 0) }
+// ค่าตั้งค่าสูตรค่ารอบจากร้าน (ใช้แสดงที่มาของรายได้เท่านั้น ยอดจริงมาจาก API)
+const feeSettings = ref(null)
+
+const sumTrips = (trips) => ({ trips: trips.length, earnings: trips.reduce((s, t) => s + Number(t.rider_fee || 0), 0) })
+const startOfDay = (d = new Date()) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
+const periodStats = computed(() => {
+  const trips = earnings.value.trips.filter((t) => t.delivered_at)
+  const today = startOfDay()
+  const week = new Date(today)
+  week.setDate(today.getDate() - ((today.getDay() + 6) % 7)) // เริ่มสัปดาห์วันจันทร์
+  const month = new Date(today.getFullYear(), today.getMonth(), 1)
+  const since = (from) => trips.filter((t) => new Date(t.delivered_at) >= from)
+  return [
+    { label: 'วันนี้', accent: true, ...sumTrips(since(today)) },
+    { label: 'สัปดาห์นี้', ...sumTrips(since(week)) },
+    { label: 'เดือนนี้', ...sumTrips(since(month)) },
+    { label: 'ทั้งหมด', trips: earnings.value.total_trips, earnings: earnings.value.total_earnings }
+  ]
 })
+
+// ---------- เงินสดที่ต้องนำส่งร้าน ----------
+const cashStatusOf = (t) => (t.cash_status || 'NONE').toUpperCase()
+const cashTrips = computed(() => earnings.value.trips.filter((t) => cashStatusOf(t) !== 'NONE'))
+const cashPending = computed(() => cashTrips.value.filter((t) => cashStatusOf(t) === 'PENDING'))
+const cashPendingTotal = computed(() => cashPending.value.reduce((s, t) => s + Number(t.cash_amount || 0), 0))
+const cashSubmittedTotal = computed(() =>
+  cashTrips.value.filter((t) => cashStatusOf(t) === 'SUBMITTED').reduce((s, t) => s + Number(t.cash_amount || 0), 0)
+)
+const selectedCashIds = ref([])
+const allCashSelected = computed(() => cashPending.value.length > 0 && selectedCashIds.value.length === cashPending.value.length)
+const toggleCash = (id) => {
+  selectedCashIds.value = selectedCashIds.value.includes(id)
+    ? selectedCashIds.value.filter((x) => x !== id)
+    : [...selectedCashIds.value, id]
+}
+const toggleAllCash = () => {
+  selectedCashIds.value = allCashSelected.value ? [] : cashPending.value.map((t) => t.delivery_id)
+}
+const cashBadge = (t) => ({
+  PENDING: { text: 'ค้างนำส่ง', cls: 'bg-amber-100 text-amber-800' },
+  SUBMITTED: { text: 'รอแอดมินยืนยัน', cls: 'bg-blue-100 text-blue-800' },
+  CONFIRMED: { text: 'รับแล้ว', cls: 'bg-emerald-100 text-emerald-800' }
+}[cashStatusOf(t)] || { text: cashStatusOf(t), cls: 'bg-slate-100 text-slate-600' })
 
 // ---------- helpers ----------
 // จำนวนเต็มแสดงไม่มีทศนิยม, มีเศษแสดง 2 ตำแหน่งเสมอ (62.80 ไม่ใช่ 62.8)
@@ -333,7 +419,25 @@ const money = (v) => {
   return n.toLocaleString('th-TH', { minimumFractionDigits: digits, maximumFractionDigits: 2 })
 }
 const addressOf = (o) => o.delivery?.delivery_address || o.delivery_address || o.user?.address || '-'
+const landmarkOf = (o) => o.delivery?.delivery_landmark || o.delivery_landmark || ''
 const customerOf = (o) => o.delivery?.customer_name || o.user?.username || 'ลูกค้าเดลิเวอรี'
+// ยอดค่ารอบจาก API เท่านั้น (ไม่มีค่าสำรองตายตัว)
+const feeText = (d, plus = true) => {
+  if (d?.rider_fee === undefined || d?.rider_fee === null) return '-'
+  return `${plus ? '+' : ''}฿${money(d.rider_fee)}`
+}
+// ที่มาของรายได้ เช่น "ค่าออเดอร์ ฿15 + ระยะ 4.2 กม. ฿10 = ฿25"
+const feeBreakdown = (d) => {
+  if (!d || d.rider_fee === undefined || d.rider_fee === null) return ''
+  const fee = Number(d.rider_fee)
+  const km = Number(d.distance_km) || 0
+  const base = feeSettings.value ? Number(feeSettings.value.base_rider_fee) : NaN
+  if (!Number.isFinite(base) || base > fee) {
+    return km > 0 ? `ระยะ ${km.toFixed(1)} กม. = ฿${money(fee)}` : ''
+  }
+  const extra = fee - base
+  return `ค่าออเดอร์ ฿${money(base)} + ระยะ ${km.toFixed(1)} กม. ฿${money(extra)} = ฿${money(fee)}`
+}
 const distanceText = (o) => {
   const km = Number(o.delivery?.distance_km)
   return km > 0 ? `~${km.toFixed(1)} กม.` : 'ไม่มีพิกัด GPS'
@@ -422,13 +526,43 @@ const fetchEarnings = async () => {
   try {
     const { data } = await axios.get(`${API_BASE}/orders/rider/earnings`)
     earnings.value = { total_trips: data.total_trips || 0, total_earnings: data.total_earnings || 0, trips: data.trips || [] }
+    // ตัดงานที่ไม่ใช่สถานะค้างนำส่งออกจากรายการที่เลือกไว้
+    const pendingIds = new Set(cashPending.value.map((t) => t.delivery_id))
+    selectedCashIds.value = selectedCashIds.value.filter((id) => pendingIds.has(id))
   } catch (e) {}
+}
+
+const fetchFeeSettings = async () => {
+  try {
+    const { data } = await axios.get(`${API_BASE}/settings`)
+    feeSettings.value = data
+  } catch (e) {}
+}
+
+const submitCash = async () => {
+  const ids = [...selectedCashIds.value]
+  if (!ids.length) return
+  const total = cashPending.value.filter((t) => ids.includes(t.delivery_id)).reduce((s, t) => s + Number(t.cash_amount || 0), 0)
+  const res = await showConfirm('ยืนยันนำส่งเงินสด?', `นำส่งเงินสด ${ids.length} งาน ยอดรวม ฿${money(total)} ให้ร้าน`)
+  if (!res.isConfirmed) return
+  busy.value = true
+  try {
+    await axios.patch(`${API_BASE}/deliveries/cash/submit`, { delivery_ids: ids })
+    selectedCashIds.value = []
+    await fetchEarnings()
+    showSuccess('แจ้งนำส่งเงินแล้ว', 'รอแอดมินยืนยันรับเงิน')
+  } catch (err) {
+    showError('นำส่งเงินไม่สำเร็จ', errMsg(err, 'กรุณาลองใหม่อีกครั้ง'))
+    await fetchEarnings()
+  } finally {
+    busy.value = false
+  }
 }
 
 let initialized = false
 const refresh = async () => {
   loading.value = true
-  await Promise.all([fetchJobs(), fetchEarnings()])
+  await Promise.all([fetchJobs(), fetchEarnings(), feeSettings.value ? null : fetchFeeSettings()])
   loading.value = false
   initialized = true
 }

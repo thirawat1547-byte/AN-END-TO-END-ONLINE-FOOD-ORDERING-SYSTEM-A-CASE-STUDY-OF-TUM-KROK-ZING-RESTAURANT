@@ -114,8 +114,39 @@ const pendingCount = computed(() => {
   return adminStore.orders.filter(o => isPendingOrder(o)).length
 })
 
+// ช่องทางชำระเงิน: CARD / PROMPTPAY / CASH (รายการ STRIPE เก่าที่ยังไม่แยกชนิด แสดงเป็น Stripe)
+const CHANNELS = {
+  CARD: { label: '💳 บัตร', cls: 'bg-indigo-50 text-indigo-700' },
+  PROMPTPAY: { label: '📱 พร้อมเพย์', cls: 'bg-sky-50 text-sky-700' },
+  CASH: { label: '💵 เงินสด', cls: 'bg-amber-50 text-amber-800' },
+  STRIPE: { label: '💳 Stripe', cls: 'bg-violet-50 text-violet-700' }
+}
+const normalizeChannel = (m) => {
+  const v = String(m || '').trim().toUpperCase()
+  if (['CASH', 'เงินสด', 'COD'].includes(v)) return 'CASH'
+  if (['PROMPTPAY', 'PROMPT_PAY', 'พร้อมเพย์'].includes(v)) return 'PROMPTPAY'
+  if (['CARD', 'CREDIT_CARD', 'DEBIT_CARD'].includes(v)) return 'CARD'
+  if (v === 'STRIPE') return 'STRIPE'
+  return v
+}
+const channelOf = (o) => {
+  const key = normalizeChannel(o.payment_method)
+  return CHANNELS[key] || { label: o.payment_method || '-', cls: 'bg-slate-100 text-slate-700' }
+}
+const selectedChannel = ref('All')
+const channelCounts = computed(() => {
+  const c = { CARD: 0, PROMPTPAY: 0, CASH: 0 }
+  adminStore.orders.forEach(o => {
+    const k = normalizeChannel(o.payment_method)
+    if (k in c) c[k]++
+  })
+  return c
+})
+
 const filteredOrders = computed(() => {
   return adminStore.orders.filter(o => {
+    if (selectedChannel.value !== 'All' && normalizeChannel(o.payment_method) !== selectedChannel.value) return false
+
     // 1. แสดงออเดอร์ตามสถานะหากอยู่หมวดหมู่นั้นๆ
     let matchStatus = true
     if (selectedStatus.value === 'Completed') {
@@ -201,8 +232,8 @@ function viewOrderDetails(order) {
       </div>
     </div>
 
-    <!-- รายการโอนพร้อมเพย์รอตรวจสอบ (ซ่อนเวลาพิมพ์) -->
-    <div class="no-print bg-white p-4 rounded-2xl border-2 shadow-sm"
+    <!-- รายการโอนพร้อมเพย์รอตรวจสอบด้วยมือ (ทางสำรองแบบเดิม — พร้อมเพย์ผ่าน Stripe ยืนยันอัตโนมัติแล้ว จึงแสดงเฉพาะเมื่อมีรายการค้าง) -->
+    <div v-if="pendingPromptPay.length > 0" class="no-print bg-white p-4 rounded-2xl border-2 shadow-sm"
          :class="pendingPromptPay.length > 0 ? 'border-amber-300' : 'border-slate-200/80'">
       <div class="flex items-center justify-between gap-3 mb-3">
         <div>
@@ -296,6 +327,16 @@ function viewOrderDetails(order) {
         </button>
       </div>
 
+      <select
+        v-model="selectedChannel"
+        class="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 focus:outline-none"
+      >
+        <option value="All">ทุกช่องทาง</option>
+        <option value="CARD">💳 บัตร ({{ channelCounts.CARD }})</option>
+        <option value="PROMPTPAY">📱 พร้อมเพย์ ({{ channelCounts.PROMPTPAY }})</option>
+        <option value="CASH">💵 เงินสด ({{ channelCounts.CASH }})</option>
+      </select>
+
       <div class="relative w-full sm:w-64">
         <span class="absolute left-3 top-2.5 text-slate-400 text-xs">🔍</span>
         <input 
@@ -338,8 +379,8 @@ function viewOrderDetails(order) {
                 </span>
               </td>
               <td class="p-4">
-                <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-semibold">
-                  {{ order.payment_method }}
+                <span class="px-2 py-0.5 rounded-md text-[11px] font-semibold" :class="channelOf(order).cls">
+                  {{ channelOf(order).label }}
                 </span>
               </td>
               <td class="p-4 text-amber-600 font-bold">

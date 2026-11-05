@@ -5,6 +5,13 @@ import axios from 'axios'
 import QRCode from 'qrcode'
 import { API_BASE } from '../../config/api'
 import { getInitial, getStoredUserName } from '../../utils/avatar'
+import {
+  isStripePromptPayEnabled,
+  fetchUnpaidTableOrders,
+  payOrdersWithStripePromptPay,
+  payOrdersWithCash,
+  paymentErrorText
+} from '../../utils/tablePayment'
 
 // แสดงตัวอักษรย่อของผู้ใช้ที่ล็อกอินอยู่แทนรูปโปรไฟล์
 const kitchenUserName = getStoredUserName()
@@ -95,36 +102,9 @@ const generateQr = async () => {
   }
 }
 
-// ฟังก์ชันสร้าง QR Code ชำระเงิน (PromptPay / Stripe Payment)
+// พร้อมเพย์จ่ายผ่าน Stripe แล้ว (Stripe สร้าง QR ตอนกดชำระ) ไม่ต้องสร้าง QR ของร้านล่วงหน้า
 const generatePaymentQr = async () => {
-  if (netTotal.value <= 0) {
-    paymentQrDataUrl.value = ''
-    return
-  }
-  try {
-    // 1. เรียกสร้าง Stripe Intent ฝั่ง Backend (ถ้ามี orderId)
-    if (activeOrderIds.value.length > 0) {
-      const orderId = activeOrderIds.value[0]
-      axios.post(`${API_BASE}/transactions/stripe/create-intent/${orderId}`)
-        .then(res => {
-          stripePaymentIntent.value = res.data
-        })
-        .catch(() => {})
-    }
-
-    // 2. สร้าง PromptPay QR Code ตามมาตรฐาน EMVCo พร้อมระบุยอดเงินสุทธิ
-    const payload = generatePromptPayPayload(promptpayNumber.value, netTotal.value)
-    paymentQrDataUrl.value = await QRCode.toDataURL(payload, {
-      width: 280,
-      margin: 2,
-      color: {
-        dark: '#003B70', // สีน้ำเงินพร้อมเพย์มาตรฐาน
-        light: '#FFFFFF'
-      }
-    })
-  } catch (err) {
-    console.error('สร้าง QR ชำระเงินไม่สำเร็จ:', err)
-  }
+  paymentQrDataUrl.value = ''
 }
 
 // ฟังก์ชันดึงรายละเอียดโต๊ะและออเดอร์ของโต๊ะนี้
@@ -291,36 +271,30 @@ const toggleTableStatus = async () => {
 }
 
 const isPaying = ref(false)
+const payProgress = ref('')
 
-const confirmPayment = async () => {
+// ปิดบิลโต๊ะ: พร้อมเพย์ผ่าน Stripe (QR แสดงบนจอให้ลูกค้าสแกน) หรือรับเงินสด
+const payTable = async (method) => {
   if (isPaying.value) return
+  const targetTableId = tableData.value.table_id
   isPaying.value = true
+  payProgress.value = 'กำลังโหลดออเดอร์ที่ยังไม่ชำระ...'
 
   try {
-    const targetTableId = tableData.value.table_id
+    const unpaid = await fetchUnpaidTableOrders(targetTableId, tableData.value.id)
 
-    // ดึงรายการออเดอร์ทั้งหมดเพื่อปิดบิลให้ครบถ้วน
-    const ordersRes = await axios.get(`${API_BASE}/orders`).catch(() => ({ data: [] }))
-    const allOrders = ordersRes.data || []
-
-    const currentParam = String(paramValue.value || '').trim()
-    const cleanParam = currentParam.replace(/[\s_\-]/g, '').toUpperCase()
-
-    const targetOrders = allOrders.filter(o => {
-      const matchId = targetTableId && (o.table_id === targetTableId || o.table?.table_id === targetTableId)
-      const matchNum = o.table?.table_number && (String(o.table.table_number).replace(/[\s_\-]/g, '').toUpperCase() === cleanParam)
-      return (matchId || matchNum) && (o.status || '').toUpperCase() !== 'CANCELLED'
-    })
-
-    const orderIdsToPay = targetOrders.length > 0 
-      ? targetOrders.map(o => o.order_id)
-      : activeOrderIds.value
-
-    for (const orderId of orderIdsToPay) {
-      // ปรับสถานะ Transaction เป็น COMPLETED และ Order เป็น PAID
-      await axios.post(`${API_BASE}/transactions/stripe/confirm-test/${orderId}`).catch(() => {
-        return axios.patch(`${API_BASE}/orders/${orderId}/status`, { status: 'PAID' })
-      })
+    if (unpaid.length) {
+      if (method === 'cash') {
+        const total = unpaid.reduce((s, o) => s + Number(o.total_price || 0), 0)
+        if (!confirm(`ยืนยันรับเงินสด ฿${total.toLocaleString()} (${unpaid.length} ออเดอร์)?`)) return
+        await payOrdersWithCash(unpaid)
+      } else {
+        await payOrdersWithStripePromptPay(unpaid, {
+          onProgress: (i, n, o) => {
+            payProgress.value = `แสดง QR พร้อมเพย์ออเดอร์ #${o.order_id} (${i + 1}/${n}) ฿${Number(o.total_price).toLocaleString()}`
+          }
+        })
+      }
     }
 
     // ปรับสถานะโต๊ะเป็น AVAILABLE (ว่าง) เพื่อจบบริการ
@@ -338,13 +312,14 @@ const confirmPayment = async () => {
     // นำทางกลับหน้าผังโต๊ะอาหาร
     router.push('/kitchen/manage')
   } catch (err) {
+    // ชำระไม่สำเร็จ: ไม่ปิดโต๊ะ ให้พนักงานลองใหม่หรือรับเงินสดแทน
     console.error('ชำระเงินไม่สำเร็จ:', err)
-    if (tableData.value.table_id) {
-      await axios.patch(`${API_BASE}/tables/${tableData.value.table_id}/status`, { status: 'AVAILABLE' }).catch(() => {})
-    }
-    router.push('/kitchen/manage')
+    const done = err?.paidOrders?.length ? ` (ชำระสำเร็จแล้ว ${err.paidOrders.length} ออเดอร์)` : ''
+    alert(`ชำระเงินไม่สำเร็จ: ${paymentErrorText(err, 'เกิดข้อผิดพลาด')}${done}\nกดชำระอีกครั้งเพื่อสร้าง QR ใหม่ หรือรับเงินสดแทน`)
+    await fetchTableDetail()
   } finally {
     isPaying.value = false
+    payProgress.value = ''
   }
 }
 
@@ -433,18 +408,13 @@ const printPaymentBillSlip = () => {
       </div>
       <div class="qr-card">
         <div class="badge-row">
-          <span class="promptpay-badge">พร้อมเพย์ PromptPay</span>
+          <span class="promptpay-badge">พร้อมเพย์</span>
           <span class="stripe-badge">Stripe</span>
         </div>
-        <div style="font-size: 11px; color: #374151; font-weight: 600;">สแกนเพื่อชำระเงินยอด ฿${netTotal.value.toLocaleString()}</div>
-        <img class="qr-img" src="${paymentQrDataUrl.value || qrCodeDataUrl.value}" alt="Payment QR" />
-        <div style="font-size: 11px; color: #1f2937; font-weight: 700; margin-top: 4px;">
-          ${promptpayName.value}<br/>
-          <span style="font-family: monospace; font-size: 12px; color: #003B70;">พร้อมเพย์: ${promptpayNumber.value}</span>
-        </div>
+        <div style="font-size: 12px; color: #374151; font-weight: 600;">ชำระที่เคาน์เตอร์ ยอด ฿${netTotal.value.toLocaleString()}</div>
+        <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">พร้อมเพย์ (พนักงานแสดง QR ผ่าน Stripe) หรือเงินสด</div>
       </div>
       <div class="footer">
-        สแกนผ่านแอปธนาคารได้ทุกธนาคาร (SCB, KBank, BBL, KTB ฯลฯ)<br/>
         ขอบคุณที่ใช้บริการร้านตำครกซิ่งครับ / ค่ะ
       </div>
       <script>
@@ -800,7 +770,7 @@ const goBack = () => {
                     :style="qrTab === 'payment' ? 'background: #003B70; color: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1);' : 'background: transparent; color: #4B5563;'"
                     style="flex: 1; padding: 7px 4px; border: none; border-radius: 9px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 4px;"
                   >
-                    <span>🧾</span> QR ชำระเงิน (Stripe/พร้อมเพย์)
+                    <span>🧾</span> ชำระเงิน (พร้อมเพย์/เงินสด)
                   </button>
                   <button
                     type="button"
@@ -823,27 +793,32 @@ const goBack = () => {
                     ยอดที่ต้องชำระ: <span style="color: #003B70; font-size: 16px;">฿{{ netTotal.toLocaleString() }}</span>
                   </div>
 
-                  <div style="padding: 10px; background-color: white; border-radius: 16px; border: 2px solid #003B70; box-shadow: 0 4px 12px rgba(0,59,112,0.08); display: flex; justify-content: center; align-items: center;">
-                    <img v-if="paymentQrDataUrl" :src="paymentQrDataUrl" :alt="`QR ชำระเงิน โต๊ะ ${tableData.id}`" style="width: 160px; height: 160px; display: block;" />
-                    <div v-else style="width: 160px; height: 160px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #9CA3AF; font-size: 11px; padding: 8px; text-align: center;">
-                      <span>ยังไม่มียอดค้างชำระ</span>
-                      <small style="margin-top: 4px;">เมื่อมีรายการสั่งอาหารจะแสดง QR สำหรับชำระเงินทันที</small>
-                    </div>
+                  <div style="font-size: 11px; color: #4B5563; text-align: center; line-height: 1.4; padding: 0 8px;">
+                    <template v-if="netTotal <= 0">ยังไม่มียอดค้างชำระ</template>
+                    <template v-else-if="isStripePromptPayEnabled">กด "พร้อมเพย์" ระบบ Stripe จะแสดง QR ให้ลูกค้าสแกน และยืนยันยอดอัตโนมัติ</template>
+                    <template v-else>ยังไม่ได้ตั้งค่า Stripe — รับได้เฉพาะเงินสด</template>
                   </div>
-
-                  <div style="font-size: 11px; color: #4B5563; text-align: center; margin-top: 8px; line-height: 1.3;">
-                    <div style="font-weight: 600;">{{ promptpayName }}</div>
-                    <span style="font-family: monospace; color: #003B70; font-weight: 700;">พร้อมเพย์: {{ promptpayNumber }}</span>
-                  </div>
+                  <div v-if="payProgress" style="font-size: 12px; color: #003B70; font-weight: 700; margin-top: 6px; text-align: center;">⏳ {{ payProgress }}</div>
 
                   <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 14px;">
-                    <button 
-                      @click="confirmPayment"
+                    <button
+                      v-if="isStripePromptPayEnabled"
+                      @click="payTable('promptpay')"
+                      :disabled="isPaying || netTotal <= 0"
+                      type="button"
+                      :style="isPaying || netTotal <= 0 ? 'opacity: 0.6; cursor: not-allowed;' : ''"
+                      style="width: 100%; padding: 13px 16px; background-color: #003B70; border: none; border-radius: 12px; font-size: 14px; font-weight: 700; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 2px 6px rgba(0,59,112,0.3); transition: all 0.2s;"
+                    >
+                      <span>📱</span> {{ isPaying ? 'กำลังดำเนินการ...' : 'พร้อมเพย์ (Stripe) & ปิดโต๊ะ' }}
+                    </button>
+                    <button
+                      @click="payTable('cash')"
                       :disabled="isPaying"
                       type="button"
+                      :style="isPaying ? 'opacity: 0.6; cursor: not-allowed;' : ''"
                       style="width: 100%; padding: 13px 16px; background-color: #336846; border: none; border-radius: 12px; font-size: 14px; font-weight: 700; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 2px 6px rgba(51,104,70,0.3); transition: all 0.2s;"
                     >
-                      <span>💳</span> {{ isPaying ? 'กำลังบันทึกชำระเงิน...' : 'ยืนยันรับเงิน & ปิดโต๊ะ (จบบริการ)' }}
+                      <span>💵</span> {{ netTotal > 0 ? 'รับเงินสด & ปิดโต๊ะ (จบบริการ)' : 'ปิดโต๊ะ (จบบริการ)' }}
                     </button>
                     <button 
                       @click="printPaymentBillSlip"

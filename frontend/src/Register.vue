@@ -77,6 +77,41 @@
           <div v-if="phoneMessage" :class="['field-feedback', phoneStatus === 'available' ? 'feedback-success' : 'feedback-danger']">
             {{ phoneMessage }}
           </div>
+
+          <!-- ยืนยันเบอร์โทรด้วยรหัส OTP -->
+          <div v-if="otpVerifiedPhone && otpVerifiedPhone === form.phone" class="otp-verified">✅ ยืนยันเบอร์โทรศัพท์แล้ว</div>
+          <div v-else class="otp-box">
+            <button
+              type="button"
+              class="otp-send-btn"
+              @click="requestOtp"
+              :disabled="loading || otpSending || otpCooldown > 0 || form.phone.length !== 10 || phoneStatus === 'duplicate' || phoneStatus === 'invalid_format'"
+            >
+              <span v-if="otpSending">กำลังส่ง…</span>
+              <span v-else-if="otpCooldown > 0">ส่งรหัสใหม่ได้ใน {{ otpCooldown }} วิ</span>
+              <span v-else>{{ otpSentPhone === form.phone ? 'ส่งรหัส OTP อีกครั้ง' : 'ส่งรหัส OTP' }}</span>
+            </button>
+            <template v-if="otpSentPhone && otpSentPhone === form.phone">
+              <div class="otp-row">
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="one-time-code"
+                  maxlength="6"
+                  v-model="otpCode"
+                  @input="otpCode = otpCode.replace(/\D/g, '').slice(0, 6)"
+                  placeholder="กรอกรหัส 6 หลัก"
+                  class="otp-input"
+                  :disabled="loading || otpVerifying"
+                >
+                <button type="button" class="otp-verify-btn" @click="verifyOtp" :disabled="otpCode.length !== 6 || otpVerifying">
+                  {{ otpVerifying ? 'กำลังตรวจสอบ…' : 'ยืนยัน' }}
+                </button>
+              </div>
+              <div v-if="otpIsTest" class="otp-test-badge">🧪 โหมดทดสอบ — รหัสทดสอบ: 123456</div>
+            </template>
+            <div v-if="otpMessage" :class="['field-feedback', otpError ? 'feedback-danger' : 'feedback-success']">{{ otpMessage }}</div>
+          </div>
         </div>
 
         <!-- อีเมล (บังคับเฉพาะ @gmail.com หรือ @hotmail.com และห้ามซ้ำ) -->
@@ -176,7 +211,7 @@
           >
         </div>
 
-        <button type="submit" class="submit-btn" :disabled="loading || usernameLoading || phoneLoading || emailLoading || usernameStatus === 'duplicate' || phoneStatus === 'duplicate' || emailStatus === 'duplicate'">
+        <button type="submit" class="submit-btn" :disabled="loading || !isPhoneVerified || usernameLoading || phoneLoading || emailLoading || usernameStatus === 'duplicate' || phoneStatus === 'duplicate' || emailStatus === 'duplicate'">
           <span v-if="loading">กำลังสร้างบัญชี...</span>
           <span v-else>สมัครสมาชิก</span>
         </button>
@@ -238,15 +273,98 @@ export default {
       emailStatus: null, // 'available' | 'duplicate' | 'invalid_format' | null
       emailMessage: '',
       emailDebounceTimer: null,
+      // OTP ยืนยันเบอร์โทร
+      otpSending: false,
+      otpVerifying: false,
+      otpSentPhone: '',
+      otpVerifiedPhone: '',
+      otpToken: '',
+      otpCode: '',
+      otpIsTest: false,
+      otpCooldown: 0,
+      otpTimer: null,
+      otpMessage: '',
+      otpError: false,
       loading: false,
       errorMessage: ''
     };
+  },
+  computed: {
+    isPhoneVerified() {
+      return !!this.otpToken && this.otpVerifiedPhone === this.form.phone;
+    }
   },
   mounted() {
     // เคลียร์เซสชันเดิมออกเสมอเมื่อเปิดหน้าสมัครสมาชิก เพื่อไม่ให้ติดสิทธิ์ของบัญชีเดิม
     authStore.logout(false);
   },
+  beforeUnmount() {
+    if (this.otpTimer) clearInterval(this.otpTimer);
+  },
   methods: {
+    startOtpCooldown(seconds) {
+      if (this.otpTimer) clearInterval(this.otpTimer);
+      this.otpCooldown = seconds;
+      this.otpTimer = setInterval(() => {
+        this.otpCooldown -= 1;
+        if (this.otpCooldown <= 0) {
+          this.otpCooldown = 0;
+          clearInterval(this.otpTimer);
+          this.otpTimer = null;
+        }
+      }, 1000);
+    },
+
+    otpErrorText(err, fallback) {
+      const m = err?.response?.data?.message;
+      return (Array.isArray(m) ? m.join(', ') : m) || fallback;
+    },
+
+    async requestOtp() {
+      const phone = this.form.phone;
+      if (!/^0\d{9}$/.test(phone)) {
+        this.otpError = true;
+        this.otpMessage = 'กรุณากรอกเบอร์โทรศัพท์ 10 หลักให้ถูกต้องก่อน';
+        return;
+      }
+      this.otpSending = true;
+      this.otpMessage = '';
+      try {
+        const { data } = await axios.post(`${API_BASE}/auth/otp/request`, { phone });
+        this.otpSentPhone = phone;
+        this.otpCode = '';
+        this.otpIsTest = !!data?.is_test;
+        this.otpError = false;
+        this.otpMessage = 'ส่งรหัส OTP แล้ว รหัสมีอายุ 5 นาที';
+        this.startOtpCooldown(Number(data?.cooldown_seconds) || 60);
+      } catch (err) {
+        this.otpError = true;
+        this.otpMessage = this.otpErrorText(err, 'ส่งรหัส OTP ไม่สำเร็จ กรุณาลองใหม่');
+        // backend แจ้งให้รอ X วินาที -> นับถอยหลังตามนั้น
+        const wait = Number((this.otpMessage.match(/รอ\s*(\d+)\s*วินาที/) || [])[1]);
+        if (wait > 0) this.startOtpCooldown(wait);
+      } finally {
+        this.otpSending = false;
+      }
+    },
+
+    async verifyOtp() {
+      if (this.otpCode.length !== 6) return;
+      this.otpVerifying = true;
+      try {
+        const { data } = await axios.post(`${API_BASE}/auth/otp/verify`, { phone: this.otpSentPhone, otp: this.otpCode });
+        this.otpToken = data?.otp_token || '';
+        this.otpVerifiedPhone = this.otpSentPhone;
+        this.otpError = false;
+        this.otpMessage = '';
+      } catch (err) {
+        this.otpError = true;
+        this.otpMessage = this.otpErrorText(err, 'รหัส OTP ไม่ถูกต้อง');
+      } finally {
+        this.otpVerifying = false;
+      }
+    },
+
     onUsernameInput() {
       this.usernameStatus = null;
       this.usernameMessage = '';
@@ -483,6 +601,13 @@ export default {
         return;
       }
 
+      // 7.1 ต้องยืนยันเบอร์โทรด้วย OTP ก่อนสมัคร
+      if (!this.isPhoneVerified) {
+        this.errorMessage = 'กรุณายืนยันเบอร์โทรศัพท์ด้วยรหัส OTP ก่อนสมัครสมาชิก';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
       // 8. ตรวจสอบสถานะอีเมลซ้ำก่อนส่ง
       if (this.emailStatus === 'duplicate') {
         this.errorMessage = 'อีเมลนี้ถูกใช้งานแล้วในระบบ กรุณาใช้อีเมลอื่น';
@@ -506,7 +631,8 @@ export default {
           password: this.form.password,
           phone_number: cleanPhone,
           email: this.form.email.trim(),
-          address: fullAddress
+          address: fullAddress,
+          otp_token: this.otpToken
         };
 
         // เคลียร์เซสชันเดิมก่อนสร้างบัญชีใหม่
@@ -772,6 +898,36 @@ export default {
 
 .feedback-success { color: #2e7d32; }
 .feedback-danger { color: #c62828; }
+
+/* OTP */
+.otp-box { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.otp-row { display: flex; gap: 6px; }
+.otp-input { flex: 1; min-width: 0; letter-spacing: 4px; font-weight: 700; text-align: center; }
+.otp-send-btn,
+.otp-verify-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.otp-send-btn { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; align-self: flex-start; }
+.otp-verify-btn { background: #2e7d32; color: #fff; }
+.otp-send-btn:disabled,
+.otp-verify-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.otp-test-badge {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #6a1b9a;
+  background: #f3e5f5;
+  border: 1px dashed #ce93d8;
+  border-radius: 8px;
+  padding: 4px 8px;
+  align-self: flex-start;
+}
+.otp-verified { font-size: 12px; font-weight: 700; color: #2e7d32; margin-top: 4px; }
 .field-hint { font-size: 11.5px; color: #888; margin-top: 2px; }
 
 .submit-btn { 

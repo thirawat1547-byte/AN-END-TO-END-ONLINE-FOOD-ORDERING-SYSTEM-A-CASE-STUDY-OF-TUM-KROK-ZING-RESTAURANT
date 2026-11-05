@@ -4,6 +4,54 @@ import axios from 'axios'
 import { API_BASE } from '../../config/api'
 import { getInitial, getStoredUserName } from '../../utils/avatar'
 import { socket } from '../../config/socket'
+import PurchaseModal from '../../components/inventory/PurchaseModal.vue'
+import PurchaseHistory from '../../components/inventory/PurchaseHistory.vue'
+
+// มุมมอง: เมนู (เปิด/ปิดขาย) | วัตถุดิบ (สั่งเพิ่มพร้อมราคา) | ประวัติการสั่งซื้อ
+const view = ref('menus')
+const VIEWS = [
+  { id: 'menus', label: '🍽️ เมนู' },
+  { id: 'ingredients', label: '🥬 วัตถุดิบ / สั่งเพิ่ม' },
+  { id: 'purchases', label: '🧾 ประวัติการสั่งซื้อ' }
+]
+
+const ingredients = ref([])
+const ingredientsLoading = ref(false)
+const fetchIngredients = async () => {
+  ingredientsLoading.value = true
+  try {
+    const { data } = await axios.get(`${API_BASE}/ingredients`)
+    ingredients.value = (Array.isArray(data) ? data : []).map((i) => ({
+      id: i.ingredient_id || i.id,
+      label: i.name || i.ingredient_name,
+      unit: i.unit,
+      unitLabel: i.unit,
+      stock: Number(i.quantity ?? i.quantity_in_stock ?? 0),
+      min: Number(i.min_quantity ?? i.reorder_level ?? 0)
+    }))
+  } catch (err) {
+    console.error('โหลดวัตถุดิบไม่สำเร็จ:', err)
+  } finally {
+    ingredientsLoading.value = false
+  }
+}
+const filteredIngredients = computed(() =>
+  ingredients.value.filter((i) => (i.label || '').toLowerCase().includes(search.value.toLowerCase()))
+)
+
+const purchaseOpen = ref(false)
+const purchaseInitialId = ref(null)
+const purchaseRefreshKey = ref(0)
+const openPurchase = (item) => {
+  purchaseInitialId.value = item ? item.id : null
+  purchaseOpen.value = true
+}
+const onPurchaseSaved = async () => {
+  purchaseOpen.value = false
+  purchaseRefreshKey.value++
+  await fetchIngredients()
+}
+const fmtQty = (v) => Number(v || 0).toLocaleString('th-TH', { maximumFractionDigits: 2 })
 
 // แสดงตัวอักษรย่อของผู้ใช้ที่ล็อกอินอยู่แทนรูปโปรไฟล์
 const kitchenUserName = getStoredUserName()
@@ -161,6 +209,7 @@ const fetchMenus = async () => {
 
 onMounted(() => {
   fetchMenus()
+  fetchIngredients()
   if (socket) {
     socket.on('menu_updated', fetchMenus)
     socket.on('new_order', fetchMenus)
@@ -227,7 +276,64 @@ const toggleAvailable = async (item) => {
     <!-- Content & Controls -->
     <div style="flex: 1; padding: 32px; overflow-y: auto; display: flex; flex-direction: column; align-items: center;">
       <div style="width: 100%; max-width: 1152px;">
-        
+
+        <!-- View Switch -->
+        <div style="display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
+          <button
+            v-for="v in VIEWS"
+            :key="v.id"
+            @click="view = v.id"
+            style="padding: 10px 18px; border-radius: 14px; font-size: 14px; border: none; cursor: pointer;"
+            :style="view === v.id ? 'background-color: #48785A; color: white; font-weight: 700;' : 'background-color: #EFECE3; color: #4B5563; font-weight: 500;'"
+          >
+            {{ v.label }}
+          </button>
+        </div>
+
+        <!-- ===== วัตถุดิบ / สั่งเพิ่ม ===== -->
+        <div v-if="view === 'ingredients'" style="background-color: #EFECE3; border-radius: 24px; padding: 24px; margin-bottom: 40px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+            <input
+              v-model="search"
+              type="text"
+              placeholder="ค้นหาวัตถุดิบ..."
+              style="flex: 1; min-width: 220px; max-width: 360px; background-color: #FAF9F5; padding: 10px 16px; border-radius: 14px; font-size: 14px; border: none; outline: none;"
+            />
+            <button
+              @click="openPurchase(null)"
+              style="padding: 10px 18px; border-radius: 14px; background-color: #48785A; color: white; font-weight: 700; border: none; cursor: pointer;"
+            >
+              🛒 สั่งวัตถุดิบเพิ่ม
+            </button>
+          </div>
+          <p v-if="ingredientsLoading && !ingredients.length" style="text-align: center; color: #9CA3AF; padding: 32px 0;">กำลังโหลด…</p>
+          <div
+            v-for="i in filteredIngredients"
+            :key="i.id"
+            style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid rgba(209,213,219,0.4); font-size: 14px;"
+          >
+            <div>
+              <div style="font-weight: 700; color: #1F2937;">{{ i.label }}</div>
+              <div style="font-size: 12px;" :style="i.stock <= i.min ? 'color: #DC2626; font-weight: 700;' : 'color: #6B7280;'">
+                คงเหลือ {{ fmtQty(i.stock) }} {{ i.unitLabel }}<span v-if="i.stock <= i.min"> • ใกล้หมด</span>
+              </div>
+            </div>
+            <button
+              @click="openPurchase(i)"
+              style="padding: 8px 14px; border-radius: 12px; background-color: #FAF9F5; color: #48785A; font-weight: 700; border: 1px solid #C9D8CF; cursor: pointer; white-space: nowrap;"
+            >
+              🛒 สั่งเพิ่ม
+            </button>
+          </div>
+          <p v-if="!ingredientsLoading && !filteredIngredients.length" style="text-align: center; color: #9CA3AF; padding: 32px 0;">ไม่พบวัตถุดิบ</p>
+        </div>
+
+        <!-- ===== ประวัติการสั่งซื้อ ===== -->
+        <div v-else-if="view === 'purchases'" style="margin-bottom: 40px;">
+          <PurchaseHistory :refresh-key="purchaseRefreshKey" />
+        </div>
+
+        <template v-else>
         <!-- Toolbar (Search & Category Switch) -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 16px; flex-wrap: wrap;">
           <!-- Search Input -->
@@ -345,8 +451,17 @@ const toggleAvailable = async (item) => {
             </div>
           </div>
         </div>
+        </template>
 
       </div>
     </div>
+
+    <PurchaseModal
+      :open="purchaseOpen"
+      :ingredients="ingredients"
+      :initial-id="purchaseInitialId"
+      @close="purchaseOpen = false"
+      @saved="onPurchaseSaved"
+    />
   </div>
 </template>

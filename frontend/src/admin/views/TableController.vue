@@ -5,6 +5,13 @@ import axios from 'axios'
 import QRCode from 'qrcode'
 import { API_BASE } from '../../config/api'
 import { adminStore } from '../store/adminData'
+import {
+  isStripePromptPayEnabled,
+  fetchUnpaidTableOrders,
+  payOrdersWithStripePromptPay,
+  payOrdersWithCash,
+  paymentErrorText
+} from '../../utils/tablePayment'
 
 const router = useRouter()
 
@@ -252,6 +259,7 @@ const payQrDataUrl = ref('')
 const isPaymentModalOpen = ref(false)
 const isPaying = ref(false)
 
+const payProgress = ref('')
 const openPaymentModal = async (table) => {
   selectedPayTable.value = table
   const amount = table.total || 0
@@ -259,17 +267,52 @@ const openPaymentModal = async (table) => {
     alert('โต๊ะนี้ยังไม่มียอดค้างชำระครับ')
     return
   }
+  payProgress.value = ''
+  payQrDataUrl.value = ''
+  isPaymentModalOpen.value = true
+}
 
+// ปิดบิลโต๊ะ: พร้อมเพย์ผ่าน Stripe (Stripe แสดง QR ให้ลูกค้าสแกน) หรือรับเงินสด
+const payTable = async (method) => {
+  if (!selectedPayTable.value || isPaying.value) return
+  const t = selectedPayTable.value
+  isPaying.value = true
+  payProgress.value = 'กำลังโหลดออเดอร์ที่ยังไม่ชำระ...'
+  let paidCount = 0
   try {
-    const payload = generatePromptPayPayload(promptpayNumber.value, amount)
-    payQrDataUrl.value = await QRCode.toDataURL(payload, {
-      width: 260,
-      margin: 2,
-      color: { dark: '#003B70', light: '#FFFFFF' }
-    })
-    isPaymentModalOpen.value = true
-  } catch (e) {
-    console.error(e)
+    const orders = await fetchUnpaidTableOrders(t.table_id, t.id)
+    if (!orders.length) {
+      alert('โต๊ะนี้ไม่มีออเดอร์ค้างชำระแล้วครับ')
+    } else if (method === 'cash') {
+      const total = orders.reduce((s, o) => s + Number(o.total_price || 0), 0)
+      if (!confirm(`ยืนยันรับเงินสด ฿${total.toLocaleString()} (${orders.length} ออเดอร์) ของโต๊ะ ${t.id}?`)) return
+      await payOrdersWithCash(orders)
+      paidCount = orders.length
+    } else {
+      const paid = await payOrdersWithStripePromptPay(orders, {
+        onProgress: (i, n, o) => {
+          payProgress.value = `แสดง QR พร้อมเพย์ออเดอร์ #${o.order_id} (${i + 1}/${n}) ฿${Number(o.total_price).toLocaleString()}`
+        }
+      })
+      paidCount = paid.length
+    }
+
+    if (paidCount && t.table_id) {
+      await axios.patch(`${API_BASE}/tables/${t.table_id}/status`, { status: 'AVAILABLE' }).catch(() => {})
+    }
+    if (paidCount) {
+      alert(`ชำระเงินโต๊ะ ${t.id} สำเร็จเรียบร้อยแล้ว`)
+      isPaymentModalOpen.value = false
+    }
+    await fetchTablesData()
+  } catch (err) {
+    console.error('ชำระเงินไม่สำเร็จ:', err)
+    const done = err?.paidOrders?.length ? ` (ชำระสำเร็จแล้ว ${err.paidOrders.length} ออเดอร์)` : ''
+    alert(`ชำระเงินไม่สำเร็จ: ${paymentErrorText(err, 'เกิดข้อผิดพลาด')}${done}\nกดชำระอีกครั้งเพื่อสร้าง QR ใหม่ หรือรับเงินสดแทน`)
+    await fetchTablesData()
+  } finally {
+    isPaying.value = false
+    payProgress.value = ''
   }
 }
 
@@ -306,14 +349,9 @@ const printTablePaymentSlip = () => {
       <div class="table-box">ใบแจ้งยอดชำระเงิน (โต๊ะ ${t.id})</div>
       <div>วันที่: ${nowStr}</div>
       <div class="amount">ยอดสุทธิ ฿${t.total.toLocaleString()}</div>
-      <div class="instruction">📱 สแกน QR ผ่าน Mobile Banking หรือ Stripe เพื่อชำระเงิน</div>
-      <img class="qr-img" src="${payQrDataUrl.value}" alt="QR Code" />
-      <div style="font-size: 11px; color: #4b5563; margin-top: 8px;">
-        ร้านตำครกซิ่ง | พร้อมเพย์: ${promptpayNumber.value}
-      </div>
+      <div class="instruction">ชำระที่เคาน์เตอร์: พร้อมเพย์ (พนักงานแสดง QR) หรือเงินสด</div>
       <div class="divider"></div>
       <div class="footer">
-        สแกนผ่านแอปธนาคารทุกธนาคารเพื่อชำระเงินได้ทันที<br/>
         ขอบคุณที่ใช้บริการครับ / ค่ะ
       </div>
       <script>
@@ -325,40 +363,6 @@ const printTablePaymentSlip = () => {
     </html>
   `)
   printWindow.document.close()
-}
-
-const confirmTablePaymentFromModal = async () => {
-  if (!selectedPayTable.value || isPaying.value) return
-  isPaying.value = true
-  const t = selectedPayTable.value
-
-  try {
-    const ordersRes = await axios.get(`${API_BASE}/orders`)
-    const allOrders = ordersRes.data || []
-    const activeOrders = allOrders.filter(o => 
-      (o.table_id === t.table_id || o.table?.table_number === t.id) &&
-      ['PENDING', 'COOKING', 'READY', 'SERVED'].includes((o.status || '').toUpperCase())
-    )
-
-    for (const ord of activeOrders) {
-      await axios.post(`${API_BASE}/transactions/stripe/confirm-test/${ord.order_id}`).catch(() => {
-        return axios.patch(`${API_BASE}/orders/${ord.order_id}/status`, { status: 'PAID' })
-      })
-    }
-
-    if (t.table_id) {
-      await axios.patch(`${API_BASE}/tables/${t.table_id}/status`, { status: 'AVAILABLE' }).catch(() => {})
-    }
-
-    alert(`ชำระเงินโต๊ะ ${t.id} สำเร็จเรียบร้อยแล้ว`)
-    isPaymentModalOpen.value = false
-    await fetchTablesData()
-  } catch (err) {
-    console.error('ชำระเงินไม่สำเร็จ:', err)
-    alert('เกิดข้อผิดพลาดในการชำระเงิน')
-  } finally {
-    isPaying.value = false
-  }
 }
 
 const openQrModal = async (table) => {
@@ -938,15 +942,10 @@ const confirmDeleteTable = async (table) => {
           <span style="font-size: 12px; font-weight: 600; color: #4B5563;">ยอดชำระสุทธิ (Net Total)</span>
           <span style="font-size: 28px; font-weight: 900; color: #003B70; margin: 4px 0;">฿{{ selectedPayTable.total.toLocaleString() }}</span>
           
-          <!-- Badge แสดงระบบชำระเงิน -->
-          <div style="display: flex; gap: 6px; margin: 4px 0 8px 0;">
-            <span style="background: #003B70; color: white; padding: 2px 10px; border-radius: 9999px; font-size: 10px; font-weight: 700;">พร้อมเพย์</span>
-            <span style="background: #635BFF; color: white; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 700;">Stripe</span>
-          </div>
-
-          <!-- รูป QR PromptPay -->
-          <img :src="payQrDataUrl" alt="Payment QR" style="width: 170px; height: 170px; display: block; border-radius: 10px; border: 1px solid #E5E7EB;" />
-          <span style="font-size: 11px; color: #4B5563; margin-top: 6px;">ร้านตำครกซิ่ง | พร้อมเพย์: {{ promptpayNumber }}</span>
+          <span style="font-size: 11px; color: #6B7280;">
+            {{ isStripePromptPayEnabled ? 'กด "พร้อมเพย์" ระบบ Stripe จะแสดง QR ให้ลูกค้าสแกน และยืนยันยอดอัตโนมัติ' : 'ยังไม่ได้ตั้งค่า Stripe — รับได้เฉพาะเงินสด' }}
+          </span>
+          <span v-if="payProgress" style="font-size: 12px; color: #003B70; font-weight: 700; margin-top: 6px;">⏳ {{ payProgress }}</span>
         </div>
 
         <!-- ปุ่ม Action ใน Modal -->
@@ -958,13 +957,26 @@ const confirmDeleteTable = async (table) => {
             >
               <span>🖨️</span> พิมพ์ใบแจ้งหนี้
             </button>
-            <button 
-              @click="confirmTablePaymentFromModal" 
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button
+              v-if="isStripePromptPayEnabled"
+              @click="payTable('promptpay')"
               :disabled="isPaying"
-              style="flex: 1.2; padding: 11px 0; border-radius: 12px; font-size: 13px; font-weight: 700; background: #003B70; color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
+              style="flex: 1; padding: 11px 0; border-radius: 12px; font-size: 13px; font-weight: 700; background: #003B70; color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
+              :style="isPaying ? 'opacity: 0.6; cursor: not-allowed;' : ''"
             >
-              <span>💳</span>
-              <span>{{ isPaying ? 'กำลังดำเนินการ...' : 'ยืนยันรับเงินเสร็จสิ้น' }}</span>
+              <span>📱</span>
+              <span>{{ isPaying ? 'กำลังดำเนินการ...' : 'พร้อมเพย์ (Stripe)' }}</span>
+            </button>
+            <button
+              @click="payTable('cash')"
+              :disabled="isPaying"
+              style="flex: 1; padding: 11px 0; border-radius: 12px; font-size: 13px; font-weight: 700; background: #2d5a43; color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
+              :style="isPaying ? 'opacity: 0.6; cursor: not-allowed;' : ''"
+            >
+              <span>💵</span>
+              <span>รับเงินสด</span>
             </button>
           </div>
         </div>

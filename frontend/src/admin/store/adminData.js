@@ -128,9 +128,9 @@ export const adminStore = reactive({
     vatRate: 7,
     baseDeliveryFee: 30,
     deliveryFeePerKm: 10,
-    riderFee: 40,
-    riderFreeKm: 3,
-    riderFeePerKm: 7,
+    riderFee: 15,
+    riderFeeStepKm: 2,
+    riderFeePerStep: 5,
     storeLat: null,
     storeLng: null,
     autoDeductStock: true,
@@ -693,7 +693,7 @@ export const adminStore = reactive({
             status: normStatus,
             order_type: o.order_type === 'DINE_IN' || o.table_id ? 'In-store' : 'Delivery',
             raw_order_type: o.order_type || (o.table_id ? 'DINE_IN' : 'DELIVERY'),
-            payment_method: txn?.payment_method || (o.table_id ? 'Stripe / QR' : 'PromptPay'),
+            payment_method: txn?.payment_method || '-',
             payment_status: isPaid ? 'Completed' : (isRejected ? 'Rejected' : 'Pending'),
             payment_slip_url: txn?.payment_slip_url || null,
             discount_applied: Number(o.discount_applied || 0)
@@ -937,8 +937,8 @@ export const adminStore = reactive({
           baseDeliveryFee: data.base_delivery_fee !== undefined ? Number(data.base_delivery_fee) : this.storeSettings.baseDeliveryFee,
           deliveryFeePerKm: data.delivery_fee_per_km !== undefined ? Number(data.delivery_fee_per_km) : this.storeSettings.deliveryFeePerKm,
           riderFee: data.base_rider_fee !== undefined ? Number(data.base_rider_fee) : this.storeSettings.riderFee,
-          riderFreeKm: data.rider_free_km !== undefined ? Number(data.rider_free_km) : this.storeSettings.riderFreeKm,
-          riderFeePerKm: data.rider_fee_per_km !== undefined ? Number(data.rider_fee_per_km) : this.storeSettings.riderFeePerKm,
+          riderFeeStepKm: data.rider_fee_step_km !== undefined ? Number(data.rider_fee_step_km) : this.storeSettings.riderFeeStepKm,
+          riderFeePerStep: data.rider_fee_per_step !== undefined ? Number(data.rider_fee_per_step) : this.storeSettings.riderFeePerStep,
           storeLat: data.store_lat ?? null,
           storeLng: data.store_lng ?? null
         }
@@ -1000,8 +1000,8 @@ export const adminStore = reactive({
         base_delivery_fee: Number(customSettings.baseDeliveryFee !== undefined ? customSettings.baseDeliveryFee : this.storeSettings.baseDeliveryFee),
         delivery_fee_per_km: Number(customSettings.deliveryFeePerKm !== undefined ? customSettings.deliveryFeePerKm : this.storeSettings.deliveryFeePerKm),
         base_rider_fee: Number(customSettings.riderFee !== undefined ? customSettings.riderFee : this.storeSettings.riderFee),
-        rider_free_km: Number(customSettings.riderFreeKm !== undefined ? customSettings.riderFreeKm : this.storeSettings.riderFreeKm),
-        rider_fee_per_km: Number(customSettings.riderFeePerKm !== undefined ? customSettings.riderFeePerKm : this.storeSettings.riderFeePerKm),
+        rider_fee_step_km: Number(customSettings.riderFeeStepKm !== undefined ? customSettings.riderFeeStepKm : this.storeSettings.riderFeeStepKm),
+        rider_fee_per_step: Number(customSettings.riderFeePerStep !== undefined ? customSettings.riderFeePerStep : this.storeSettings.riderFeePerStep),
         store_lat: toCoord(customSettings.storeLat !== undefined ? customSettings.storeLat : this.storeSettings.storeLat),
         store_lng: toCoord(customSettings.storeLng !== undefined ? customSettings.storeLng : this.storeSettings.storeLng)
       }
@@ -1034,8 +1034,8 @@ export const adminStore = reactive({
         baseDeliveryFee: Number(data.base_delivery_fee),
         deliveryFeePerKm: Number(data.delivery_fee_per_km),
         riderFee: Number(data.base_rider_fee),
-        riderFreeKm: Number(data.rider_free_km),
-        riderFeePerKm: Number(data.rider_fee_per_km),
+        riderFeeStepKm: Number(data.rider_fee_step_km),
+        riderFeePerStep: Number(data.rider_fee_per_step),
         storeLat: data.store_lat ?? null,
         storeLng: data.store_lng ?? null
       }

@@ -9,10 +9,11 @@ const isSaving = ref(false)
 const hasStoreLocation = computed(() =>
   Number(adminStore.storeSettings.storeLat) && Number(adminStore.storeSettings.storeLng)
 )
+// สูตร: ค่าต่อออเดอร์ + เพิ่มครั้งละ × floor(กม. ÷ ทุก ๆ กี่ กม.)
 const exampleFee = (km) => {
   const s = adminStore.storeSettings
-  const extraKm = Math.max(0, Math.ceil(km - Number(s.riderFreeKm || 0)))
-  return Number(s.riderFee || 0) + extraKm * Number(s.riderFeePerKm || 0)
+  const stepKm = Number(s.riderFeeStepKm) > 0 ? Number(s.riderFeeStepKm) : 2
+  return Number(s.riderFee || 0) + Number(s.riderFeePerStep || 0) * Math.floor(km / stepKm)
 }
 
 const isLocating = ref(false)
@@ -270,7 +271,7 @@ async function saveSettings() {
         <h3 class="font-bold text-slate-800">ค่ารอบไรเดอร์ (คิดตามระยะทาง)</h3>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label class="block font-bold text-slate-700 mb-1">ค่ารอบเริ่มต้น (บาท)</label>
+            <label class="block font-bold text-slate-700 mb-1">ค่าต่อออเดอร์ (บาท)</label>
             <input
               type="number"
               step="1"
@@ -278,28 +279,29 @@ async function saveSettings() {
               v-model.number="adminStore.storeSettings.riderFee"
               class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none font-bold text-emerald-700 font-mono"
             />
-            <span class="text-[10px] text-slate-400 mt-0.5 block">ได้ทุกเที่ยว ครอบคลุมระยะทางช่วงแรก</span>
+            <span class="text-[10px] text-slate-400 mt-0.5 block">ได้ทุกออเดอร์ (เช่น ฿15)</span>
           </div>
           <div>
-            <label class="block font-bold text-slate-700 mb-1">ระยะที่รวมในค่าเริ่มต้น (กม.)</label>
+            <label class="block font-bold text-slate-700 mb-1">ทุก ๆ กี่ กม.</label>
             <input
               type="number"
               step="0.5"
-              min="0"
-              v-model.number="adminStore.storeSettings.riderFreeKm"
+              min="0.5"
+              v-model.number="adminStore.storeSettings.riderFeeStepKm"
               class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none font-bold text-slate-800"
             />
+            <span class="text-[10px] text-slate-400 mt-0.5 block">นับเฉพาะช่วงที่ครบ (เช่น ทุก 2 กม.)</span>
           </div>
           <div>
-            <label class="block font-bold text-slate-700 mb-1">ส่วนที่เกิน (บาท/กม.)</label>
+            <label class="block font-bold text-slate-700 mb-1">เพิ่มครั้งละ (บาท)</label>
             <input
               type="number"
               step="1"
               min="0"
-              v-model.number="adminStore.storeSettings.riderFeePerKm"
+              v-model.number="adminStore.storeSettings.riderFeePerStep"
               class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none font-bold text-slate-800"
             />
-            <span class="text-[10px] text-slate-400 mt-0.5 block">ปัดขึ้นเป็นกิโลเต็ม</span>
+            <span class="text-[10px] text-slate-400 mt-0.5 block">บวกเพิ่มทุกช่วงระยะที่ครบ (เช่น ฿5)</span>
           </div>
         </div>
 
@@ -340,8 +342,11 @@ async function saveSettings() {
           :class="hasStoreLocation ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-amber-50 border-amber-200 text-amber-900'"
         >
           <template v-if="hasStoreLocation">
-            ตัวอย่างค่ารอบ: 2 กม. = ฿{{ exampleFee(2) }} • 5 กม. = ฿{{ exampleFee(5) }} • 10 กม. = ฿{{ exampleFee(10) }}
-            <span class="block text-[10px] opacity-80 mt-0.5">ระยะทางประมาณจากพิกัด GPS ร้านถึงหมุดลูกค้า (เส้นตรง × 1.3 ตามเส้นทางถนน) ค่ารอบจริงล็อกตอนไรเดอร์กดรับงาน</span>
+            ตัวอย่างค่ารอบ: 1 กม. = ฿{{ exampleFee(1) }} • 3 กม. = ฿{{ exampleFee(3) }} • 5 กม. = ฿{{ exampleFee(5) }} • 10 กม. = ฿{{ exampleFee(10) }}
+            <span class="block text-[10px] opacity-80 mt-0.5">
+              สูตร: ฿{{ Number(adminStore.storeSettings.riderFee || 0) }} + ฿{{ Number(adminStore.storeSettings.riderFeePerStep || 0) }} × (กม. ÷ {{ Number(adminStore.storeSettings.riderFeeStepKm || 2) }} ปัดลง) •
+              ระยะทางเส้นตรงจากพิกัดร้านถึงหมุดลูกค้า ค่ารอบจริงล็อกตอนไรเดอร์กดรับงาน
+            </span>
           </template>
           <template v-else>
             ⚠️ ยังไม่ได้ตั้งพิกัดร้าน ระบบจะจ่ายค่ารอบเริ่มต้น ฿{{ Number(adminStore.storeSettings.riderFee || 0) }} ทุกเที่ยว จนกว่าจะใส่พิกัดร้าน

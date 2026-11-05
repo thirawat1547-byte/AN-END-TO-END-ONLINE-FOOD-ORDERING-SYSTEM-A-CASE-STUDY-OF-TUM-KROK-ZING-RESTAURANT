@@ -1,6 +1,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { adminStore } from '../store/adminData'
+import PurchaseModal from '../../components/inventory/PurchaseModal.vue'
+import PurchaseHistory from '../../components/inventory/PurchaseHistory.vue'
 
 // พจนานุกรมแปลชื่อวัตถุดิบและหน่วยนับอัตโนมัติสำหรับ Frontend
 const THAI_MAP = {
@@ -176,13 +178,27 @@ async function saveAdjust() {
   isAdjustModalOpen.value = false
 }
 
-async function quickAdd(item, amount) {
-  const newQty = Number(item.quantity_in_stock) + amount
-  if (typeof adminStore.updateStockAPI === 'function') {
-    await adminStore.updateStockAPI(item.ingredient_id, newQty)
-  } else {
-    adminStore.updateStock(item.ingredient_id, newQty)
-  }
+// สั่งวัตถุดิบเพิ่ม (บันทึกราคา + บวกสต็อกทันทีผ่าน API)
+const purchaseOpen = ref(false)
+const purchaseInitialId = ref(null)
+const purchaseRefreshKey = ref(0)
+const purchaseIngredients = computed(() =>
+  adminStore.ingredients.map(i => ({
+    id: i.ingredient_id,
+    label: getThaiName(i.ingredient_name),
+    unit: i.unit,
+    unitLabel: getThaiUnit(i.unit, i.ingredient_name),
+    stock: i.quantity_in_stock
+  }))
+)
+function openPurchase(item) {
+  purchaseInitialId.value = item ? item.ingredient_id : null
+  purchaseOpen.value = true
+}
+async function onPurchaseSaved() {
+  purchaseOpen.value = false
+  purchaseRefreshKey.value++
+  await adminStore.fetchInventoryFromAPI()
 }
 
 async function handleTranslateAll() {
@@ -420,7 +436,37 @@ async function saveRecipeFormula() {
         <span>🍲 สูตรอาหารและการตัดสต็อก (Recipe Formula)</span>
         <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-[#2d5a43] font-bold text-[10px]">Auto Deduct</span>
       </button>
+      <button
+        @click="activeTab = 'purchases'"
+        :class="[
+          'px-4 py-2.5 text-xs font-bold transition border-b-2 flex items-center gap-2',
+          activeTab === 'purchases' ? 'border-[#2d5a43] text-[#2d5a43]' : 'border-transparent text-slate-500 hover:text-slate-800'
+        ]"
+      >
+        <span>🧾 ประวัติการสั่งซื้อ</span>
+      </button>
     </div>
+
+    <!-- TAB 3: ประวัติการสั่งซื้อวัตถุดิบ -->
+    <div v-if="activeTab === 'purchases'" class="space-y-4">
+      <div class="flex justify-end">
+        <button
+          @click="openPurchase(null)"
+          class="px-4 py-2 rounded-xl bg-[#2d5a43] hover:bg-[#23473a] text-white text-xs font-bold"
+        >
+          🛒 สั่งวัตถุดิบเพิ่ม
+        </button>
+      </div>
+      <PurchaseHistory :refresh-key="purchaseRefreshKey" />
+    </div>
+
+    <PurchaseModal
+      :open="purchaseOpen"
+      :ingredients="purchaseIngredients"
+      :initial-id="purchaseInitialId"
+      @close="purchaseOpen = false"
+      @saved="onPurchaseSaved"
+    />
 
     <!-- TAB 1: Stock Inventory Table -->
     <div v-if="activeTab === 'stock'" class="space-y-4">
@@ -531,12 +577,12 @@ async function saveRecipeFormula() {
                 <!-- Actions -->
                 <td class="p-4 text-right">
                   <div class="flex items-center justify-end gap-1.5">
-                    <button 
-                      @click="quickAdd(item, 5)"
+                    <button
+                      @click="openPurchase(item)"
                       class="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-[10px] transition"
-                      title="เติมสต็อกทันที +5 หน่วย"
+                      title="สั่งวัตถุดิบเพิ่มพร้อมบันทึกราคา"
                     >
-                      +5
+                      🛒 สั่งเพิ่ม
                     </button>
                     <button 
                       @click="openAdjust(item)"
@@ -561,7 +607,7 @@ async function saveRecipeFormula() {
     </div>
 
     <!-- TAB 2: Recipe Formulation (MENU_INGREDIENTS) -->
-    <div v-else class="space-y-4">
+    <div v-else-if="activeTab === 'recipes'" class="space-y-4">
       <div class="bg-emerald-50 p-4 rounded-2xl border border-emerald-200/80 text-xs text-[#183324] flex items-start gap-3">
         <span class="text-xl flex-shrink-0">💡</span>
         <div>

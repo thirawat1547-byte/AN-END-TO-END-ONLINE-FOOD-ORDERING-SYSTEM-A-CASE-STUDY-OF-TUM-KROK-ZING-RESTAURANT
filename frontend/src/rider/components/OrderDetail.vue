@@ -18,6 +18,7 @@
       </div>
       <div class="mt-3 bg-slate-50 rounded-xl p-3 text-sm">
         <p class="text-slate-800">📍 {{ address }}</p>
+        <p v-if="landmark" class="mt-1 text-slate-700 text-xs">🏷️ จุดสังเกต: <b>{{ landmark }}</b></p>
         <p v-if="order.order_notes" class="mt-1.5 text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 text-xs">
           📝 หมายเหตุ: {{ order.order_notes }}
         </p>
@@ -89,7 +90,9 @@ const customerPhone = computed(() => delivery.value.customer_phone || props.orde
 const phoneDigits = computed(() => customerPhone.value.replace(/[^\d+]/g, ''))
 const address = computed(() => delivery.value.delivery_address || props.order.delivery_address || props.order.user?.address || '-')
 
-const hasGps = computed(() => Number(delivery.value.customer_lat) && Number(delivery.value.customer_lng))
+const landmark = computed(() => delivery.value.delivery_landmark || props.order.delivery_landmark || '')
+
+const hasGps =computed(() => Number(delivery.value.customer_lat) && Number(delivery.value.customer_lng))
 const mapsUrl = computed(() => {
   const dest = hasGps.value
     ? `${Number(delivery.value.customer_lat)},${Number(delivery.value.customer_lng)}`

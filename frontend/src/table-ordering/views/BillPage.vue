@@ -55,14 +55,15 @@
         <div style="display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 8px;">
           <span style="background: #003B70; color: white; padding: 2px 10px; border-radius: 9999px; font-weight: 800; font-size: 11px;">PromptPay</span>
           <span style="background: #635bff; color: white; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 10px;">Stripe</span>
+          <span style="background: #2d5a43; color: white; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 10px;">เงินสด</span>
         </div>
-        <div style="font-size: 13px; font-weight: 700; color: #1F2937; margin-bottom: 6px;">
-          สแกน QR เพื่อชำระเงิน ฿{{ billTotal.toFixed(2) }}
+        <div style="font-size: 14px; font-weight: 700; color: #1F2937; margin-bottom: 6px;">
+          ยอดชำระ ฿{{ billTotal.toFixed(2) }}
         </div>
-        <img v-if="paymentQrUrl" :src="paymentQrUrl" alt="Payment QR" style="width: 170px; height: 170px; margin: 0 auto; display: block; border: 2px solid #003B70; border-radius: 12px; background: white; padding: 6px;" />
-        <div style="font-size: 11px; color: #6B7280; margin-top: 8px; line-height: 1.4;">
-          {{ promptpayName || 'ร้านตำครกซิ่ง' }} | พร้อมเพย์: {{ promptpayNumber || '-' }}<br/>
-          (สามารถสแกนจ่ายผ่านแอปธนาคาร หรือแจ้งชำระที่เคาน์เตอร์ได้ครับ)
+        <div style="font-size: 12px; color: #4B5563; line-height: 1.5;">
+          🙋 เรียกพนักงานเพื่อเช็คบิล<br/>
+          📱 <b>พร้อมเพย์</b>: พนักงานจะแสดง QR (ผ่าน Stripe) ให้สแกนจ่าย ยอดเข้าระบบอัตโนมัติ<br/>
+          💵 <b>เงินสด</b>: ชำระกับพนักงานได้ที่โต๊ะ
         </div>
       </div>
     </div>
@@ -70,11 +71,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import QRCode from 'qrcode'
-import axios from 'axios'
-import { API_BASE } from '../../config/api'
 import OrderHeader from '../components/OrderHeader.vue'
 import { useCart } from '../composables/useCart'
 
@@ -83,79 +80,6 @@ const router = useRouter()
 const tableId = route.params.tableId || '1'
 
 const { placedOrders, billTotal, billTotalCalories, getItemCalories } = useCart()
-const paymentQrUrl = ref('')
-// ข้อมูลพร้อมเพย์ ดึงจากหน้าตั้งค่าร้าน (Admin Settings) ผ่าน GET /settings
-const promptpayNumber = ref('')
-const promptpayName = ref('')
-
-const loadPromptPaySettings = async () => {
-  try {
-    const res = await axios.get(`${API_BASE}/settings`)
-    promptpayNumber.value = res.data?.promptpay_number || ''
-    promptpayName.value = res.data?.promptpay_name || ''
-  } catch (e) {
-    console.error('โหลดข้อมูลพร้อมเพย์จากตั้งค่าร้านไม่สำเร็จ:', e)
-  }
-}
-
-function crc16(data) {
-  let crc = 0xFFFF;
-  for (let i = 0; i < data.length; i++) {
-    let x = ((crc >> 8) ^ data.charCodeAt(i)) & 0xFF;
-    x ^= x >> 4;
-    crc = ((crc << 8) ^ (x << 12) ^ (x << 5) ^ x) & 0xFFFF;
-  }
-  return crc.toString(16).toUpperCase().padStart(4, '0');
-}
-
-function generatePromptPayPayload(target, amount) {
-  const cleanTarget = String(target || '0954238372').replace(/[^0-9]/g, '');
-  const targetType = cleanTarget.length >= 13 ? '02' : '01';
-  let formattedTarget = cleanTarget;
-  if (targetType === '01') {
-    formattedTarget = '0066' + cleanTarget.replace(/^0/, '');
-  }
-  const targetTag = targetType + String(formattedTarget.length).padStart(2, '0') + formattedTarget;
-  const aid = '0016A000000677010111';
-  const merchantInfo = aid + targetTag;
-  const merchantTag = '29' + String(merchantInfo.length).padStart(2, '0') + merchantInfo;
-  
-  let payload = '000201' + '010212' + merchantTag + '5802TH' + '5303764';
-  if (amount !== undefined && amount !== null && Number(amount) > 0) {
-    const formattedAmount = Number(amount).toFixed(2);
-    payload += '54' + String(formattedAmount.length).padStart(2, '0') + formattedAmount;
-  }
-  payload += '6304';
-  payload += crc16(payload);
-  return payload;
-}
-
-const generatePaymentQr = async () => {
-  if (billTotal.value <= 0 || !promptpayNumber.value) {
-    paymentQrUrl.value = ''
-    return
-  }
-  try {
-    const payload = generatePromptPayPayload(promptpayNumber.value, billTotal.value)
-    paymentQrUrl.value = await QRCode.toDataURL(payload, {
-      width: 240,
-      margin: 2,
-      color: { dark: '#003B70', light: '#FFFFFF' }
-    })
-  } catch (e) {
-    console.error(e)
-  }
-}
-
-onMounted(async () => {
-  await loadPromptPaySettings()
-  generatePaymentQr()
-})
-
-watch(billTotal, () => {
-  generatePaymentQr()
-})
-
 const goToMenu = () => {
   router.push(`/table/${tableId}`)
 }

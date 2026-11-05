@@ -57,21 +57,34 @@
                 <p class="address-text" v-if="hasValidAddress">{{ userProfile.address }}</p>
                 <p class="address-text address-empty-text" v-else>📍 ยังไม่ได้ระบุที่อยู่จัดส่งเดลิเวอรี่</p>
 
-                <!-- ป้ายแสดงพิกัด GPS จริงที่ปักหมุดไว้ -->
+                <!-- ป้ายแสดงว่าปักหมุดแล้ว (เก็บพิกัดไว้เบื้องหลังเพื่อคิดค่ารอบไรเดอร์) -->
                 <div class="gps-pinned-badge" v-if="deliveryLat && deliveryLng">
                   <span class="gps-badge-icon">📍</span>
                   <div class="gps-badge-info">
-                    <span class="gps-badge-title">พิกัด GPS ปักหมุด:</span>
-                    <span class="gps-badge-coords">{{ Number(deliveryLat).toFixed(5) }}, {{ Number(deliveryLng).toFixed(5) }}</span>
+                    <span class="gps-badge-title">ปักหมุดตำแหน่งจัดส่งแล้ว</span>
+                    <span class="gps-badge-coords" v-if="pinnedAddress">{{ pinnedAddress }}</span>
                   </div>
-                  <span class="gps-badge-tag">พิกัดจริง</span>
+                  <span class="gps-badge-tag">GPS</span>
                 </div>
 
                 <div v-if="gpsNotice" class="gps-notice-banner">
                   {{ gpsNotice }}
                 </div>
 
-                <p class="address-note">หมายเหตุ: ไรเดอร์จะนำทางตามพิกัด GPS นี้เพื่อความแม่นยำสูงสุด</p>
+                <!-- จุดสังเกต -->
+                <div class="landmark-field">
+                  <label class="edit-field-label">🏷️ จุดสังเกต (ไม่บังคับ)</label>
+                  <input
+                    type="text"
+                    v-model="deliveryLandmark"
+                    @change="saveLandmark"
+                    maxlength="255"
+                    placeholder="เช่น ตึกสีฟ้า หน้าเซเว่น"
+                    class="landmark-input"
+                  />
+                </div>
+
+                <p class="address-note">หมายเหตุ: ไรเดอร์จะนำทางตามหมุดที่ปักไว้เพื่อความแม่นยำสูงสุด</p>
 
                 <div class="address-action-row">
                   <button 
@@ -101,6 +114,16 @@
                 <!-- ป้ายแสดงสถานะการแปลงที่อยู่เป็นพิกัดแผนที่ -->
                 <div v-if="isGeocoding" class="geocoding-status-banner loading">
                   <span class="spin-icon">⏳</span> กำลังค้นหาตำแหน่งบนแผนที่จากที่อยู่ที่กรอก...
+                </div>
+                <div v-else-if="isReverseGeocoding" class="geocoding-status-banner loading">
+                  <span class="spin-icon">⏳</span> กำลังแปลงตำแหน่งที่ปักหมุดเป็นที่อยู่...
+                </div>
+                <div v-else-if="pinnedByGps && pinnedAddress" class="geocoding-status-banner success">
+                  <span class="check-icon">📍</span> ที่อยู่ปัจจุบัน: <strong>{{ pinnedAddress }}</strong>
+                  <span class="geo-edit-hint">
+                    แก้ไขข้อความที่อยู่ด้านบนได้ หมุดจะยังอยู่ตำแหน่งเดิม •
+                    <a href="#" @click.prevent="unpinGps">ค้นหาหมุดจากที่อยู่ที่พิมพ์แทน</a>
+                  </span>
                 </div>
                 <div v-else-if="geocodeFoundAddress" class="geocoding-status-banner success">
                   <span class="check-icon">📍</span> ปักหมุดแผนที่ตรงกับ: <strong>{{ geocodeFoundAddress }}</strong>
@@ -189,7 +212,7 @@
             >
               <div class="pay-icon">📱</div>
               <span class="pay-title">พร้อมเพย์</span>
-              <span class="pay-sub">สแกน QR Code</span>
+              <span class="pay-sub">{{ isCardPaymentEnabled ? 'สแกน QR ผ่าน Stripe' : 'สแกน QR Code' }}</span>
             </div>
 
             <!-- 3. เงินสด -->
@@ -513,7 +536,7 @@
     <div v-if="isCardProcessingModalOpen" class="card-processing-backdrop">
       <div class="card-processing-card">
         <div class="processing-top-badge">
-          <span>💳 บัตรเดบิต (Stripe)</span>
+          <span>{{ paymentProcessingLabel }}</span>
         </div>
 
         <div class="processing-icon-area">
@@ -666,6 +689,17 @@
               {{ missingInfoGpsNotice }}
             </span>
           </div>
+
+          <div class="missing-info-form-group">
+            <label class="missing-info-label">🏷️ จุดสังเกต (ไม่บังคับ)</label>
+            <input
+              type="text"
+              v-model="deliveryLandmark"
+              maxlength="255"
+              placeholder="เช่น ตึกสีฟ้า หน้าเซเว่น"
+              class="missing-info-input"
+            />
+          </div>
         </div>
 
         <div class="missing-info-modal-actions">
@@ -781,6 +815,13 @@ export default {
       isGeocoding: false,
       geocodeFoundAddress: '',
       geocodeDebounceTimer: null,
+      // ที่อยู่จากการปักหมุด (OpenStreetMap ผ่าน backend /geo/reverse)
+      isReverseGeocoding: false,
+      pinnedByGps: false,
+      pinnedAddress: '',
+      deliveryLandmark: localStorage.getItem('delivery_landmark') || '',
+      // พร้อมเพย์ผ่าน Stripe
+      paymentProcessingLabel: '💳 บัตรเดบิต (Stripe)',
       showQrModal: false,
       qrCodeUrl: '',
       isGeneratingQr: false,
@@ -1212,11 +1253,40 @@ export default {
       this.isEditingAddress = true;
     },
 
+    // แปลงพิกัดเป็นที่อยู่ภาษาไทยผ่าน backend (OpenStreetMap Nominatim)
+    async reverseGeocode(lat, lng) {
+      this.isReverseGeocoding = true;
+      try {
+        const { data } = await axios.get(`${API_BASE}/geo/reverse`, { params: { lat, lng } });
+        return (data?.display_name || '').trim();
+      } catch (err) {
+        console.warn('แปลงพิกัดเป็นที่อยู่ไม่สำเร็จ:', err);
+        return '';
+      } finally {
+        this.isReverseGeocoding = false;
+      }
+    },
+
+    // เลิกใช้หมุด GPS แล้วค้นหาพิกัดจากข้อความที่อยู่ที่พิมพ์แทน
+    unpinGps() {
+      this.pinnedByGps = false;
+      this.pinnedAddress = '';
+      this.onAddressInput();
+    },
+
+    saveLandmark() {
+      try {
+        localStorage.setItem('delivery_landmark', (this.deliveryLandmark || '').trim());
+      } catch (e) {}
+    },
+
     onAddressInput() {
       this.geocodeFoundAddress = '';
       if (this.geocodeDebounceTimer) {
         clearTimeout(this.geocodeDebounceTimer);
       }
+      // ปักหมุดด้วย GPS แล้ว: ลูกค้าแก้ข้อความที่อยู่ได้โดยไม่ย้ายหมุด
+      if (this.pinnedByGps) return;
       this.geocodeDebounceTimer = setTimeout(() => {
         this.geocodeAddress(this.editAddressText, true);
       }, 500);
@@ -1260,13 +1330,23 @@ export default {
       this.isGettingGpsInModal = true;
       this.missingInfoGpsNotice = 'กำลังค้นหาตำแหน่งพิกัด GPS...';
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        async (position) => {
           this.missingInfoForm.lat = Number(position.coords.latitude);
           this.missingInfoForm.lng = Number(position.coords.longitude);
           this.deliveryLat = this.missingInfoForm.lat;
           this.deliveryLng = this.missingInfoForm.lng;
+          this.pinnedByGps = true;
+          this.missingInfoGpsNotice = '📍 ปักหมุดแล้ว กำลังแปลงเป็นที่อยู่...';
+          const addr = await this.reverseGeocode(this.deliveryLat, this.deliveryLng);
           this.isGettingGpsInModal = false;
-          this.missingInfoGpsNotice = `📍 ดึงพิกัดสำเร็จ (${this.deliveryLat.toFixed(5)}, ${this.deliveryLng.toFixed(5)})`;
+          if (addr) {
+            this.pinnedAddress = addr;
+            // ใส่ที่อยู่ให้ในช่อง ลูกค้าแก้ไขต่อได้ (ถ้ามีข้อความเดิมจะใช้ที่อยู่จากหมุดแทน)
+            this.missingInfoForm.address = addr;
+            this.missingInfoGpsNotice = `📍 ที่อยู่ปัจจุบัน: ${addr}`;
+          } else {
+            this.missingInfoGpsNotice = '📍 ปักหมุดสำเร็จ แต่แปลงเป็นที่อยู่ไม่ได้ กรุณากรอกที่อยู่เอง';
+          }
         },
         (error) => {
           console.warn('GPS Error in modal:', error);
@@ -1322,6 +1402,7 @@ export default {
         }
         this.userProfile.phone = rawPhone;
         this.userProfile.address = rawAddress;
+        this.saveLandmark();
         localStorage.setItem('userProfile', JSON.stringify(this.userProfile));
         if (authStore && typeof authStore.updateProfile === 'function') {
           authStore.updateProfile(this.userProfile);
@@ -1396,29 +1477,26 @@ export default {
         'พัทยา': { lat: 12.9276, lng: 100.8771, name: 'เมืองพัทยา ชลบุรี' }
       };
 
-      // 1. เรียก OpenStreetMap Nominatim API ค้นหาพิกัดจริง
+      // 1. ค้นหาพิกัดจริงผ่าน backend (/geo/search -> OpenStreetMap Nominatim, มี cache และคุมจำนวนครั้ง)
       const queries = [
         raw,
         raw.replace(/ห้อง\s*\S+|ชั้น\s*\S+|ตึก\s*\S+|อาคาร\s*\S+|เลขที่\s*\S+/g, ' ').replace(/\s+/g, ' ').trim()
       ];
 
-      for (const q of queries) {
+      for (const q of [...new Set(queries)]) {
         if (!q) continue;
         try {
-          const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=th&limit=1`;
-          const res = await fetch(url, { headers: { 'User-Agent': 'TumKrokZing-App' } });
-          if (res.ok) {
-            const data = await res.json();
-            if (data && data.length > 0) {
-              const item = data[0];
-              const parts = (item.display_name || '').split(',');
-              const shortName = parts.slice(0, 3).join(', ').trim() || raw;
-              return {
-                lat: Number(Number(item.lat).toFixed(6)),
-                lng: Number(Number(item.lon).toFixed(6)),
-                name: shortName
-              };
-            }
+          const { data } = await axios.get(`${API_BASE}/geo/search`, { params: { q } });
+          const list = Array.isArray(data) ? data : (data?.results || []);
+          if (list.length > 0) {
+            const item = list[0];
+            const parts = (item.display_name || '').split(',');
+            const shortName = parts.slice(0, 3).join(', ').trim() || raw;
+            return {
+              lat: Number(Number(item.lat).toFixed(6)),
+              lng: Number(Number(item.lng ?? item.lon).toFixed(6)),
+              name: shortName
+            };
           }
         } catch (e) {
           // ข้ามไปยังรอบถัดไป
@@ -1490,13 +1568,26 @@ export default {
       this.isGettingGps = true;
       this.gpsNotice = 'กำลังค้นหาตำแหน่งพิกัด GPS ของคุณ...';
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        async (position) => {
           this.deliveryLat = Number(position.coords.latitude);
           this.deliveryLng = Number(position.coords.longitude);
           this.editDeliveryLat = this.deliveryLat;
           this.editDeliveryLng = this.deliveryLng;
+          this.pinnedByGps = true;
+          this.gpsNotice = 'ปักหมุดแล้ว กำลังแปลงเป็นที่อยู่...';
+
+          // แปลงพิกัดเป็นที่อยู่ แล้วเปิดช่องที่อยู่ให้ลูกค้าแก้ไขต่อได้
+          const addr = await this.reverseGeocode(this.deliveryLat, this.deliveryLng);
           this.isGettingGps = false;
-          this.gpsNotice = `ปักหมุดพิกัดเรียบร้อย (${this.deliveryLat.toFixed(5)}, ${this.deliveryLng.toFixed(5)})`;
+          if (addr) {
+            this.pinnedAddress = addr;
+            this.editAddressText = addr;
+            this.geocodeFoundAddress = '';
+            this.isEditingAddress = true;
+            this.gpsNotice = '';
+          } else {
+            this.gpsNotice = 'ปักหมุดเรียบร้อย แต่แปลงเป็นที่อยู่ไม่ได้ กรุณาแก้ไขที่อยู่เอง';
+          }
 
           try {
             const gpsData = {
@@ -1533,8 +1624,8 @@ export default {
         return;
       }
 
-      // ถ้าที่อยู่มีการเปลี่ยนแปลง ให้ค้นหาพิกัดใหม่เสมอ
-      if (this.editAddressText.trim() !== this.userProfile.address && !this.geocodeFoundAddress) {
+      // ถ้าที่อยู่มีการเปลี่ยนแปลง ให้ค้นหาพิกัดใหม่ (ยกเว้นปักหมุดด้วย GPS แล้ว ใช้หมุดเดิม)
+      if (!this.pinnedByGps && this.editAddressText.trim() !== this.userProfile.address && !this.geocodeFoundAddress) {
         await this.geocodeAddress(this.editAddressText, false);
       }
 
@@ -1543,7 +1634,8 @@ export default {
         this.deliveryLat = Number(this.editDeliveryLat);
         this.deliveryLng = Number(this.editDeliveryLng);
       }
-      this.gpsNotice = 'ปักหมุดพิกัดตามที่อยู่เรียบร้อยแล้ว';
+      this.gpsNotice = this.pinnedByGps ? 'บันทึกที่อยู่แล้ว (ใช้ตำแหน่งตามหมุดที่ปักไว้)' : 'ปักหมุดพิกัดตามที่อยู่เรียบร้อยแล้ว';
+      this.saveLandmark();
       localStorage.setItem('userProfile', JSON.stringify(this.userProfile));
       try {
         const gpsData = {
@@ -1744,6 +1836,81 @@ async validateAndCheckout() {
       }
     },
 
+    // พร้อมเพย์ผ่าน Stripe: Stripe แสดง QR ให้สแกน (โหมดทดสอบมีหน้ากด "อนุมัติ/ไม่อนุมัติ")
+    async processPromptPayStripe() {
+      if (this.isSubmitting) return;
+      const token = localStorage.getItem('access_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      this.isSubmitting = true;
+      this.paymentProcessingLabel = '📱 พร้อมเพย์ (Stripe)';
+      this.isCardProcessingModalOpen = true;
+      this.cardProcessingStep = 'authorizing';
+      this.cardProcessingMessage = 'กำลังสร้างคำสั่งซื้อ...';
+
+      let order = this.pendingCardOrder;
+      try {
+        if (!stripe) stripe = await loadStripe();
+        if (!order) {
+          order = await this.createOrder();
+          this.pendingCardOrder = order;
+        }
+
+        this.cardProcessingMessage = 'กำลังสร้าง QR พร้อมเพย์...';
+        const intentRes = await axios.post(`${API_BASE}/transactions/stripe/create-intent/${order.order_id}`, {}, { headers });
+        const clientSecret = intentRes.data?.clientSecret;
+        if (!clientSecret) throw new Error('ไม่ได้รับข้อมูลการชำระเงินจากเซิร์ฟเวอร์');
+
+        // ซ่อนหน้าสถานะไว้ก่อน ให้ Stripe แสดงหน้าต่าง QR
+        this.isCardProcessingModalOpen = false;
+        const email = (this.authStore?.userProfile?.email || '').trim() || `order${order.order_id}@tumkrokzing.duckdns.org`;
+        const result = await stripe.confirmPromptPayPayment(clientSecret, {
+          payment_method: {
+            billing_details: { email, name: (this.userProfile.name || '').trim() || undefined }
+          }
+        });
+
+        if (result.error) {
+          // QR หมดอายุ / ลูกค้าปิดหน้าต่างก่อนจ่าย / ไม่อนุมัติ
+          throw new Error(result.error.message || 'การชำระเงินพร้อมเพย์ไม่สำเร็จ');
+        }
+
+        const status = result.paymentIntent?.status;
+        if (status === 'succeeded') {
+          this.isCardProcessingModalOpen = true;
+          this.cardProcessingMessage = 'กำลังบันทึกผลการชำระเงิน...';
+          try {
+            await axios.post(`${API_BASE}/transactions/stripe/confirm/${order.order_id}`, {
+              paymentIntentId: result.paymentIntent.id
+            }, { headers });
+          } catch (confirmErr) {
+            // webhook จาก Stripe จะอัปเดตสถานะให้อีกทาง
+            console.warn('บันทึกผลพร้อมเพย์ผ่านหน้าเว็บไม่สำเร็จ (รอ webhook):', confirmErr);
+          }
+          this.cardProcessingStep = 'success';
+          this.cardProcessingMessage = 'ชำระเงินผ่านพร้อมเพย์เรียบร้อยแล้ว';
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          this.isCardProcessingModalOpen = false;
+          await this.finishOrder(order, 'ชำระเงินผ่านพร้อมเพย์เรียบร้อย ทางร้านได้รับคำสั่งซื้อแล้วครับ');
+        } else if (status === 'processing') {
+          await this.finishOrder(order, 'กำลังรอยืนยันยอดจากธนาคาร ระบบจะอัปเดตสถานะให้อัตโนมัติครับ');
+        } else {
+          throw new Error('ยังไม่ได้ชำระเงิน — QR อาจหมดอายุหรือปิดหน้าต่างก่อนจ่าย');
+        }
+      } catch (error) {
+        console.error('ชำระเงินพร้อมเพย์ไม่สำเร็จ:', error);
+        this.isCardProcessingModalOpen = false;
+        const rawMsg = error.response?.data?.message || error.message || 'เกิดข้อผิดพลาดในการชำระเงิน';
+        const errMsg = Array.isArray(rawMsg) ? rawMsg.join(', ') : rawMsg;
+        const hint = order
+          ? `<br><span style="color: #64748b; font-size: 0.9rem;">ออเดอร์ #${order.order_id} ยังไม่ถูกชำระ กดยืนยันอีกครั้งเพื่อสร้าง QR ใหม่ หรือเปลี่ยนเป็นวิธีชำระเงินอื่นได้ครับ</span>`
+          : '';
+        await showError('ชำระเงินพร้อมเพย์ไม่สำเร็จ', `${errMsg}${hint}`, { isHtml: true });
+      } finally {
+        this.isSubmitting = false;
+        this.paymentProcessingLabel = '💳 บัตรเดบิต (Stripe)';
+      }
+    },
+
     async confirmOrder() {
       if (this.cartItems.length === 0) {
         alert('กรุณาเลือกอาหารก่อนชำระเงินครับ!');
@@ -1775,7 +1942,13 @@ async validateAndCheckout() {
       }
 
       if (this.selectedPayment === 'qr') {
-        this.openQrModal();
+        // ตั้งค่า Stripe แล้ว -> ให้ Stripe แสดง QR พร้อมเพย์และยืนยันยอดอัตโนมัติ
+        // ยังไม่ตั้งค่า -> ใช้ QR ของร้าน (ทางสำรอง แอดมินยืนยันเอง)
+        if (this.isCardPaymentEnabled) {
+          this.processPromptPayStripe();
+        } else {
+          this.openQrModal();
+        }
       } else if (this.selectedPayment === 'card') {
         this.processCardPayment();
       } else {
@@ -1808,6 +1981,7 @@ async validateAndCheckout() {
         delivery_phone: this.userProfile.phone || undefined,
         delivery_lat: this.deliveryLat ? Number(this.deliveryLat) : undefined,
         delivery_lng: this.deliveryLng ? Number(this.deliveryLng) : undefined,
+        delivery_landmark: (this.deliveryLandmark || '').trim() || undefined,
         items: this.cartItems.map(item => {
           const cleanItemName = (item.name || '').trim().toLowerCase();
           const matched = dbMenus.find(m => {
@@ -2041,6 +2215,19 @@ async validateAndCheckout() {
 .phone-text { font-size: 13px; color: #666; font-weight: 400; }
 .address-text { font-size: 14px; color: #555; line-height: 1.5; background: #faf9f5; padding: 10px 12px; border-radius: 8px; border: 1px solid #eee; margin-top: 5px;}
 .address-note { font-size: 12px; color: #888; margin-bottom: 4px; }
+.landmark-field { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.landmark-input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font-size: 13px;
+  color: #334155;
+}
+.landmark-input:focus { outline: none; border-color: #2e7d32; box-shadow: 0 0 0 2px rgba(46, 125, 50, 0.15); }
+.geo-edit-hint { display: block; font-size: 11px; color: #64748b; margin-top: 4px; }
+.geo-edit-hint a { color: #2e7d32; font-weight: 600; text-decoration: underline; }
 .edit-address-btn { background: white; border: 1px solid #557c61; color: #557c61; padding: 4px 14px; border-radius: 15px; font-size: 12px; font-weight: 500; cursor: pointer; align-self: flex-start; transition: 0.2s; font-family: inherit;}
 .edit-address-btn:hover { background: #f4faeb; }
 

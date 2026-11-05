@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { adminStore } from '../store/adminData'
 import { socket } from '../../config/socket'
+import FinancePanel from '../components/FinancePanel.vue'
 
 let refreshInterval = null
 let midnightInterval = null
@@ -552,6 +553,9 @@ const avgPrepTimeMinutes = computed(() => {
         </router-link>
       </div>
     </div>
+
+    <!-- สรุปการเงิน: ยอดแยกช่องทาง, รายจ่าย, กำไรสุทธิ, ไรเดอร์ + เงินสด, ค่าน้ำมัน -->
+    <FinancePanel />
 
     <!-- 4 Key Executive Metric Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
