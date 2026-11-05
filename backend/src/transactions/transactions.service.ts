@@ -7,6 +7,8 @@ import {
   InternalServerErrorException,
   Logger,
   OnModuleInit,
+  OnModuleDestroy,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
@@ -15,10 +17,15 @@ import { OrdersService } from '../orders/orders.service';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const Stripe = require('stripe');
 
+// ออเดอร์ที่กดจ่าย Stripe แล้วไม่จ่ายภายในเวลานี้จะถูกยกเลิกอัตโนมัติ
+const UNPAID_STRIPE_TIMEOUT_MINUTES = 15;
+
 @Injectable()
-export class TransactionsService implements OnModuleInit {
+export class TransactionsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TransactionsService.name);
   private stripe: any;
+  private expiredCheckTimer?: NodeJS.Timeout;
+  private isCancellingExpired = false;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -31,6 +38,12 @@ export class TransactionsService implements OnModuleInit {
 
   async onModuleInit() {
     await this.ensureTransactionColumns();
+    // ตรวจออเดอร์ค้างจ่าย Stripe ทุก 1 นาที
+    this.expiredCheckTimer = setInterval(() => void this.cancelExpiredStripeOrders(), 60_000);
+  }
+
+  onModuleDestroy() {
+    if (this.expiredCheckTimer) clearInterval(this.expiredCheckTimer);
   }
 
   // ตรวจสอบและสร้างคอลัมน์ใหม่ (paid_at, stripe_payment_intent_id, stripe_fee) หากยังไม่มีในฐานข้อมูล
@@ -429,6 +442,11 @@ export class TransactionsService implements OnModuleInit {
       }
     }
 
+    // ต้องมี PaymentIntent เสมอ ไม่อย่างนั้นจะไม่มีอะไรยืนยันว่าลูกค้าจ่ายจริง
+    if (!resolvedIntentId) {
+      throw new BadRequestException('ไม่พบรายการชำระเงิน Stripe ของคำสั่งซื้อนี้');
+    }
+
     let channel = 'CARD';
     let stripeFee = 0;
 
@@ -448,6 +466,11 @@ export class TransactionsService implements OnModuleInit {
         throw new BadRequestException(
           `ไม่สามารถตรวจสอบสถานะกับ Stripe ได้: ${err?.message || 'เกิดข้อผิดพลาดในการดึงข้อมูล PaymentIntent'}`,
         );
+      }
+
+      // PaymentIntent ต้องเป็นของออเดอร์นี้ (กันเอารายการที่จ่ายแล้วของออเดอร์อื่นมายืนยันแทน)
+      if (String(intent.metadata?.order_id ?? '') !== String(orderId)) {
+        throw new BadRequestException('รายการชำระเงิน Stripe นี้ไม่ใช่ของคำสั่งซื้อนี้');
       }
 
       // ดึงข้อมูล Payment Method หรือ Card Details จาก Stripe API
@@ -516,6 +539,11 @@ export class TransactionsService implements OnModuleInit {
 
       if (intent.status !== 'succeeded') {
         throw new BadRequestException(`การชำระเงินยังไม่สำเร็จในระบบ Stripe (สถานะปัจจุบัน: ${intent.status})`);
+      }
+
+      const expectedSatang = Math.round(Number(order.total_price) * 100);
+      if (Number(intent.amount_received ?? intent.amount) < expectedSatang) {
+        throw new BadRequestException('ยอดที่ชำระผ่าน Stripe น้อยกว่ายอดคำสั่งซื้อ');
       }
 
       // 3. คำนวณและบันทึกค่าธรรมเนียม Stripe ลง stripe_fee:
@@ -647,211 +675,189 @@ export class TransactionsService implements OnModuleInit {
     return updated;
   }
 
-  // Webhook handler สำหรับรับ event จาก Stripe พร้อมตรวจสอบ Signature และ Raw Body
-  async handleStripeWebhook(rawBody: Buffer | string | any, signature?: string) {
+  // Webhook จาก Stripe: รับเฉพาะ event ที่ลายเซ็นถูกต้องเท่านั้น
+  // ไม่มี secret / ไม่มีลายเซ็น / ลายเซ็นผิด = ปฏิเสธทั้งหมด (กันคนยิง event ปลอมให้ออเดอร์กลายเป็นจ่ายแล้ว)
+  async handleStripeWebhook(rawBody: Buffer, signature?: string) {
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    let event: any;
+    if (!webhookSecret || webhookSecret.includes('placeholder')) {
+      this.logger.error('ยังไม่ได้ตั้งค่า STRIPE_WEBHOOK_SECRET จึงปฏิเสธ webhook ทุกรายการ');
+      throw new ServiceUnavailableException('ยังไม่ได้ตั้งค่า Stripe webhook secret');
+    }
+    if (!signature || !Buffer.isBuffer(rawBody)) {
+      throw new BadRequestException('ไม่พบ Stripe signature หรือ raw body');
+    }
 
-    if (signature && Buffer.isBuffer(rawBody)) {
-      if (!webhookSecret || webhookSecret === 'whsec_placeholder') {
-        this.logger.warn(
-          'STRIPE_WEBHOOK_SECRET ยังไม่ได้ถูกกำหนดหรือเป็น placeholder: ข้ามการตรวจสอบ Stripe signature ในโหมดพัฒนา',
-        );
-        try {
-          event = JSON.parse(rawBody.toString('utf-8'));
-        } catch (parseErr: any) {
-          throw new BadRequestException(`ไม่สามารถแปลงข้อมูล Webhook JSON ได้: ${parseErr?.message}`);
-        }
-      } else {
-        try {
-          event = this.stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
-        } catch (err: any) {
-          this.logger.error(`Stripe Webhook Signature Verification Failed: ${err.message}`);
-          throw new BadRequestException(`Stripe Webhook Signature Verification Failed: ${err.message}`);
-        }
-      }
-    } else if (rawBody && typeof rawBody === 'object' && rawBody.type) {
-      // Fallback สำหรับกรณีเรียกตรงหรือ mock event ใน test
-      event = rawBody;
-    } else if (rawBody) {
-      try {
-        const bodyStr = Buffer.isBuffer(rawBody) ? rawBody.toString('utf-8') : String(rawBody);
-        event = JSON.parse(bodyStr);
-      } catch (err: any) {
-        throw new BadRequestException(`Invalid Webhook payload: ${err.message}`);
-      }
-    } else {
-      throw new BadRequestException('ไม่พบข้อมูล Webhook payload');
+    let event: any;
+    try {
+      event = this.stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+    } catch (err: any) {
+      this.logger.error(`Stripe Webhook Signature Verification Failed: ${err.message}`);
+      throw new BadRequestException(`Stripe Webhook Signature Verification Failed: ${err.message}`);
     }
 
     this.logger.log(`Processing Stripe Webhook event: ${event?.type} (ID: ${event?.id})`);
 
-    // 1. จัดการ Event: payment_intent.succeeded
-    if (event?.type === 'payment_intent.succeeded') {
-      const intent = event.data?.object;
-      let orderId = Number(intent?.metadata?.order_id);
-      const intentId = intent?.id;
+    const intent = event.data?.object;
+    const intentId: string | undefined = intent?.id;
 
-      if (!orderId && intentId) {
-        const txn = await this.prisma.transaction.findFirst({
-          where: { stripe_payment_intent_id: intentId },
-          select: { order_id: true },
-        });
-        if (txn) orderId = txn.order_id;
+    // 1. จ่ายสำเร็จ: ยืนยันกับ Stripe API อีกครั้งผ่าน confirmStripePayment (เช็คสถานะ ยอดเงิน และออเดอร์ที่ผูกไว้)
+    if (event.type === 'payment_intent.succeeded' && intentId) {
+      const orderId = await this.resolveOrderIdForIntent(intent);
+      if (!orderId) {
+        this.logger.warn(`ไม่พบออเดอร์ที่ผูกกับ PaymentIntent ${intentId}`);
+        return { received: true, event: event.type };
       }
-
-      if (orderId && intentId) {
-        try {
-          return await this.confirmStripePayment(orderId, intentId);
-        } catch (confirmErr: any) {
-          this.logger.warn(
-            `confirmStripePayment via webhook failed: ${confirmErr.message}. Executing direct update.`,
-          );
-          await this.handlePaymentIntentSucceededDirect(intent, orderId);
-          return { received: true, status: 'COMPLETED', order_id: orderId };
-        }
-      } else if (intentId) {
-        await this.handlePaymentIntentSucceededDirect(intent);
-        return { received: true, status: 'COMPLETED' };
+      try {
+        await this.confirmStripePayment(orderId, intentId);
+        return { received: true, status: 'COMPLETED', order_id: orderId };
+      } catch (err: any) {
+        // ยืนยันไม่ผ่าน (เช่น ออเดอร์ถูกยกเลิกไปแล้ว หรือใช้บัตรเครดิต) ห้ามบันทึกว่าจ่ายแล้ว
+        this.logger.warn(`ไม่บันทึกการชำระของออเดอร์ #${orderId} (${intentId}): ${err?.message}`);
+        await this.refundIfOrderCancelled(orderId, intentId);
+        return { received: true, status: 'IGNORED', order_id: orderId };
       }
-
-      return { received: true, event: event.type };
     }
 
-    // 2. จัดการ Event: payment_intent.payment_failed หรือ payment_intent.canceled
+    // 2. จ่ายไม่สำเร็จ / ถูกยกเลิก
     if (
-      event?.type === 'payment_intent.payment_failed' ||
-      event?.type === 'payment_intent.canceled'
+      (event.type === 'payment_intent.payment_failed' || event.type === 'payment_intent.canceled') &&
+      intentId
     ) {
-      const intent = event.data?.object;
-      let orderId = Number(intent?.metadata?.order_id);
-      const intentId = intent?.id;
-
-      this.logger.warn(
-        `PaymentIntent #${intentId} failed or canceled (type: ${event.type})`,
-      );
-
-      const whereClause: any = {
-        OR: [
-          ...(intentId ? [{ stripe_payment_intent_id: intentId }] : []),
-          ...(orderId
-            ? [
-                {
-                  order_id: orderId,
-                  payment_status: 'PENDING',
-                  payment_method: { in: ['STRIPE', 'CARD', 'PROMPTPAY'] },
-                },
-              ]
-            : []),
-        ],
-      };
-
-      if (whereClause.OR.length > 0) {
-        await this.prisma.transaction.updateMany({
-          where: whereClause,
-          data: {
-            payment_status: 'FAILED',
-          },
-        });
-      }
-
+      this.logger.warn(`PaymentIntent #${intentId} failed or canceled (type: ${event.type})`);
+      await this.prisma.transaction.updateMany({
+        where: { stripe_payment_intent_id: intentId, payment_status: 'PENDING' },
+        data: { payment_status: 'FAILED' },
+      });
       return { received: true, status: 'FAILED', event: event.type };
     }
 
-    return { received: true, event: event?.type };
+    return { received: true, event: event.type };
   }
 
-  // อัปเดตข้อมูล Transaction และ Order โดยตรงจาก PaymentIntent ของ Stripe Webhook
-  private async handlePaymentIntentSucceededDirect(intent: any, orderId?: number) {
-    const intentId = intent?.id;
-    const pmType =
-      intent?.payment_method?.type ||
-      intent?.charges?.data?.[0]?.payment_method_details?.type ||
-      intent?.payment_method_types?.[0];
-    const channel = pmType === 'promptpay' ? 'PROMPTPAY' : 'CARD';
+  // หาออเดอร์ของ PaymentIntent: ใช้รายการในฐานข้อมูลก่อน ถ้าไม่มีค่อยใช้ metadata (event ผ่านการตรวจลายเซ็นแล้ว)
+  private async resolveOrderIdForIntent(intent: any): Promise<number | null> {
+    const txn = await this.prisma.transaction.findFirst({
+      where: { stripe_payment_intent_id: intent?.id },
+      select: { order_id: true },
+    });
+    if (txn) return txn.order_id;
+    const fromMeta = Number(intent?.metadata?.order_id);
+    return Number.isInteger(fromMeta) && fromMeta > 0 ? fromMeta : null;
+  }
 
-    let stripeFee = 0;
-    const charge = intent?.charges?.data?.[0] || intent?.latest_charge;
-    const balanceTxn = charge?.balance_transaction;
-    const feeSatang =
-      typeof balanceTxn === 'object'
-        ? balanceTxn?.fee
-        : typeof balanceTxn === 'number'
-        ? balanceTxn
-        : undefined;
-    if (typeof feeSatang === 'number' && feeSatang >= 0) {
-      stripeFee = feeSatang / 100;
-    }
-
-    const whereClause: any = {
-      OR: [
-        ...(intentId ? [{ stripe_payment_intent_id: intentId }] : []),
-        ...(orderId
-          ? [
-              {
-                order_id: orderId,
-                payment_method: { in: ['STRIPE', 'CARD', 'PROMPTPAY'] },
-              },
-            ]
-          : []),
-      ],
-    };
-
-    if (whereClause.OR.length > 0) {
+  // ลูกค้าจ่ายเข้ามาหลังออเดอร์ถูกยกเลิกแล้ว: คืนเงินอัตโนมัติ
+  private async refundIfOrderCancelled(orderId: number, intentId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { order_id: orderId },
+      select: { status: true },
+    });
+    if (order?.status !== 'CANCELLED') return;
+    try {
+      await this.stripe.refunds.create(
+        { payment_intent: intentId, reason: 'requested_by_customer' },
+        { idempotencyKey: `refund-cancelled-${intentId}` },
+      );
       await this.prisma.transaction.updateMany({
-        where: whereClause,
-        data: {
-          payment_method: channel,
-          payment_status: 'COMPLETED',
-          paid_at: new Date(),
-          stripe_fee: stripeFee,
-          ...(intentId ? { stripe_payment_intent_id: intentId } : {}),
-        },
+        where: { stripe_payment_intent_id: intentId },
+        data: { payment_status: 'REFUNDED' },
       });
+      this.logger.warn(`คืนเงิน PaymentIntent ${intentId} เพราะออเดอร์ #${orderId} ถูกยกเลิกไปแล้ว`);
+    } catch (err: any) {
+      this.logger.error(`คืนเงิน PaymentIntent ${intentId} ไม่สำเร็จ: ${err?.message}`);
     }
+  }
 
-    if (orderId) {
-      const order = await this.prisma.order.findUnique({
-        where: { order_id: orderId },
-        select: { order_type: true, status: true, table_id: true },
+  // ==========================================================
+  // ยกเลิกออเดอร์เดลิเวอรี/สั่งกลับบ้านที่สร้างรายการจ่าย Stripe แล้วไม่จ่ายภายใน 15 นาที
+  // (ไม่แตะออเดอร์ที่โต๊ะ เงินสด หรือพร้อมเพย์แบบแอดมินตรวจสลิป)
+  // ==========================================================
+  private async cancelExpiredStripeOrders() {
+    if (this.isCancellingExpired) return;
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeKey || stripeKey.includes('placeholder')) return;
+
+    this.isCancellingExpired = true;
+    try {
+      const cutoff = new Date(Date.now() - UNPAID_STRIPE_TIMEOUT_MINUTES * 60_000);
+      const candidates = await this.prisma.order.findMany({
+        where: {
+          table_id: null,
+          status: { notIn: ['PAID', 'COMPLETED', 'CANCELLED', 'DELIVERED'] },
+          transaction: {
+            some: { stripe_payment_intent_id: { not: null } },
+            // มีรายการที่จ่ายสำเร็จแล้ว หรือมีรายการแบบอื่น (เงินสด/โอนตรวจสลิป) = ไม่ยกเลิก
+            none: {
+              OR: [
+                { payment_status: { in: ['COMPLETED', 'REFUNDED'] } },
+                { stripe_payment_intent_id: null },
+              ],
+            },
+          },
+        },
+        select: {
+          order_id: true,
+          transaction: {
+            where: { stripe_payment_intent_id: { not: null } },
+            orderBy: { created_at: 'desc' },
+            select: { stripe_payment_intent_id: true, created_at: true },
+          },
+        },
+        take: 50,
       });
 
-      if (order) {
-        let nextStatus = 'PAID';
-        if (order.order_type === 'DELIVERY') {
-          if (['COOKING', 'READY', 'IN_DELIVERY'].includes(order.status)) {
-            nextStatus = order.status;
-          } else if (order.status === 'DELIVERED') {
-            nextStatus = 'COMPLETED';
-          } else {
-            nextStatus = 'PAID';
-          }
+      for (const order of candidates) {
+        // นับเวลาจากครั้งล่าสุดที่ลูกค้ากดจ่าย (กดจ่ายใหม่ = เริ่มนับใหม่)
+        const latest = order.transaction[0];
+        if (!latest || latest.created_at > cutoff) continue;
+
+        try {
+          await this.cancelUnpaidStripeOrder(
+            order.order_id,
+            order.transaction.map((t) => t.stripe_payment_intent_id as string),
+          );
+        } catch (err: any) {
+          this.logger.error(`ยกเลิกออเดอร์ค้างจ่าย #${order.order_id} ไม่สำเร็จ: ${err?.message}`);
         }
+      }
+    } catch (err: any) {
+      this.logger.error(`ตรวจออเดอร์ค้างจ่าย Stripe ไม่สำเร็จ: ${err?.message}`);
+    } finally {
+      this.isCancellingExpired = false;
+    }
+  }
 
-        await this.prisma.order.update({
-          where: { order_id: orderId },
-          data: { status: nextStatus },
-        });
-
-        if (order.table_id) {
-          const remainingUnpaid = await this.prisma.order.count({
-            where: {
-              table_id: order.table_id,
-              status: { in: ['PENDING', 'COOKING', 'READY', 'SERVED'] },
-              order_id: { not: orderId },
-            },
-          });
-          if (remainingUnpaid === 0) {
-            await this.prisma.table
-              .update({
-                where: { table_id: order.table_id },
-                data: { status: 'AVAILABLE' },
-              })
-              .catch(() => {});
-          }
+  private async cancelUnpaidStripeOrder(orderId: number, intentIds: string[]) {
+    // ปิด PaymentIntent ที่ Stripe ก่อน เพื่อไม่ให้ลูกค้าสแกนจ่ายได้หลังยกเลิก
+    for (const intentId of [...new Set(intentIds)]) {
+      const intent = await this.stripe.paymentIntents.retrieve(intentId);
+      if (intent.status === 'succeeded') {
+        // จ่ายแล้วแต่ webhook ยังไม่มา: ยืนยันการชำระแทนการยกเลิก
+        await this.confirmStripePayment(orderId, intentId);
+        return;
+      }
+      if (intent.status === 'processing') {
+        return; // กำลังตัดเงิน รอรอบถัดไป
+      }
+      if (intent.status !== 'canceled') {
+        try {
+          await this.stripe.paymentIntents.cancel(intentId);
+        } catch (err: any) {
+          // ระหว่างนั้นลูกค้าอาจจ่ายสำเร็จพอดี: ข้ามไปก่อน รอบถัดไปจะเห็นเป็น succeeded
+          this.logger.warn(`ยกเลิก PaymentIntent ${intentId} ไม่สำเร็จ: ${err?.message}`);
+          return;
         }
       }
     }
+
+    await this.prisma.transaction.updateMany({
+      where: { order_id: orderId, stripe_payment_intent_id: { in: intentIds }, payment_status: 'PENDING' },
+      data: { payment_status: 'FAILED' },
+    });
+    // ใช้ updateStatus เดิม: คืนสต็อก ปิดงานไรเดอร์ และแจ้งหน้าจอทุกฝั่งผ่าน socket
+    await this.ordersService.updateStatus(orderId, { status: 'CANCELLED' } as any);
+    this.logger.warn(
+      `ยกเลิกออเดอร์ #${orderId} อัตโนมัติ: ไม่ชำระผ่าน Stripe ภายใน ${UNPAID_STRIPE_TIMEOUT_MINUTES} นาที`,
+    );
   }
 
   // สำหรับทดสอบ Flow ในหน้าแอดมิน/โต๊ะ
