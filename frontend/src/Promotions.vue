@@ -148,8 +148,12 @@ export default {
     };
   },
   computed: {
+    // แสดงเฉพาะโปรที่เปิดใช้และยังไม่หมดอายุ (กันไว้อีกชั้น เผื่อหน้าเปิดค้างไว้ข้ามเวลาหมดอายุ)
     activePromotions() {
-      return this.promotionsList.filter(p => p.is_active !== false);
+      const now = Date.now();
+      return this.promotionsList.filter(
+        p => p.is_active !== false && (!p.expiry_date || new Date(p.expiry_date).getTime() >= now)
+      );
     }
   },
   async mounted() {
@@ -161,23 +165,15 @@ export default {
   },
   methods: {
     async loadPromotions() {
+      // ใช้ /promotions/active ที่กรองโปรที่ปิดใช้หรือหมดอายุออกตั้งแต่ฝั่ง backend
+      // (ไม่ใช้ข้อมูลสำรองแบบตายตัว เพราะจะโชว์โค้ดที่เก็บไม่ได้จริง)
       try {
-        const res = await axios.get(`${API_BASE}/promotions`);
-        if (Array.isArray(res.data) && res.data.length > 0) {
-          this.promotionsList = res.data;
-          return;
-        }
+        const res = await axios.get(`${API_BASE}/promotions/active`);
+        this.promotionsList = Array.isArray(res.data) ? res.data : [];
       } catch (err) {
-        console.warn('ดึงโปรโมชันจาก API ไม่สำเร็จ ใช้ข้อมูลสำรอง:', err);
+        console.warn('ดึงโปรโมชันจาก API ไม่สำเร็จ:', err);
+        this.promotionsList = [];
       }
-
-      // ข้อมูลสำรองเริ่มต้น
-      this.promotionsList = [
-        { promo_id: 1, code: 'ZING50', discount_type: 'FIXED', discount_value: 50, min_order_price: 300, expiry_date: '2026-12-31' },
-        { promo_id: 2, code: 'SEP10', discount_type: 'PERCENTAGE', discount_value: 10, min_order_price: 200, expiry_date: '2026-12-31' },
-        { promo_id: 3, code: 'WELCOME100', discount_type: 'FIXED', discount_value: 100, min_order_price: 500, expiry_date: '2026-12-31' },
-        { promo_id: 4, code: 'DELIVERY20', discount_type: 'FIXED', discount_value: 20, min_order_price: 200, expiry_date: '2026-12-31' }
-      ];
     },
 
     async loadMyClaimedPromotions() {

@@ -334,7 +334,7 @@
             </div>
 
             <!-- คูปองที่เก็บไว้ในบัญชีของผู้ใช้ -->
-            <div v-if="myClaimedCoupons.length > 0" class="my-coupons-box">
+            <div v-if="myAvailableCoupons.length > 0" class="my-coupons-box">
               <div class="my-coupons-header-row">
                 <div class="my-coupons-title">🎟️ คูปองที่คุณกดเก็บไว้ ({{ myAvailableCoupons.length }} ใบ):</div>
                 <button 
@@ -885,7 +885,15 @@ export default {
       return this.isFreeShipping ? 0 : 20;
     },
     myAvailableCoupons() {
-      return this.myClaimedCoupons.filter(c => !c.is_used);
+      // ไม่แสดงคูปองที่ใช้ไปแล้ว ถูกปิดใช้ หรือหมดอายุ (backend ปฏิเสธคูปองหมดอายุตอนสั่งอยู่แล้ว)
+      const now = Date.now();
+      return this.myClaimedCoupons.filter(
+        c =>
+          !c.is_used &&
+          c.is_active !== false &&
+          !c.is_expired &&
+          (!c.expiry_date || new Date(c.expiry_date).getTime() >= now)
+      );
     },
     discountAmount() {
       if (!this.appliedPromo) return 0;
