@@ -21,6 +21,8 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SocialLoginDto } from './dto/social-login.dto';
+import { RequestOtpDto } from './dto/request-otp.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { FacebookAuthGuard } from './guards/facebook-auth.guard';
@@ -51,6 +53,28 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'ผลการตรวจสอบอีเมล' })
   checkEmail(@Query('email') email: string) {
     return this.authService.checkEmailAvailable(email);
+  }
+
+  @Post('otp/request')
+  @ApiOperation({
+    summary: 'ขอรหัส OTP สำหรับยืนยันเบอร์โทรศัพท์ตอนสมัครสมาชิก (รองรับโหมดทดสอบ)',
+    description: 'ส่งรหัส OTP 6 หลักไปยังเบอร์โทรศัพท์ (ในโหมดทดสอบจะใช้รหัสจาก OTP_TEST_CODE หรือ 123456 และแสดงใน Terminal)',
+  })
+  @ApiResponse({ status: 200, description: 'ส่งรหัส OTP สำเร็จ' })
+  @ApiResponse({ status: 400, description: 'เบอร์โทรศัพท์ไม่ถูกต้อง หรือขอถี่เกินไป (ติด Cooldown 60 วินาที)' })
+  requestOtp(@Body() dto: RequestOtpDto) {
+    return this.authService.requestOtp(dto);
+  }
+
+  @Post('otp/verify')
+  @ApiOperation({
+    summary: 'ตรวจสอบรหัส OTP และรับ otp_token',
+    description: 'ตรวจสอบรหัส OTP 6 หลัก หากถูกต้องจะได้รับ otp_token (JWT อายุ 15 นาที) เพื่อนำไปแนบในการสมัครสมาชิก',
+  })
+  @ApiResponse({ status: 200, description: 'ยืนยันรหัส OTP สำเร็จ ได้รับ otp_token' })
+  @ApiResponse({ status: 400, description: 'รหัส OTP ไม่ถูกต้อง หมดอายุ หรือกรอกผิดเกิน 5 ครั้ง' })
+  verifyOtp(@Body() dto: VerifyOtpDto) {
+    return this.authService.verifyOtp(dto);
   }
 
   @Post('register')

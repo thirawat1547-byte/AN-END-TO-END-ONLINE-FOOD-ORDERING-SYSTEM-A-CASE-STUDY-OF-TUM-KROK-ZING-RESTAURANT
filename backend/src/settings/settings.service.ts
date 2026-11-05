@@ -19,6 +19,8 @@ export interface StoreSettings {
   max_delivery_km: number;
   min_order_delivery: number;
   base_rider_fee: number;
+  rider_fee_step_km: number;
+  rider_fee_per_step: number;
   rider_free_km: number;
   rider_fee_per_km: number;
   store_lat: number | null;
@@ -57,7 +59,9 @@ export class SettingsService implements OnModuleInit {
             delivery_fee_per_km: 10.00,
             max_delivery_km: 15.00,
             min_order_delivery: 100.00,
-            base_rider_fee: 40.00,
+            base_rider_fee: 15.00,
+            rider_fee_step_km: 2.00,
+            rider_fee_per_step: 5.00,
             vat_rate: 7.00,
           },
         });
@@ -88,7 +92,9 @@ export class SettingsService implements OnModuleInit {
           delivery_fee_per_km: Number(row.delivery_fee_per_km || 10.00),
           max_delivery_km: Number(row.max_delivery_km || 15.00),
           min_order_delivery: Number(row.min_order_delivery || 100.00),
-          base_rider_fee: Number(row.base_rider_fee || 40.00),
+          base_rider_fee: Number(row.base_rider_fee || 15.00),
+          rider_fee_step_km: Number(row.rider_fee_step_km || 2.00),
+          rider_fee_per_step: Number(row.rider_fee_per_step || 5.00),
           rider_free_km: Number(row.rider_free_km ?? 3.00),
           rider_fee_per_km: Number(row.rider_fee_per_km ?? 7.00),
           store_lat: row.store_lat != null ? Number(row.store_lat) : null,
@@ -116,7 +122,9 @@ export class SettingsService implements OnModuleInit {
       delivery_fee_per_km: 10.00,
       max_delivery_km: 15.00,
       min_order_delivery: 100.00,
-      base_rider_fee: 40.00,
+      base_rider_fee: 15.00,
+      rider_fee_step_km: 2.00,
+      rider_fee_per_step: 5.00,
       rider_free_km: 3.00,
       rider_fee_per_km: 7.00,
       store_lat: null,
@@ -146,6 +154,8 @@ export class SettingsService implements OnModuleInit {
         ...(dto.max_delivery_km !== undefined && { max_delivery_km: dto.max_delivery_km }),
         ...(dto.min_order_delivery !== undefined && { min_order_delivery: dto.min_order_delivery }),
         ...(dto.base_rider_fee !== undefined && { base_rider_fee: dto.base_rider_fee }),
+        ...(dto.rider_fee_step_km !== undefined && { rider_fee_step_km: dto.rider_fee_step_km }),
+        ...(dto.rider_fee_per_step !== undefined && { rider_fee_per_step: dto.rider_fee_per_step }),
         ...(dto.rider_free_km !== undefined && { rider_free_km: dto.rider_free_km }),
         ...(dto.rider_fee_per_km !== undefined && { rider_fee_per_km: dto.rider_fee_per_km }),
         ...(dto.store_lat !== undefined && { store_lat: dto.store_lat }),

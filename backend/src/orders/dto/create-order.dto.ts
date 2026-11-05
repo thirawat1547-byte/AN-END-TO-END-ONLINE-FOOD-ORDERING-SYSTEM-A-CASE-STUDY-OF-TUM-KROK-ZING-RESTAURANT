@@ -116,6 +116,11 @@ export class CreateOrderDto {
   @IsOptional()
   delivery_address?: string;
 
+  @ApiPropertyOptional({ example: 'ตึกสีฟ้า หน้าเซเว่น ซอย 3', description: 'จุดสังเกตสำหรับการจัดส่ง (Landmark)' })
+  @IsString()
+  @IsOptional()
+  delivery_landmark?: string;
+
   @ApiPropertyOptional({ example: '081-234-5678', description: 'เบอร์โทรผู้รับสำหรับจัดส่ง' })
   @IsString()
   @IsOptional()

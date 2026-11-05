@@ -18,7 +18,10 @@ export class UpdateSettingsDto {
   @IsOptional() @IsNumber() @Min(0) max_delivery_km?: number;
   @IsOptional() @IsNumber() @Min(0) min_order_delivery?: number;
   @IsOptional() @IsNumber() @Min(0) base_rider_fee?: number;
-  // ค่ารอบตามระยะทาง: ค่าเริ่มต้นครอบคลุม rider_free_km กม.แรก แล้วคิดเพิ่ม rider_fee_per_km ต่อ กม.
+  // ค่ารอบไรเดอร์สูตรใหม่: base_rider_fee + rider_fee_per_step * floor(km / rider_fee_step_km)
+  @IsOptional() @IsNumber() @Min(0) rider_fee_step_km?: number;
+  @IsOptional() @IsNumber() @Min(0) rider_fee_per_step?: number;
+  // ค่ารอบตามระยะทาง (สูตรเดิม): ค่าเริ่มต้นครอบคลุม rider_free_km กม.แรก แล้วคิดเพิ่ม rider_fee_per_km ต่อ กม.
   @IsOptional() @IsNumber() @Min(0) rider_free_km?: number;
   @IsOptional() @IsNumber() @Min(0) rider_fee_per_km?: number;
   // พิกัดร้าน (ใช้คำนวณระยะทางไปหาลูกค้า) ส่ง null เพื่อล้างค่า

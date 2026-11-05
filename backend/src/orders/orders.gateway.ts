@@ -86,6 +86,19 @@ export class OrdersGateway
   }
 
   /**
+   * แจ้งเตือนแอดมินเมื่อไรเดอร์กดนำส่งเงินสด (cash_submitted)
+   */
+  notifyCashSubmitted(payload: any) {
+    this.logger.log(`📢 กระจายสัญญาณ cash_submitted: ${JSON.stringify(payload)}`);
+    try {
+      this.server?.emit('cash_submitted', payload);
+      this.server?.to('admin')?.emit('cash_submitted', payload);
+    } catch (e: any) {
+      this.logger.warn('ไม่สามารถกระจายสัญญาณ cash_submitted:', e.message);
+    }
+  }
+
+  /**
    * รองรับการรับสัญญาณ place_order หรือ new_order จากฝั่ง Frontend (ถ้ามี)
    */
   @SubscribeMessage('place_order')

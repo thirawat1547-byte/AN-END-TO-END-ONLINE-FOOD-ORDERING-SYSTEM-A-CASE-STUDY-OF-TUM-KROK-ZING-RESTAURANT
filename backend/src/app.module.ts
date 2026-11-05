@@ -12,6 +12,8 @@ import { PromotionsModule } from './promotions/promotions.module';
 import { ReportsModule } from './reports/reports.module';
 import { SettingsModule } from './settings/settings.module';
 import { ChatbotModule } from './chatbot/chatbot.module';
+import { ExpensesModule } from './expenses/expenses.module';
+import { GeoModule } from './geo/geo.module';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { ChatbotModule } from './chatbot/chatbot.module';
     ReportsModule,
     SettingsModule,
     ChatbotModule,
+    ExpensesModule,
+    GeoModule,
   ],
   providers: [PrismaService],
 })

@@ -16,6 +16,8 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SocialLoginDto } from './dto/social-login.dto';
+import { RequestOtpDto } from './dto/request-otp.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
 
 export interface OAuthUserProfile {
   provider: string;
@@ -39,7 +41,38 @@ export class AuthService implements OnModuleInit {
 
   async onModuleInit() {
     await this.ensureSessionTable();
+    await this.ensurePhoneOtpsTable();
     await this.loadActiveSessions();
+  }
+
+  // สร้างตาราง PHONE_OTPS ในฐานข้อมูลหากยังไม่มี
+  private async ensurePhoneOtpsTable() {
+    try {
+      await this.prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS PHONE_OTPS (
+          otp_id INT AUTO_INCREMENT PRIMARY KEY,
+          phone VARCHAR(15) NOT NULL,
+          otp_hash VARCHAR(255) NOT NULL,
+          purpose VARCHAR(20) NOT NULL DEFAULT 'REGISTER',
+          expires_at DATETIME NOT NULL,
+          attempts INT NOT NULL DEFAULT 0,
+          verified_at DATETIME NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_phone_otps_phone_purpose (phone, purpose)
+        );
+      `);
+      this.logger.log('Ensured PHONE_OTPS table exists');
+    } catch (err: any) {
+      this.logger.warn(`Could not ensure PHONE_OTPS table: ${err.message}`);
+    }
+
+    try {
+      await this.prisma.$executeRawUnsafe(`
+        ALTER TABLE USERS ADD COLUMN IF NOT EXISTS phone_verified_at DATETIME NULL;
+      `);
+    } catch (err: any) {
+      // ละเว้นหากฐานข้อมูลไม่รองรับ IF NOT EXISTS หรือคอลัมน์มีอยู่แล้ว
+    }
   }
 
   // สร้างตาราง USER_ACTIVE_SESSIONS ในฐานข้อมูลหากยังไม่มี
@@ -178,6 +211,125 @@ export class AuthService implements OnModuleInit {
     return { available: true, message: 'อีเมลนี้สามารถใช้งานได้' };
   }
 
+  // ขอรหัส OTP ยืนยันเบอร์โทรศัพท์ตอนสมัครสมาชิก
+  async requestOtp(dto: RequestOtpDto) {
+    const cleanPhone = (dto.phone || '').trim().replace(/[-\s]/g, '');
+    if (!/^0\d{9}$/.test(cleanPhone)) {
+      throw new BadRequestException('เบอร์โทรศัพท์ต้องมีครบ 10 หลักและขึ้นต้นด้วย 0 (เช่น 0812345678)');
+    }
+
+    // ตรวจสอบ Rate Limit (Cooldown 60 วินาที)
+    const latestOtp = await this.prisma.phoneOtp.findFirst({
+      where: {
+        phone: cleanPhone,
+        purpose: 'REGISTER',
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    if (latestOtp) {
+      const elapsedMs = Date.now() - latestOtp.created_at.getTime();
+      const cooldownMs = 60 * 1000;
+      if (elapsedMs < cooldownMs) {
+        const waitSeconds = Math.ceil((cooldownMs - elapsedMs) / 1000);
+        throw new BadRequestException(`กรุณารอ ${waitSeconds} วินาทีก่อนขอรหัสใหม่`);
+      }
+    }
+
+    // กำหนดอายุ OTP 5 นาที
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+    // รองรับโหมดทดสอบ
+    const isTestMode = process.env.OTP_MODE !== 'production';
+    let code: string;
+    if (isTestMode) {
+      code = process.env.OTP_TEST_CODE || '123456';
+      console.log(`[OTP-TEST] รหัส OTP สำหรับเบอร์ ${cleanPhone} คือ: ${code}`);
+      this.logger.log(`[OTP-TEST] รหัส OTP สำหรับเบอร์ ${cleanPhone} คือ: ${code}`);
+    } else {
+      code = Math.floor(100000 + Math.random() * 900000).toString();
+      // เมื่อขึ้น Production จริง เชื่อมต่อกับ SMS Gateway ที่นี่
+    }
+
+    // เข้ารหัส Hash รหัส OTP
+    const saltRounds = 10;
+    const otpHash = await bcrypt.hash(code, saltRounds);
+
+    // บันทึกลงตาราง PhoneOtp
+    await this.prisma.phoneOtp.create({
+      data: {
+        phone: cleanPhone,
+        otp_hash: otpHash,
+        purpose: 'REGISTER',
+        expires_at: expiresAt,
+        attempts: 0,
+        verified_at: null,
+      },
+    });
+
+    return {
+      message: 'ส่งรหัส OTP เรียบร้อยแล้ว',
+      cooldown_seconds: 60,
+      is_test: isTestMode,
+    };
+  }
+
+  // ตรวจสอบรหัส OTP และออก Token ยืนยัน
+  async verifyOtp(dto: VerifyOtpDto) {
+    const cleanPhone = (dto.phone || '').trim().replace(/[-\s]/g, '');
+    const cleanOtp = (dto.otp || '').trim();
+
+    if (!cleanPhone || !cleanOtp) {
+      throw new BadRequestException('กรุณาระบุเบอร์โทรศัพท์และรหัส OTP ให้ครบถ้วน');
+    }
+
+    const latestOtp = await this.prisma.phoneOtp.findFirst({
+      where: {
+        phone: cleanPhone,
+        purpose: 'REGISTER',
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    if (!latestOtp || latestOtp.expires_at < new Date()) {
+      throw new BadRequestException('รหัส OTP หมดอายุแล้ว');
+    }
+
+    if (latestOtp.attempts >= 5) {
+      throw new BadRequestException('กรอกรหัสผิดเกิน 5 ครั้ง กรุณาขอรหัสใหม่');
+    }
+
+    const isMatch = await bcrypt.compare(cleanOtp, latestOtp.otp_hash);
+    if (!isMatch) {
+      await this.prisma.phoneOtp.update({
+        where: { otp_id: latestOtp.otp_id },
+        data: { attempts: latestOtp.attempts + 1 },
+      });
+      throw new BadRequestException('รหัส OTP ไม่ถูกต้อง');
+    }
+
+    // อัปเดต verified_at ในเรคอร์ด OTP
+    await this.prisma.phoneOtp.update({
+      where: { otp_id: latestOtp.otp_id },
+      data: { verified_at: new Date() },
+    });
+
+    // สร้าง JWT Token อายุสั้น 15 นาที สำหรับนำไปใช้สมัครสมาชิก
+    const otp_token = this.jwtService.sign(
+      {
+        phone: cleanPhone,
+        purpose: 'PHONE_VERIFICATION',
+      },
+      { expiresIn: '15m' },
+    );
+
+    return {
+      message: 'ยืนยันเบอร์โทรศัพท์สำเร็จ',
+      phone: cleanPhone,
+      otp_token,
+    };
+  }
+
   async register(dto: RegisterDto) {
     const existingUser = await this.prisma.user.findFirst({
       where: { username: dto.username },
@@ -230,6 +382,26 @@ export class AuthService implements OnModuleInit {
     } else {
       throw new BadRequestException('กรุณากรอกเบอร์โทรศัพท์');
     }
+    // 🛑 ตรวจสอบ OTP Token เพื่อยืนยันว่าเบอร์โทรศัพท์ผ่านการยืนยันแล้ว
+    if (!dto.otp_token) {
+      throw new BadRequestException('กรุณายืนยันเบอร์โทรศัพท์ด้วยรหัส OTP ก่อนลงทะเบียน');
+    }
+
+    let decoded: any;
+    try {
+      decoded = this.jwtService.verify(dto.otp_token);
+    } catch (err: any) {
+      throw new BadRequestException('Token ยืนยันเบอร์โทรศัพท์ไม่ถูกต้องหรือหมดอายุแล้ว กรุณายืนยันใหม่อีกครั้ง');
+    }
+
+    if (decoded?.purpose !== 'PHONE_VERIFICATION' || !decoded?.phone) {
+      throw new BadRequestException('Token ยืนยันเบอร์โทรศัพท์ไม่ถูกต้อง');
+    }
+
+    if (decoded.phone !== cleanPhone) {
+      throw new BadRequestException('เบอร์โทรศัพท์ที่ใช้สมัครไม่ตรงกับเบอร์โทรศัพท์ที่ยืนยัน OTP');
+    }
+
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(dto.password, saltRounds);
 
@@ -241,6 +413,7 @@ export class AuthService implements OnModuleInit {
         password: hashedPassword,
         email: dto.email ? dto.email.trim() : null,
         phone_number: cleanPhone,
+        phone_verified_at: new Date(),
         address: dto.address ? dto.address.trim().substring(0, 255) : null,
         role: assignedRole,
       },

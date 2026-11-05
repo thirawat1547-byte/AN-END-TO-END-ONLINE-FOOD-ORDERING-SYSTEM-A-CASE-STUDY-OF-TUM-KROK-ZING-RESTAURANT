@@ -1,10 +1,12 @@
-import { Controller, Get, Res, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { Response } from 'express';
 import { ReportsService } from './reports.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { QueryFinanceReportDto } from './dto/query-finance-report.dto';
+import { FinanceReportResponseDto } from './dto/finance-report-response.dto';
 
 @ApiTags('Reports & Database Views')
 @ApiBearerAuth()
@@ -40,6 +42,38 @@ export class ReportsController {
   @ApiResponse({ status: 200, description: 'ข้อมูลสรุปสำหรับหน้าแดชบอร์ด' })
   getDashboardAnalytics() {
     return this.reportsService.getDashboardAnalytics();
+  }
+
+  @Get('riders')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'ดึงรายงานสรุปผลการปฏิบัติงานและการนำส่งเงินสดของไรเดอร์ (เฉพาะ Admin)' })
+  @ApiQuery({ name: 'from', required: false, type: String, description: 'วันที่เริ่มต้น เช่น 2026-11-01 หรือ ISO 8601' })
+  @ApiQuery({ name: 'to', required: false, type: String, description: 'วันที่สิ้นสุด เช่น 2026-11-30 หรือ ISO 8601' })
+  @ApiResponse({ status: 200, description: 'ดึงรายงานสรุปไรเดอร์สำเร็จ' })
+  @ApiResponse({ status: 401, description: 'ไม่ได้เข้าสู่ระบบ (Unauthorized)' })
+  @ApiResponse({ status: 403, description: 'ไม่มีสิทธิ์เข้าถึง (เฉพาะ Admin)' })
+  getRiderReport(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.reportsService.getRiderReport({ from, to });
+  }
+
+  @Get('finance')
+  @Roles('ADMIN')
+  @ApiOperation({
+    summary: 'ดึงรายงานสรุปการเงินและกำไรสุทธิ (Financial & Net Profit Report)',
+    description: 'คำนวณรายรับ (แยกตาม CARD, PROMPTPAY, CASH), รายจ่าย (วัตถุดิบ, ค่าน้ำมัน, ค่ารอบไรเดอร์, ค่าธรรมเนียม Stripe) และกำไรสุทธิ พร้อม Time-series breakdown สำหรับทำกราฟ (เฉพาะ Admin)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'ดึงรายงานสรุปการเงินและกำไรสุทธิสำเร็จ',
+    type: FinanceReportResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'ไม่ได้เข้าสู่ระบบ (Unauthorized)' })
+  @ApiResponse({ status: 403, description: 'ไม่มีสิทธิ์เข้าถึง (เฉพาะ Admin)' })
+  getFinanceReport(@Query() query: QueryFinanceReportDto) {
+    return this.reportsService.getFinanceReport(query);
   }
 
   @Get('export-csv')

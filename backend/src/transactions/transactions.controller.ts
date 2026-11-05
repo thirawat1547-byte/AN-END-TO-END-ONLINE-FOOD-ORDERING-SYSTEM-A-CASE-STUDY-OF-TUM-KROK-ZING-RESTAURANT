@@ -10,7 +10,11 @@ import {
   UseGuards,
   Req,
   ForbiddenException,
+  Headers,
+  BadRequestException,
+  RawBodyRequest,
 } from '@nestjs/common';
+import { Request } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -130,6 +134,29 @@ export class TransactionsController {
     @Body('paymentIntentId') paymentIntentId?: string,
   ) {
     return this.transactionsService.confirmStripePayment(orderId, paymentIntentId);
+  }
+
+  @Post('stripe/webhook')
+  @ApiOperation({
+    summary: 'รับการแจ้งเตือนสถานะการชำระเงินจาก Stripe Webhook พร้อมตรวจสอบ Signature',
+    description: 'รับ Raw Body และ stripe-signature เพื่อตรวจสอบความถูกต้องจาก Stripe ก่อนอัปเดตสถานะการชำระเงิน',
+  })
+  @ApiResponse({ status: 200, description: 'รับและประมวลผล Webhook เรียบร้อย' })
+  @ApiResponse({ status: 400, description: 'Stripe signature หรือ Raw body ไม่ถูกต้อง' })
+  async handleWebhook(
+    @Headers('stripe-signature') signature: string,
+    @Req() req: RawBodyRequest<Request>,
+  ) {
+    if (!signature) {
+      throw new BadRequestException('ไม่พบ Stripe signature ใน Request Header (stripe-signature)');
+    }
+
+    const rawBody = req.rawBody;
+    if (!rawBody) {
+      throw new BadRequestException('ไม่พบ Raw Body ใน Request');
+    }
+
+    return this.transactionsService.handleStripeWebhook(rawBody, signature);
   }
 
   @Post('stripe/confirm-test/:orderId')

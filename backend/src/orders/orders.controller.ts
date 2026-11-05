@@ -22,6 +22,7 @@ import { extname, join } from 'path';
 import * as fs from 'fs';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { SubmitCashDto } from './dto/submit-cash.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrderChatMessageDto } from './dto/chat-message.dto';
 import { ReviewOrderDto } from './dto/review-order.dto';
@@ -126,6 +127,16 @@ export class OrdersController {
   @ApiOperation({ summary: 'ดูรายการงานจัดส่งที่เปิดรับไรเดอร์ (ADMIN / STAFF / RIDER)' })
   getAvailableDeliveries() {
     return this.ordersService.getAvailableDeliveries();
+  }
+
+  // ไรเดอร์ส่งเงินสดเข้าสู่ระบบ (alias: PATCH /api/v1/orders/deliveries/cash/submit)
+  @Patch('deliveries/cash/submit')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('RIDER', 'ADMIN', 'STAFF')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'ไรเดอร์ส่งเงินสดเข้าสู่ระบบ (รอยืนยัน) (เฉพาะ Rider - alias)' })
+  submitCashOrderAlias(@Body() dto: SubmitCashDto, @Req() req: any) {
+    return this.ordersService.submitCash(dto.delivery_ids, this.getUserId(req));
   }
 
   // หน้าไรเดอร์: งานที่ครัวทำเสร็จพร้อมให้รับ, งานที่ฉันกำลังส่ง, ออเดอร์ที่ยังปรุงอยู่

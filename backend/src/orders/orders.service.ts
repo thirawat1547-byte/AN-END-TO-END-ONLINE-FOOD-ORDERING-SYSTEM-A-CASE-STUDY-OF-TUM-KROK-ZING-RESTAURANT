@@ -222,6 +222,7 @@ export class OrdersService implements OnModuleInit {
           delivery_fee: deliveryFee,
           total_price: finalTotalPrice,
           delivery_address: createOrderDto.delivery_address || (existingUser ? existingUser.address : null),
+          delivery_landmark: createOrderDto.delivery_landmark || null,
           delivery_phone: createOrderDto.delivery_phone || (existingUser ? existingUser.phone_number : null),
           order_notes: createOrderDto.order_notes || null,
           ...(createOrderDto.table_id && {
@@ -267,6 +268,7 @@ export class OrdersService implements OnModuleInit {
               customer_name: createOrderDto.customer_name || existingUser?.username || 'ลูกค้าเดลิเวอรี',
               customer_phone: createOrderDto.delivery_phone || existingUser?.phone_number || '-',
               delivery_address: createOrderDto.delivery_address || existingUser?.address || 'ตามหมุดจัดส่ง',
+              delivery_landmark: createOrderDto.delivery_landmark || null,
               rider_fee: riderFee.rider_fee,
               distance_km: riderFee.distance_km,
               ...(createOrderDto.delivery_lat && createOrderDto.delivery_lng && {
@@ -786,10 +788,29 @@ export class OrdersService implements OnModuleInit {
       });
     } else if (statusUpper === 'COMPLETED') {
       // ไรเดอร์รับอาหารออกไปแล้ว = ถือว่าส่งสำเร็จ (นับค่ารอบ), ยังไม่ได้รับอาหาร = ปิดงานโดยไม่นับค่ารอบ
-      await this.prisma.delivery.updateMany({
+      const delivering = await this.prisma.delivery.findMany({
         where: { order_id: id, delivery_status: 'DELIVERING' },
-        data: { delivery_status: 'DELIVERED', delivered_at: new Date() },
       });
+      if (delivering.length > 0) {
+        const orderInfo = await this.prisma.order.findUnique({
+          where: { order_id: id },
+          include: { transaction: true },
+        });
+        const lastTxn = (orderInfo?.transaction || []).slice(-1)[0];
+        const isCash = /cash/i.test(lastTxn?.payment_method || '');
+        const cashStatus = isCash ? 'PENDING' : 'NONE';
+        const cashAmount = isCash ? Number(orderInfo?.total_price || 0) : 0;
+
+        await this.prisma.delivery.updateMany({
+          where: { order_id: id, delivery_status: 'DELIVERING' },
+          data: {
+            delivery_status: 'DELIVERED',
+            delivered_at: new Date(),
+            cash_amount: cashAmount,
+            cash_status: cashStatus,
+          },
+        });
+      }
       await this.prisma.delivery.updateMany({
         where: { order_id: id, delivery_status: { in: ['WAITING_RIDER', 'ASSIGNED'] } },
         data: { delivery_status: 'CANCELLED' },
@@ -904,7 +925,9 @@ export class OrdersService implements OnModuleInit {
           customer_name: (order.user as any)?.username || 'ลูกค้าเดลิเวอรี',
           customer_phone: order.delivery_phone || (order.user as any)?.phone_number || '-',
           delivery_address: order.delivery_address || (order.user as any)?.address || '-',
+          delivery_landmark: order.delivery_landmark || null,
           rider_fee: riderFee.rider_fee,
+          distance_km: riderFee.distance_km,
         },
       }).catch(() => {});
     }
@@ -1056,6 +1079,38 @@ export class OrdersService implements OnModuleInit {
       throw new BadRequestException('ต้องกดรับอาหารออกจากร้านก่อนจึงจะยืนยันส่งสำเร็จได้');
     }
 
+    let cashStatus = 'NONE';
+    let cashAmount = 0;
+
+    if (isDelivered) {
+      const orderInfo = await this.prisma.order.findUnique({
+        where: { order_id: orderId },
+        include: { transaction: true },
+      });
+
+      const lastTxn = (orderInfo?.transaction || []).slice(-1)[0];
+      const isCash = /cash/i.test(lastTxn?.payment_method || '');
+
+      if (isCash) {
+        cashStatus = 'PENDING';
+        cashAmount = Number(orderInfo?.total_price || 0);
+
+        // หากมีรายการชำระเงินแบบ CASH ที่สถานะเป็น PENDING ให้อัปเดตเป็น COMPLETED พร้อมบันทึก paid_at
+        if (lastTxn && lastTxn.payment_status === 'PENDING') {
+          await this.prisma.transaction.update({
+            where: { transaction_id: lastTxn.transaction_id },
+            data: {
+              payment_status: 'COMPLETED',
+              paid_at: new Date(),
+            },
+          }).catch(() => {});
+        }
+      } else {
+        cashStatus = 'NONE';
+        cashAmount = 0;
+      }
+    }
+
     await this.prisma.delivery.update({
       where: { order_id: orderId },
       data: {
@@ -1064,6 +1119,8 @@ export class OrdersService implements OnModuleInit {
         ...(isDelivered && {
           delivered_at: new Date(),
           ...(proofImageUrl && { proof_image_url: proofImageUrl }),
+          cash_amount: cashAmount,
+          cash_status: cashStatus,
         }),
       },
     });
@@ -1268,5 +1325,121 @@ export class OrdersService implements OnModuleInit {
     } catch (e) {}
 
     return updated;
+  }
+
+  // 14. นำส่งเงินสดสำหรับไรเดอร์ (PENDING -> SUBMITTED)
+  async submitCash(deliveryIds: number[], riderId: number) {
+    if (!deliveryIds || deliveryIds.length === 0) {
+      throw new BadRequestException('กรุณาระบุรหัสงานจัดส่งที่ต้องการนำส่งเงินสด');
+    }
+
+    const deliveries = await this.prisma.delivery.findMany({
+      where: {
+        delivery_id: { in: deliveryIds },
+      },
+      include: {
+        order: true,
+      },
+    });
+
+    if (deliveries.length !== deliveryIds.length) {
+      throw new NotFoundException('พบงานจัดส่งบางรายการไม่มีอยู่ในระบบ');
+    }
+
+    for (const d of deliveries) {
+      if (d.rider_id !== riderId) {
+        throw new ForbiddenException(`งานจัดส่ง #${d.delivery_id} ไม่ใช่งานของคุณ`);
+      }
+      if (d.cash_status !== 'PENDING') {
+        throw new BadRequestException(
+          `งานจัดส่ง #${d.delivery_id} ไม่ได้อยู่ในสถานะค้างนำส่ง (สถานะปัจจุบัน: ${d.cash_status})`,
+        );
+      }
+    }
+
+    const now = new Date();
+    await this.prisma.delivery.updateMany({
+      where: {
+        delivery_id: { in: deliveryIds },
+        rider_id: riderId,
+      },
+      data: {
+        cash_status: 'SUBMITTED',
+        cash_submitted_at: now,
+      },
+    });
+
+    const totalAmount = deliveries.reduce((sum, d) => sum + Number(d.cash_amount), 0);
+
+    const payload = {
+      rider_id: riderId,
+      delivery_ids: deliveryIds,
+      count: deliveryIds.length,
+      total_cash_amount: totalAmount,
+      submitted_at: now,
+    };
+
+    try {
+      this.ordersGateway.notifyCashSubmitted(payload);
+    } catch (e) {}
+
+    return {
+      message: `นำส่งเงินสดสำเร็จ ${deliveryIds.length} รายการ ยอดรวม ${totalAmount} บาท`,
+      ...payload,
+    };
+  }
+
+  // 15. แอดมินยืนยันรับเงินสดจากไรเดอร์ (SUBMITTED -> CONFIRMED)
+  async confirmCash(deliveryId: number, adminUserId: number) {
+    const delivery = await this.prisma.delivery.findUnique({
+      where: { delivery_id: deliveryId },
+    });
+    if (!delivery) {
+      throw new NotFoundException(`ไม่พบงานจัดส่งรหัส #${deliveryId}`);
+    }
+
+    const updated = await this.prisma.delivery.update({
+      where: { delivery_id: deliveryId },
+      data: {
+        cash_status: 'CONFIRMED',
+        cash_confirmed_at: new Date(),
+        cash_confirmed_by: adminUserId ? Number(adminUserId) : null,
+      },
+      include: {
+        rider: { select: { user_id: true, username: true } },
+        cash_confirmer: { select: { user_id: true, username: true } },
+      },
+    });
+
+    return {
+      message: `ยืนยันการรับเงินสดของงาน #${deliveryId} เรียบร้อยแล้ว`,
+      delivery: updated,
+    };
+  }
+
+  // 16. แอดมินปฏิเสธเงินสดจากไรเดอร์ ปรับสถานะกลับเป็น PENDING
+  async rejectCash(deliveryId: number) {
+    const delivery = await this.prisma.delivery.findUnique({
+      where: { delivery_id: deliveryId },
+    });
+    if (!delivery) {
+      throw new NotFoundException(`ไม่พบงานจัดส่งรหัส #${deliveryId}`);
+    }
+
+    const updated = await this.prisma.delivery.update({
+      where: { delivery_id: deliveryId },
+      data: {
+        cash_status: 'PENDING',
+        cash_submitted_at: null,
+      },
+      include: {
+        rider: { select: { user_id: true, username: true } },
+      },
+    });
+
+    return {
+      message: `ปรับสถานะเงินสดของงาน #${deliveryId} กลับเป็น PENDING เพื่อให้ไรเดอร์ตรวจสอบและส่งใหม่`,
+      delivery: updated,
+    };
   }
 }

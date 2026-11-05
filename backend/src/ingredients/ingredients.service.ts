@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, OnModuleInit, Logger } from '@nestjs/com
 import { PrismaService } from '../prisma.service';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { UpdateIngredientDto } from './dto/update-ingredient.dto';
+import { CreateIngredientPurchaseDto } from './dto/create-ingredient-purchase.dto';
 
 // พจนานุกรมแปลชื่อวัตถุดิบและหน่วยนับจากภาษาอังกฤษเป็นภาษาไทย
 const INGREDIENT_DICT: Array<{ regex: RegExp; thaiName: string; thaiUnit: string }> = [
@@ -97,11 +98,35 @@ export class IngredientsService implements OnModuleInit {
   constructor(private readonly prisma: PrismaService) {}
 
   async onModuleInit() {
+    await this.ensurePurchasesTable();
     // แปลงข้อมูลภาษาอังกฤษในฐานข้อมูลให้เป็นภาษาไทยโดยอัตโนมัติตั้งแต่เริ่มต้นระบบ
     try {
       await this.translateAllToThai();
     } catch (err) {
       this.logger.warn(`Could not auto-translate ingredients on init: ${err.message}`);
+    }
+  }
+
+  // สร้างตาราง INGREDIENT_PURCHASES หากยังไม่มีในฐานข้อมูล
+  private async ensurePurchasesTable() {
+    try {
+      await this.prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS INGREDIENT_PURCHASES (
+          purchase_id INT AUTO_INCREMENT PRIMARY KEY,
+          ingredient_id INT NULL,
+          ingredient_name VARCHAR(100) NOT NULL,
+          quantity DECIMAL(10, 2) NOT NULL,
+          unit VARCHAR(50) NOT NULL,
+          total_price DECIMAL(10, 2) NOT NULL,
+          purchased_by INT NULL,
+          purchased_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_ingredient_purchases_ingredient_id (ingredient_id),
+          INDEX idx_ingredient_purchases_purchased_by (purchased_by),
+          INDEX idx_ingredient_purchases_purchased_at (purchased_at)
+        );
+      `);
+    } catch (err) {
+      this.logger.warn(`Could not ensure INGREDIENT_PURCHASES table: ${err.message}`);
     }
   }
 
@@ -210,6 +235,120 @@ export class IngredientsService implements OnModuleInit {
 
     return this.prisma.ingredient.delete({
       where: { ingredient_id },
+    });
+  }
+
+  // 6. บันทึกการสั่งซื้อวัตถุดิบเข้าคลังพร้อมเพิ่มสต็อกทันที (Transaction)
+  async createPurchase(ingredientId: number, dto: CreateIngredientPurchaseDto, userId?: number) {
+    return this.prisma.$transaction(async (tx) => {
+      // 1. ตรวจสอบว่ามีวัตถุดิบนี้อยู่ในระบบหรือไม่ หากไม่พบ Throw NotFoundException
+      const ingredient = await tx.ingredient.findUnique({
+        where: { ingredient_id: ingredientId },
+      });
+
+      if (!ingredient) {
+        throw new NotFoundException(`ไม่พบวัตถุดิบรหัส ID #${ingredientId}`);
+      }
+
+      // ตรวจสอบ user เพื่อป้องกัน foreign key error
+      let purchaserId: number | null = null;
+      if (userId) {
+        const userExists = await tx.user.findUnique({
+          where: { user_id: Number(userId) },
+          select: { user_id: true },
+        });
+        if (userExists) {
+          purchaserId = userExists.user_id;
+        }
+      }
+
+      const unit = dto.unit?.trim() || ingredient.unit;
+
+      // 2. บันทึกข้อมูลลงตาราง IngredientPurchase
+      const purchase = await tx.ingredientPurchase.create({
+        data: {
+          ingredient_id: ingredient.ingredient_id,
+          ingredient_name: ingredient.name,
+          quantity: dto.quantity,
+          unit: unit,
+          total_price: dto.total_price,
+          purchased_by: purchaserId,
+          purchased_at: new Date(),
+        },
+        include: {
+          purchaser: {
+            select: {
+              user_id: true,
+              username: true,
+              role: true,
+            },
+          },
+        },
+      });
+
+      // 3. อัปเดตเพิ่มจำนวนสต๊อก (stock) ของวัตถุดิบนั้นตามค่า quantity ทันที
+      const updatedIngredient = await tx.ingredient.update({
+        where: { ingredient_id: ingredientId },
+        data: {
+          quantity: {
+            increment: dto.quantity,
+          },
+        },
+      });
+
+      return {
+        ...purchase,
+        current_stock: updatedIngredient.quantity,
+        ingredient: updatedIngredient,
+      };
+    });
+  }
+
+  // 7. ดึงรายการประวัติการซื้อวัตถุดิบทั้งหมด เรียงลำดับจากใหม่ไปเก่า พร้อมรองรับตัวกรองช่วงวันที่ (from, to)
+  async findAllPurchases(query?: { from?: string; to?: string }) {
+    const where: any = {};
+
+    if (query?.from || query?.to) {
+      where.purchased_at = {};
+
+      if (query.from) {
+        const fromDate = /^\d{4}-\d{2}-\d{2}$/.test(query.from)
+          ? new Date(`${query.from}T00:00:00+07:00`)
+          : new Date(query.from);
+        if (!isNaN(fromDate.getTime())) {
+          where.purchased_at.gte = fromDate;
+        }
+      }
+
+      if (query.to) {
+        const toDate = /^\d{4}-\d{2}-\d{2}$/.test(query.to)
+          ? new Date(`${query.to}T23:59:59.999+07:00`)
+          : new Date(query.to);
+        if (!isNaN(toDate.getTime())) {
+          where.purchased_at.lte = toDate;
+        }
+      }
+
+      if (Object.keys(where.purchased_at).length === 0) {
+        delete where.purchased_at;
+      }
+    }
+
+    return this.prisma.ingredientPurchase.findMany({
+      where,
+      orderBy: {
+        purchased_at: 'desc',
+      },
+      include: {
+        ingredient: true,
+        purchaser: {
+          select: {
+            user_id: true,
+            username: true,
+            role: true,
+          },
+        },
+      },
     });
   }
 }

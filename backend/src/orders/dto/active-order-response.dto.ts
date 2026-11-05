@@ -42,6 +42,9 @@ export class DeliveryInfoDto {
   @ApiProperty({ example: '123/45 ถนนพหลโยธิน แขวงลาดยาว เขตจตุจักร กทม.', description: 'ที่อยู่สำหรับจัดส่ง' })
   delivery_address: string;
 
+  @ApiPropertyOptional({ example: 'ตึกสีฟ้า หน้าเซเว่น ซอย 3', description: 'จุดสังเกตสำหรับการจัดส่ง (Landmark)' })
+  delivery_landmark?: string | null;
+
   @ApiPropertyOptional({ example: 13.7563, description: 'ละติจูดปลายทาง' })
   customer_lat?: number | null;
 
@@ -135,6 +138,9 @@ export class ActiveOrderResponseDto {
 
   @ApiPropertyOptional({ example: '123/45 ถนนพหลโยธิน แขวงลาดยาว เขตจตุจักร กทม.', description: 'ที่อยู่สำหรับจัดส่ง' })
   delivery_address?: string | null;
+
+  @ApiPropertyOptional({ example: 'ตึกสีฟ้า หน้าเซเว่น ซอย 3', description: 'จุดสังเกตสำหรับการจัดส่ง (Landmark)' })
+  delivery_landmark?: string | null;
 
   @ApiPropertyOptional({ example: '0891234567', description: 'เบอร์โทรศัพท์สำหรับจัดส่ง' })
   delivery_phone?: string | null;

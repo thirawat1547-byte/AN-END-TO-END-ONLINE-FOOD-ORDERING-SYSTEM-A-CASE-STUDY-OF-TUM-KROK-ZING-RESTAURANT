@@ -6,6 +6,7 @@ import {
   ForbiddenException,
   InternalServerErrorException,
   Logger,
+  OnModuleInit,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
@@ -15,7 +16,7 @@ import { OrdersService } from '../orders/orders.service';
 const Stripe = require('stripe');
 
 @Injectable()
-export class TransactionsService {
+export class TransactionsService implements OnModuleInit {
   private readonly logger = new Logger(TransactionsService.name);
   private stripe: any;
 
@@ -26,6 +27,25 @@ export class TransactionsService {
     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
       apiVersion: '2024-12-18.acacia',
     });
+  }
+
+  async onModuleInit() {
+    await this.ensureTransactionColumns();
+  }
+
+  // ตรวจสอบและสร้างคอลัมน์ใหม่ (paid_at, stripe_payment_intent_id, stripe_fee) หากยังไม่มีในฐานข้อมูล
+  private async ensureTransactionColumns() {
+    const addColumnSafe = async (sql: string) => {
+      try {
+        await this.prisma.$executeRawUnsafe(sql);
+      } catch (e: any) {
+        // ละเว้นหากมีคอลัมน์นี้อยู่แล้วในตาราง
+      }
+    };
+
+    await addColumnSafe('ALTER TABLE TRANSACTIONS ADD COLUMN stripe_payment_intent_id VARCHAR(255) NULL;');
+    await addColumnSafe('ALTER TABLE TRANSACTIONS ADD COLUMN stripe_fee DECIMAL(10, 2) DEFAULT 0.00;');
+    await addColumnSafe('ALTER TABLE TRANSACTIONS ADD COLUMN paid_at DATETIME NULL;');
   }
 
   // บันทึกการชำระเงินปกติ (เงินสด / สแกนโอน) และปรับสถานะ Order อย่างถูกต้อง
@@ -59,16 +79,30 @@ export class TransactionsService {
       }
     }
 
+    // แปลงประเภทช่องทางชำระเงินให้เป็นมาตรฐานชัดเจน:
+    // ออเดอร์ที่จ่ายแบบเงินสด บันทึกช่องทางเป็น 'CASH' ชัดเจน
+    let normalizedMethod = (payment_method || '').trim().toUpperCase();
+    if (['CASH', 'เงินสด', 'COD', 'CASH_ON_DELIVERY'].includes(normalizedMethod)) {
+      normalizedMethod = 'CASH';
+    } else if (['PROMPTPAY', 'PROMPT_PAY', 'พร้อมเพย์'].includes(normalizedMethod)) {
+      normalizedMethod = 'PROMPTPAY';
+    } else if (['CARD', 'CREDIT_CARD', 'DEBIT_CARD', 'บัตร', 'บัตรเดบิต'].includes(normalizedMethod)) {
+      normalizedMethod = 'CARD';
+    }
+
     const finalPaymentStatus = payment_status ? payment_status.toUpperCase() : 'COMPLETED';
+    const isCompleted = finalPaymentStatus === 'COMPLETED';
 
     return this.prisma.$transaction(async (tx) => {
-      // 1. สร้างรายการชำระเงิน
+      // 1. สร้างรายการชำระเงิน พร้อมบันทึก paid_at ตามเวลาจริงเมื่อ COMPLETED
       const transaction = await tx.transaction.create({
         data: {
           order_id,
           amount,
-          payment_method,
+          payment_method: normalizedMethod,
           payment_status: finalPaymentStatus,
+          paid_at: isCompleted ? new Date() : null,
+          stripe_fee: 0,
         },
       });
 
@@ -190,6 +224,8 @@ export class TransactionsService {
         amount: order.total_price,
         payment_method: 'PROMPTPAY',
         payment_status: 'PENDING',
+        paid_at: null,
+        stripe_fee: 0,
       },
     });
   }
@@ -248,7 +284,10 @@ export class TransactionsService {
 
     const updatedTxn = await this.prisma.transaction.update({
       where: { transaction_id: transactionId },
-      data: { payment_status: 'COMPLETED' },
+      data: {
+        payment_status: 'COMPLETED',
+        paid_at: new Date(),
+      },
     });
 
     // ออเดอร์ทานที่ร้าน: ปิดบิลเป็น PAID และคืนโต๊ะว่างเมื่อไม่มีออเดอร์ค้าง
@@ -339,13 +378,16 @@ export class TransactionsService {
       throw new InternalServerErrorException('ไม่ได้รับ client_secret จาก Stripe API');
     }
 
-    // บันทึกรายการลงตารางรอการชำระ (เฉพาะเมื่อสร้าง Stripe PaymentIntent สำเร็จจริง)
+    // บันทึกรายการลงตารางรอการชำระ พร้อมเก็บ stripe_payment_intent_id เพื่อใช้จับคู่
     await this.prisma.transaction.create({
       data: {
         order_id: order.order_id,
         amount: order.total_price,
         payment_method: 'STRIPE',
         payment_status: 'PENDING',
+        stripe_payment_intent_id: paymentIntent.id,
+        stripe_fee: 0,
+        paid_at: null,
       },
     });
 
@@ -372,8 +414,26 @@ export class TransactionsService {
       throw new BadRequestException(`คำสั่งซื้อนี้มีสถานะ ${order.status} ไม่สามารถดำเนินการชำระเงินซ้ำได้`);
     }
 
-    // หากมีการระบุ paymentIntentId ให้ตรวจสอบสถานะกับ Stripe API จริง
-    if (paymentIntentId) {
+    // หากไม่ได้ระบุ paymentIntentId ให้ค้นหาจาก transaction ที่บันทึกไว้ของออเดอร์นี้
+    let resolvedIntentId = paymentIntentId;
+    if (!resolvedIntentId) {
+      const pendingTxn = await this.prisma.transaction.findFirst({
+        where: {
+          order_id: orderId,
+          stripe_payment_intent_id: { not: null },
+        },
+        orderBy: { transaction_id: 'desc' },
+      });
+      if (pendingTxn?.stripe_payment_intent_id) {
+        resolvedIntentId = pendingTxn.stripe_payment_intent_id;
+      }
+    }
+
+    let channel = 'CARD';
+    let stripeFee = 0;
+
+    // หากมี paymentIntentId ให้ตรวจสอบสถานะกับ Stripe API จริง
+    if (resolvedIntentId) {
       const stripeKey = process.env.STRIPE_SECRET_KEY;
       if (!stripeKey || stripeKey.includes('placeholder')) {
         throw new InternalServerErrorException('ระบบชำระเงิน Stripe ยังไม่ได้ถูกตั้งค่าคีย์ (STRIPE_SECRET_KEY)');
@@ -381,8 +441,8 @@ export class TransactionsService {
 
       let intent: any;
       try {
-        intent = await this.stripe.paymentIntents.retrieve(paymentIntentId, {
-          expand: ['payment_method'],
+        intent = await this.stripe.paymentIntents.retrieve(resolvedIntentId, {
+          expand: ['payment_method', 'latest_charge.balance_transaction'],
         });
       } catch (err: any) {
         throw new BadRequestException(
@@ -411,8 +471,25 @@ export class TransactionsService {
         card = intent.charges.data[0].payment_method_details.card;
       }
 
-      // ตรวจสอบประเภทบัตร: ต้องเป็นบัตรเดบิต (Debit Card) เท่านั้น
-      const isCard = paymentMethod?.type === 'card' || Boolean(card);
+      // 1. ตรวจสอบประเภทช่องทางชำระเงินจาก Payment Method:
+      //    - หาก payment_method.type === 'card' ให้บันทึกช่องทางเป็น 'CARD'
+      //    - หาก payment_method.type === 'promptpay' ให้บันทึกช่องทางเป็น 'PROMPTPAY'
+      //    - (ยกเลิกการบันทึกรวมเป็น 'STRIPE' อย่างเดียว)
+      const pmType =
+        paymentMethod?.type ||
+        intent.charges?.data?.[0]?.payment_method_details?.type ||
+        intent.payment_method_types?.[0];
+
+      if (pmType === 'promptpay') {
+        channel = 'PROMPTPAY';
+      } else if (pmType === 'card') {
+        channel = 'CARD';
+      } else {
+        channel = 'CARD';
+      }
+
+      // 2. ตรวจสอบประเภทบัตร: ต้องเป็นบัตรเดบิต (Debit Card) เท่านั้น (เฉพาะกรณีชำระผ่านบัตร CARD)
+      const isCard = channel === 'CARD' || paymentMethod?.type === 'card' || Boolean(card);
       if (isCard) {
         if (!card || card.funding !== 'debit') {
           // สั่งยกเลิก/ไม่ตัดเงิน (Cancel Intent หรือ Refund หากถูกตัดเงินไปแล้ว)
@@ -422,15 +499,15 @@ export class TransactionsService {
                 intent.status,
               )
             ) {
-              await this.stripe.paymentIntents.cancel(paymentIntentId);
+              await this.stripe.paymentIntents.cancel(resolvedIntentId);
             } else if (intent.status === 'succeeded') {
               await this.stripe.refunds.create({
-                payment_intent: paymentIntentId,
+                payment_intent: resolvedIntentId,
                 reason: 'requested_by_customer',
               });
             }
           } catch (cancelErr: any) {
-            this.logger.warn(`ไม่สามารถยกเลิก/คืนเงิน PaymentIntent #${paymentIntentId} ได้: ${cancelErr?.message}`);
+            this.logger.warn(`ไม่สามารถยกเลิก/คืนเงิน PaymentIntent #${resolvedIntentId} ได้: ${cancelErr?.message}`);
           }
 
           throw new BadRequestException('ระบบรองรับเฉพาะบัตรเดบิตเท่านั้น กรุณาใช้บัตรเดบิตในการชำระเงิน');
@@ -440,26 +517,89 @@ export class TransactionsService {
       if (intent.status !== 'succeeded') {
         throw new BadRequestException(`การชำระเงินยังไม่สำเร็จในระบบ Stripe (สถานะปัจจุบัน: ${intent.status})`);
       }
+
+      // 3. คำนวณและบันทึกค่าธรรมเนียม Stripe ลง stripe_fee:
+      //    - ดึงค่าธรรมเนียมจาก Stripe Charge (latest_charge.balance_transaction.fee หรือ expand balance_transaction)
+      //    - แปลงหน่วยจากสตางค์เป็นบาท โดยนำมาหาร 100 (เช่น 350 สตางค์ = 3.50 บาท) บันทึกลงคอลัมน์ stripe_fee
+      //    - หากดึงค่าธรรมเนียมไม่สำเร็จ ให้ fallback เป็น 0
+      try {
+        let feeSatang: number | undefined;
+
+        // ดึงจาก latest_charge.balance_transaction.fee
+        const latestCharge = intent.latest_charge;
+        if (latestCharge && typeof latestCharge === 'object') {
+          if (latestCharge.balance_transaction && typeof latestCharge.balance_transaction === 'object') {
+            feeSatang = latestCharge.balance_transaction.fee;
+          } else if (typeof latestCharge.balance_transaction === 'string') {
+            const bt = await this.stripe.balanceTransactions.retrieve(latestCharge.balance_transaction);
+            feeSatang = bt?.fee;
+          }
+        } else if (typeof latestCharge === 'string') {
+          const ch = await this.stripe.charges.retrieve(latestCharge, {
+            expand: ['balance_transaction'],
+          });
+          if (ch.balance_transaction && typeof ch.balance_transaction === 'object') {
+            feeSatang = ch.balance_transaction.fee;
+          } else if (typeof ch.balance_transaction === 'string') {
+            const bt = await this.stripe.balanceTransactions.retrieve(ch.balance_transaction);
+            feeSatang = bt?.fee;
+          }
+        }
+
+        // Fallback จาก intent.charges.data[0]
+        if (feeSatang === undefined && intent.charges?.data?.[0]) {
+          const ch = intent.charges.data[0];
+          if (ch.balance_transaction && typeof ch.balance_transaction === 'object') {
+            feeSatang = ch.balance_transaction.fee;
+          } else if (typeof ch.balance_transaction === 'string') {
+            const bt = await this.stripe.balanceTransactions.retrieve(ch.balance_transaction);
+            feeSatang = bt?.fee;
+          }
+        }
+
+        if (typeof feeSatang === 'number' && !isNaN(feeSatang) && feeSatang >= 0) {
+          stripeFee = feeSatang / 100;
+        } else {
+          stripeFee = 0;
+        }
+      } catch (feeErr: any) {
+        this.logger.warn(`ไม่สามารถดึงค่าธรรมเนียม Stripe ได้: ${feeErr?.message}`);
+        stripeFee = 0;
+      }
     }
 
-    // อัปเดตรายการธุรกรรมเป็น COMPLETED
+    // อัปเดตรายการธุรกรรมเป็น COMPLETED พร้อมบันทึก paid_at, stripe_payment_intent_id, stripe_fee
     const existingTxn = await this.prisma.transaction.findFirst({
-      where: { order_id: orderId, payment_method: 'STRIPE' },
+      where: {
+        order_id: orderId,
+        OR: [
+          ...(resolvedIntentId ? [{ stripe_payment_intent_id: resolvedIntentId }] : []),
+          { payment_method: { in: ['STRIPE', 'CARD', 'PROMPTPAY'] }, payment_status: 'PENDING' },
+          { payment_method: 'STRIPE' },
+        ],
+      },
       orderBy: { transaction_id: 'desc' },
     });
+
+    const txnUpdateData = {
+      payment_method: channel,
+      payment_status: 'COMPLETED',
+      paid_at: new Date(),
+      stripe_payment_intent_id: resolvedIntentId || existingTxn?.stripe_payment_intent_id || null,
+      stripe_fee: stripeFee,
+    };
 
     if (existingTxn) {
       await this.prisma.transaction.update({
         where: { transaction_id: existingTxn.transaction_id },
-        data: { payment_status: 'COMPLETED' },
+        data: txnUpdateData,
       });
     } else {
       await this.prisma.transaction.create({
         data: {
           order_id: orderId,
           amount: order.total_price,
-          payment_method: 'STRIPE',
-          payment_status: 'COMPLETED',
+          ...txnUpdateData,
         },
       });
     }
@@ -505,6 +645,213 @@ export class TransactionsService {
     }
 
     return updated;
+  }
+
+  // Webhook handler สำหรับรับ event จาก Stripe พร้อมตรวจสอบ Signature และ Raw Body
+  async handleStripeWebhook(rawBody: Buffer | string | any, signature?: string) {
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    let event: any;
+
+    if (signature && Buffer.isBuffer(rawBody)) {
+      if (!webhookSecret || webhookSecret === 'whsec_placeholder') {
+        this.logger.warn(
+          'STRIPE_WEBHOOK_SECRET ยังไม่ได้ถูกกำหนดหรือเป็น placeholder: ข้ามการตรวจสอบ Stripe signature ในโหมดพัฒนา',
+        );
+        try {
+          event = JSON.parse(rawBody.toString('utf-8'));
+        } catch (parseErr: any) {
+          throw new BadRequestException(`ไม่สามารถแปลงข้อมูล Webhook JSON ได้: ${parseErr?.message}`);
+        }
+      } else {
+        try {
+          event = this.stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+        } catch (err: any) {
+          this.logger.error(`Stripe Webhook Signature Verification Failed: ${err.message}`);
+          throw new BadRequestException(`Stripe Webhook Signature Verification Failed: ${err.message}`);
+        }
+      }
+    } else if (rawBody && typeof rawBody === 'object' && rawBody.type) {
+      // Fallback สำหรับกรณีเรียกตรงหรือ mock event ใน test
+      event = rawBody;
+    } else if (rawBody) {
+      try {
+        const bodyStr = Buffer.isBuffer(rawBody) ? rawBody.toString('utf-8') : String(rawBody);
+        event = JSON.parse(bodyStr);
+      } catch (err: any) {
+        throw new BadRequestException(`Invalid Webhook payload: ${err.message}`);
+      }
+    } else {
+      throw new BadRequestException('ไม่พบข้อมูล Webhook payload');
+    }
+
+    this.logger.log(`Processing Stripe Webhook event: ${event?.type} (ID: ${event?.id})`);
+
+    // 1. จัดการ Event: payment_intent.succeeded
+    if (event?.type === 'payment_intent.succeeded') {
+      const intent = event.data?.object;
+      let orderId = Number(intent?.metadata?.order_id);
+      const intentId = intent?.id;
+
+      if (!orderId && intentId) {
+        const txn = await this.prisma.transaction.findFirst({
+          where: { stripe_payment_intent_id: intentId },
+          select: { order_id: true },
+        });
+        if (txn) orderId = txn.order_id;
+      }
+
+      if (orderId && intentId) {
+        try {
+          return await this.confirmStripePayment(orderId, intentId);
+        } catch (confirmErr: any) {
+          this.logger.warn(
+            `confirmStripePayment via webhook failed: ${confirmErr.message}. Executing direct update.`,
+          );
+          await this.handlePaymentIntentSucceededDirect(intent, orderId);
+          return { received: true, status: 'COMPLETED', order_id: orderId };
+        }
+      } else if (intentId) {
+        await this.handlePaymentIntentSucceededDirect(intent);
+        return { received: true, status: 'COMPLETED' };
+      }
+
+      return { received: true, event: event.type };
+    }
+
+    // 2. จัดการ Event: payment_intent.payment_failed หรือ payment_intent.canceled
+    if (
+      event?.type === 'payment_intent.payment_failed' ||
+      event?.type === 'payment_intent.canceled'
+    ) {
+      const intent = event.data?.object;
+      let orderId = Number(intent?.metadata?.order_id);
+      const intentId = intent?.id;
+
+      this.logger.warn(
+        `PaymentIntent #${intentId} failed or canceled (type: ${event.type})`,
+      );
+
+      const whereClause: any = {
+        OR: [
+          ...(intentId ? [{ stripe_payment_intent_id: intentId }] : []),
+          ...(orderId
+            ? [
+                {
+                  order_id: orderId,
+                  payment_status: 'PENDING',
+                  payment_method: { in: ['STRIPE', 'CARD', 'PROMPTPAY'] },
+                },
+              ]
+            : []),
+        ],
+      };
+
+      if (whereClause.OR.length > 0) {
+        await this.prisma.transaction.updateMany({
+          where: whereClause,
+          data: {
+            payment_status: 'FAILED',
+          },
+        });
+      }
+
+      return { received: true, status: 'FAILED', event: event.type };
+    }
+
+    return { received: true, event: event?.type };
+  }
+
+  // อัปเดตข้อมูล Transaction และ Order โดยตรงจาก PaymentIntent ของ Stripe Webhook
+  private async handlePaymentIntentSucceededDirect(intent: any, orderId?: number) {
+    const intentId = intent?.id;
+    const pmType =
+      intent?.payment_method?.type ||
+      intent?.charges?.data?.[0]?.payment_method_details?.type ||
+      intent?.payment_method_types?.[0];
+    const channel = pmType === 'promptpay' ? 'PROMPTPAY' : 'CARD';
+
+    let stripeFee = 0;
+    const charge = intent?.charges?.data?.[0] || intent?.latest_charge;
+    const balanceTxn = charge?.balance_transaction;
+    const feeSatang =
+      typeof balanceTxn === 'object'
+        ? balanceTxn?.fee
+        : typeof balanceTxn === 'number'
+        ? balanceTxn
+        : undefined;
+    if (typeof feeSatang === 'number' && feeSatang >= 0) {
+      stripeFee = feeSatang / 100;
+    }
+
+    const whereClause: any = {
+      OR: [
+        ...(intentId ? [{ stripe_payment_intent_id: intentId }] : []),
+        ...(orderId
+          ? [
+              {
+                order_id: orderId,
+                payment_method: { in: ['STRIPE', 'CARD', 'PROMPTPAY'] },
+              },
+            ]
+          : []),
+      ],
+    };
+
+    if (whereClause.OR.length > 0) {
+      await this.prisma.transaction.updateMany({
+        where: whereClause,
+        data: {
+          payment_method: channel,
+          payment_status: 'COMPLETED',
+          paid_at: new Date(),
+          stripe_fee: stripeFee,
+          ...(intentId ? { stripe_payment_intent_id: intentId } : {}),
+        },
+      });
+    }
+
+    if (orderId) {
+      const order = await this.prisma.order.findUnique({
+        where: { order_id: orderId },
+        select: { order_type: true, status: true, table_id: true },
+      });
+
+      if (order) {
+        let nextStatus = 'PAID';
+        if (order.order_type === 'DELIVERY') {
+          if (['COOKING', 'READY', 'IN_DELIVERY'].includes(order.status)) {
+            nextStatus = order.status;
+          } else if (order.status === 'DELIVERED') {
+            nextStatus = 'COMPLETED';
+          } else {
+            nextStatus = 'PAID';
+          }
+        }
+
+        await this.prisma.order.update({
+          where: { order_id: orderId },
+          data: { status: nextStatus },
+        });
+
+        if (order.table_id) {
+          const remainingUnpaid = await this.prisma.order.count({
+            where: {
+              table_id: order.table_id,
+              status: { in: ['PENDING', 'COOKING', 'READY', 'SERVED'] },
+              order_id: { not: orderId },
+            },
+          });
+          if (remainingUnpaid === 0) {
+            await this.prisma.table
+              .update({
+                where: { table_id: order.table_id },
+                data: { status: 'AVAILABLE' },
+              })
+              .catch(() => {});
+          }
+        }
+      }
+    }
   }
 
   // สำหรับทดสอบ Flow ในหน้าแอดมิน/โต๊ะ

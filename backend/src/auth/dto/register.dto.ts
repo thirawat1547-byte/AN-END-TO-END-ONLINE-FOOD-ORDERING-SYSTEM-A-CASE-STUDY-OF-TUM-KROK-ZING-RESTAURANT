@@ -24,6 +24,14 @@ export class RegisterDto {
   @IsOptional()
   phone_number?: string;
 
+  @ApiProperty({
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+    description: 'Token ยืนยันเบอร์โทรศัพท์ (ที่ได้รับหลังกรอกรหัส OTP สำเร็จ)',
+  })
+  @IsString({ message: 'otp_token ต้องเป็นข้อความ' })
+  @IsNotEmpty({ message: 'กรุณาระบุ otp_token ที่ได้จากการยืนยันเบอร์โทรศัพท์' })
+  otp_token: string;
+
   @ApiPropertyOptional({ example: '99 ซ.ศูนย์วิจัย 7 ถ.เพชรบุรีตัดใหม่ แขวงบางกะปิ เขตห้วยขวาง กรุงเทพมหานคร 10310', description: 'ที่อยู่' })
   @IsString()
   @IsOptional()
