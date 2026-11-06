@@ -37,10 +37,17 @@ onBeforeUnmount(() => {
   socket.off('order_status_updated', handleRealtimeNewOrder)
 })
 
-// ดึงเฉพาะออเดอร์ที่กำลังรอทำและกำลังปรุงในครัวมาแสดงใน KDS (ไม่รวมออเดอร์ที่ทำเสร็จแล้ว)
+// ดึงเฉพาะออเดอร์ที่พร้อมให้ครัวทำ (รอทำ / จ่ายแล้วรอทำ / กำลังปรุง) — เดลิเวอรีจ่ายออนไลน์ต้องจ่ายสำเร็จก่อน
+// ออเดอร์ที่จ่ายแล้ว (PAID) แต่ครัวยังไม่ได้ทำ ให้แสดงเป็น "รอคิวปรุง"
 const activeOrders = computed(() => {
-  return (adminStore.orders || []).filter(o => ['Pending', 'Cooking'].includes(o.status))
+  return (adminStore.orders || [])
+    .filter(o => o.in_kitchen_queue)
+    .map(o => ({ ...o, status: o.raw_status === 'COOKING' ? 'Cooking' : 'Pending' }))
 })
+
+// เวลาสั่งตามเวลาไทย (เดิมตัดจากข้อความ UTC จึงช้าไป 7 ชั่วโมง)
+const orderTime = (iso) =>
+  iso ? new Date(iso).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) : ''
 
 const totalDishesInKitchen = computed(() => {
   return activeOrders.value.reduce((sum, o) => {
@@ -126,7 +133,7 @@ const totalDishesInKitchen = computed(() => {
           </div>
           <div class="text-right">
             <span class="text-xs font-mono font-bold bg-white/20 px-2 py-0.5 rounded text-white">#ORD-{{ order.order_id }}</span>
-            <p class="text-[10px] opacity-85 mt-1 text-emerald-100">สั่งเมื่อ: {{ order.created_at ? order.created_at.slice(11, 16) : '' }} น.</p>
+            <p class="text-[10px] opacity-85 mt-1 text-emerald-100">สั่งเมื่อ: {{ orderTime(order.created_at) }} น.</p>
           </div>
         </div>
 

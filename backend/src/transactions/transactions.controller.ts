@@ -45,10 +45,10 @@ export class TransactionsController {
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN', 'STAFF', 'CUSTOMER')
+  @Roles('ADMIN', 'STAFF', 'KITCHEN', 'CUSTOMER')
   @ApiBearerAuth('JWT-auth')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'บันทึกการชำระเงินของออร์เดอร์ (ADMIN / STAFF / CUSTOMER)' })
+  @ApiOperation({ summary: 'บันทึกการชำระเงินของออร์เดอร์ (พนักงาน: ทุกแบบ / ลูกค้า: เฉพาะเงินสดปลายทาง) ยอดเงินใช้ยอดออเดอร์เสมอ' })
   @ApiResponse({ status: 201, description: 'บันทึกการชำระเงินสำเร็จ' })
   @ApiResponse({ status: 400, description: 'ข้อมูลไม่ถูกต้องหรือออเดอร์ปิดบิลแล้ว' })
   @ApiResponse({ status: 401, description: 'ไม่ได้เข้าสู่ระบบหรือไม่ได้รับอนุญาต' })

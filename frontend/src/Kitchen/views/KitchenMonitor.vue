@@ -6,6 +6,7 @@ import { getInitial, getStoredUserName } from '../../utils/avatar'
 import { socket } from '../../config/socket'
 import { useSocketStore } from '../../store/socketStore'
 import { showWarning } from '../../utils/swal'
+import { isInKitchenQueue } from '../../utils/kitchenQueue'
 
 // แสดงตัวอักษรย่อของผู้ใช้ที่ล็อกอินอยู่แทนรูปโปรไฟล์
 const kitchenUserName = getStoredUserName()
@@ -240,7 +241,8 @@ const fetchOrders = async () => {
       const st = (o.status || '').toUpperCase()
       if (['SERVED', 'READY', 'COMPLETED'].includes(st)) {
         completed.push(formatted)
-      } else if (['PENDING', 'COOKING'].includes(st)) {
+      } else if (isInKitchenQueue(o)) {
+        // PENDING / PAID / COOKING — เดลิเวอรีจ่ายออนไลน์ต้องจ่ายสำเร็จก่อนถึงจะขึ้นคิว
         incoming.push(formatted)
       }
     })

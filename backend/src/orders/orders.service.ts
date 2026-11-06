@@ -422,14 +422,31 @@ export class OrdersService implements OnModuleInit {
       return order;
     });
 
-    // ส่งสัญญาณแจ้งเตือนออเดอร์ใหม่ (new_order) ผ่าน WebSocket ไปยังหน้าจอครัว (KDS) ทันที
+    // ทานที่ร้าน: แจ้งครัวว่ามีออเดอร์ใหม่ทันที (จ่ายตอนเช็คบิล)
+    // เดลิเวอรี: ยังไม่รู้ว่าจะจ่ายช่องทางไหน — ส่งแค่ order_status_updated ให้หน้าจอต่าง ๆ รีเฟรช
+    // แล้วค่อยแจ้งครัวเป็นออเดอร์ใหม่ตอนจ่ายสำเร็จ หรือตอนเลือกเงินสดปลายทาง (notifyKitchenReady)
     try {
-      this.ordersGateway.sendNewOrder(createdOrder);
+      if (createdOrder.order_type === 'DELIVERY') {
+        this.ordersGateway.sendOrderStatusUpdated(createdOrder);
+      } else {
+        this.ordersGateway.sendNewOrder(createdOrder);
+      }
     } catch (wsErr) {
       console.warn('[WebSocket] ไม่สามารถส่งสัญญาณ new_order:', wsErr);
     }
 
     return createdOrder;
+  }
+
+  // ออเดอร์พร้อมให้ครัวทำแล้ว (จ่ายออนไลน์สำเร็จ หรือเลือกเงินสดปลายทาง): แจ้งจอครัวเป็นออเดอร์ใหม่พร้อมเสียงเตือน
+  async notifyKitchenReady(orderId: number) {
+    try {
+      const order = await this.findOne(orderId);
+      this.ordersGateway.sendNewOrder(order);
+      this.ordersGateway.sendOrderStatusUpdated(order);
+    } catch (err: any) {
+      this.logger.warn(`แจ้งจอครัวสำหรับออเดอร์ #${orderId} ไม่สำเร็จ: ${err?.message}`);
+    }
   }
 
   // 2. ดึงรายการออร์เดอร์ทั้งหมด (รองรับตัวกรอง status, tableId, orderType, date)

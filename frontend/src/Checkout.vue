@@ -2048,12 +2048,7 @@ async validateAndCheckout() {
         })
       };
 
-      if (this.vatAmount > 0) {
-        const taxInfo = `[รวม VAT ${this.vatRate}%: B${this.formatCurrency(this.vatAmount)}]`;
-        if (orderPayload.items.length > 0) {
-          orderPayload.items[0].notes = orderPayload.items[0].notes ? `${orderPayload.items[0].notes} | ${taxInfo}` : taxInfo;
-        }
-      }
+      // VAT ไม่ใส่ในหมายเหตุอาหารแล้ว (backend คิด VAT รวมใน total_price เอง และหมายเหตุอาหารไปขึ้นจอครัว)
 
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const response = await axios.post(`${API_BASE}/orders`, orderPayload, { headers });

@@ -106,12 +106,27 @@ export class TransactionsService implements OnModuleInit, OnModuleDestroy {
     const finalPaymentStatus = payment_status ? payment_status.toUpperCase() : 'COMPLETED';
     const isCompleted = finalPaymentStatus === 'COMPLETED';
 
-    return this.prisma.$transaction(async (tx) => {
+    // ลูกค้าบันทึกได้แค่ "เงินสดรอชำระ" (เก็บเงินปลายทาง) เท่านั้น
+    // ห้ามลูกค้าบันทึกว่าจ่ายแล้วเอง ไม่อย่างนั้นออเดอร์จะกลายเป็นชำระแล้วโดยไม่ได้จ่ายจริง
+    const callerRole = String(user?.role || '').toUpperCase();
+    const isStaffCaller = ['ADMIN', 'STAFF', 'KITCHEN'].includes(callerRole);
+    if (!isStaffCaller && (normalizedMethod !== 'CASH' || finalPaymentStatus !== 'PENDING')) {
+      throw new ForbiddenException('ลูกค้าบันทึกได้เฉพาะการชำระเงินสดปลายทาง การชำระออนไลน์ต้องผ่าน Stripe');
+    }
+
+    // ยอดเงินใช้ยอดออเดอร์ที่ระบบคำนวณเสมอ ไม่ใช้ยอดที่หน้าเว็บส่งมา (กันยอดไม่ตรงกับบิล)
+    if (amount !== undefined && Math.abs(Number(amount) - Number(order.total_price)) > 0.009) {
+      this.logger.warn(
+        `ยอดที่ส่งมา ฿${amount} ไม่ตรงกับยอดออเดอร์ #${order_id} ฿${order.total_price} — บันทึกตามยอดออเดอร์`,
+      );
+    }
+
+    const created = await this.prisma.$transaction(async (tx) => {
       // 1. สร้างรายการชำระเงิน พร้อมบันทึก paid_at ตามเวลาจริงเมื่อ COMPLETED
       const transaction = await tx.transaction.create({
         data: {
           order_id,
-          amount,
+          amount: order.total_price,
           payment_method: normalizedMethod,
           payment_status: finalPaymentStatus,
           paid_at: isCompleted ? new Date() : null,
@@ -175,6 +190,12 @@ export class TransactionsService implements OnModuleInit, OnModuleDestroy {
 
       return transaction;
     });
+
+    // ชำระสำเร็จ หรือเลือกเงินสดปลายทางของเดลิเวอรี: ออเดอร์พร้อมให้ครัวทำ แจ้งจอครัวทันที
+    if (isCompleted || (order.order_type === 'DELIVERY' && normalizedMethod === 'CASH')) {
+      await this.ordersService.notifyKitchenReady(order_id);
+    }
+    return created;
   }
 
   // ดูประวัติการชำระเงินทั้งหมด
@@ -314,6 +335,7 @@ export class TransactionsService implements OnModuleInit, OnModuleDestroy {
       });
     }
 
+    await this.ordersService.notifyKitchenReady(txn.order_id);
     return updatedTxn;
   }
 
@@ -672,6 +694,10 @@ export class TransactionsService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
+    // แจ้งจอครัวครั้งเดียวตอนเพิ่งจ่ายสำเร็จ (หน้าเว็บกับ webhook อาจยืนยันซ้ำกัน)
+    if (String(existingTxn?.payment_status || '').toUpperCase() !== 'COMPLETED') {
+      await this.ordersService.notifyKitchenReady(orderId);
+    }
     return updated;
   }
 

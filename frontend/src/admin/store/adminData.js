@@ -2,6 +2,7 @@ import { reactive } from 'vue'
 
 // ===== Backend API Configuration =====
 import { API_BASE } from '../../config/api'
+import { isInKitchenQueue } from '../../utils/kitchenQueue'
 import { broadcastMenuUpdated, DEFAULT_ALLERGENS } from '../../utils/menuSync'
 import imgChick from '../../assets/chick.jpg'
 import imgCoke from '../../assets/coke.jpg'
@@ -700,7 +701,8 @@ export const adminStore = reactive({
           const rawStatus = (o.status || '').toUpperCase()
           let normStatus = 'Pending'
           if (rawStatus === 'COOKING') normStatus = 'Cooking'
-          else if (rawStatus === 'SERVED' || rawStatus === 'READY') normStatus = 'Served'
+          // IN_DELIVERY = ครัวทำเสร็จแล้ว ไรเดอร์กำลังส่ง (เดิมตกไปเป็น Pending ทำให้ขึ้นคิวครัวซ้ำ)
+          else if (rawStatus === 'SERVED' || rawStatus === 'READY' || rawStatus === 'IN_DELIVERY') normStatus = 'Served'
           else if (rawStatus === 'PAID' || rawStatus === 'COMPLETED') normStatus = 'Completed'
           else if (rawStatus === 'CANCELLED') normStatus = 'Cancelled'
 
@@ -717,6 +719,9 @@ export const adminStore = reactive({
             customer_name: o.user?.username || (o.table ? `โต๊ะ ${o.table.table_number}` : (o.table_id ? `โต๊ะ T-0${o.table_id}` : `ลูกค้า #${o.order_id}`)),
             items,
             status: normStatus,
+            raw_status: rawStatus,
+            // พร้อมให้ครัวทำ (กฎเดียวกับจอครัวของพนักงาน: เดลิเวอรีจ่ายออนไลน์ต้องจ่ายสำเร็จก่อน)
+            in_kitchen_queue: isInKitchenQueue(o, rawStatus),
             order_type: o.order_type === 'DINE_IN' || o.table_id ? 'In-store' : 'Delivery',
             raw_order_type: o.order_type || (o.table_id ? 'DINE_IN' : 'DELIVERY'),
             payment_method: txn?.payment_method || '-',
