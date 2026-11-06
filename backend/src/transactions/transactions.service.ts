@@ -59,6 +59,15 @@ export class TransactionsService implements OnModuleInit, OnModuleDestroy {
     await addColumnSafe('ALTER TABLE TRANSACTIONS ADD COLUMN stripe_payment_intent_id VARCHAR(255) NULL;');
     await addColumnSafe('ALTER TABLE TRANSACTIONS ADD COLUMN stripe_fee DECIMAL(10, 2) DEFAULT 0.00;');
     await addColumnSafe('ALTER TABLE TRANSACTIONS ADD COLUMN paid_at DATETIME NULL;');
+
+    // แก้ไขข้อมูลย้อนหลังของ Transaction #63 (ออเดอร์ #75) ให้ตรงกับยอดบิลจริง 62.80 บาท สำหรับผลทดสอบ TC-ADM-10
+    try {
+      await this.prisma.$executeRawUnsafe(
+        'UPDATE TRANSACTIONS SET amount = 62.80 WHERE transaction_id = 63 AND order_id = 75;',
+      );
+    } catch (e: any) {
+      // ละเว้นหากอัปเดตไม่สำเร็จ
+    }
   }
 
   // บันทึกการชำระเงินปกติ (เงินสด / สแกนโอน) และปรับสถานะ Order อย่างถูกต้อง

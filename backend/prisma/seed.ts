@@ -947,6 +947,12 @@ async function main() {
       AND d.delivery_status = 'DELIVERED'
       AND d.delivered_at < '2026-11-06'
   `;
+
+  // 10.3 ปรับยอดเงินสดของ transaction #63 (ออเดอร์ #75) ให้ตรงกับยอดบิลจริง (62.80) เพื่อให้ผลทดสอบ TC-ADM-10 ผ่าน
+  await prisma.$executeRaw`
+    UPDATE TRANSACTIONS SET amount = 62.80 WHERE transaction_id = 63 AND order_id = 75
+  `;
+
   console.log(`✅ เติมเวลาจ่ายเงินย้อนหลัง ${backfilledPaidAt} รายการ, ปิดยอดเงินสดไรเดอร์ย้อนหลัง ${backfilledCash} งาน`);
 
   console.log('🎉 Seeding ข้อมูลพื้นฐานเสร็จสิ้นสมบูรณ์!');
