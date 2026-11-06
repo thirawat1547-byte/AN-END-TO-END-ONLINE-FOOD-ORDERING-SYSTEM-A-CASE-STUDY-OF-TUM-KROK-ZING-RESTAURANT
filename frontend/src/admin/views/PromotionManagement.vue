@@ -1,8 +1,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { adminStore } from '../store/adminData'
+import { adminStore, thaiDateStr } from '../store/adminData'
 
 // โหลดโปรโมชันจริงจาก Backend ทันทีที่เปิดหน้าเว็บ
+// (โปรที่หมดอายุ: ไม่เคยใช้ = backend ลบให้เอง, เคยใช้แล้ว = ปิดใช้งานไว้เป็นประวัติ)
 onMounted(async () => {
   if (typeof adminStore.fetchPromotionsFromAPI === 'function') {
     await adminStore.fetchPromotionsFromAPI()
@@ -10,30 +11,56 @@ onMounted(async () => {
 })
 
 const isModalOpen = ref(false)
+const editingId = ref(null) // null = สร้างใหม่, มีค่า = แก้ไขโปรนั้น
+const isSaving = ref(false)
 const simBillAmount = ref(450)
 const simCode = ref('ZING50')
 
-const newPromo = ref({
+const blankPromo = () => ({
   code: '',
   discount_type: 'Fixed',
   discount_value: 50,
   min_order_price: 300,
-  expiry_date: '2026-10-31',
+  start_date: thaiDateStr(0), // ตอนสร้างล็อกเป็นวันนี้
+  expiry_date: thaiDateStr(30),
   is_active: true
 })
+const newPromo = ref(blankPromo())
+
+const isExpired = (promo) => Boolean(promo.expiry_date) && promo.expiry_date < thaiDateStr(0)
+const notStarted = (promo) => Boolean(promo.start_date) && promo.start_date > thaiDateStr(0)
+
+function openCreate() {
+  editingId.value = null
+  newPromo.value = blankPromo()
+  isModalOpen.value = true
+}
+
+function openEdit(promo) {
+  editingId.value = promo.promo_id
+  newPromo.value = { ...promo }
+  isModalOpen.value = true
+}
 
 async function savePromo() {
   if (!newPromo.value.code || !newPromo.value.discount_value) {
     alert('กรุณากรอกรหัสโปรโมชันและมูลค่าส่วนลด')
     return
   }
-  if (typeof adminStore.addPromotionAPI === 'function') {
-    await adminStore.addPromotionAPI({ ...newPromo.value })
-  } else {
-    adminStore.addPromotion({ ...newPromo.value })
+  if (!newPromo.value.expiry_date || newPromo.value.expiry_date < newPromo.value.start_date) {
+    alert('วันหมดอายุต้องไม่ก่อนวันเริ่ม')
+    return
+  }
+  isSaving.value = true
+  const result = editingId.value
+    ? await adminStore.updatePromotionAPI(editingId.value, { ...newPromo.value })
+    : await adminStore.addPromotionAPI({ ...newPromo.value })
+  isSaving.value = false
+  if (!result?.ok) {
+    alert(`บันทึกไม่สำเร็จ: ${result?.message || 'กรุณาลองใหม่'}`)
+    return
   }
   isModalOpen.value = false
-  newPromo.value = { code: '', discount_type: 'Fixed', discount_value: 50, min_order_price: 300, expiry_date: '2026-10-31', is_active: true }
 }
 
 async function deletePromo(id) {
@@ -47,11 +74,8 @@ async function deletePromo(id) {
 }
 
 async function togglePromo(promoId) {
-  if (typeof adminStore.togglePromoStatusAPI === 'function') {
-    await adminStore.togglePromoStatusAPI(promoId)
-  } else {
-    adminStore.togglePromoStatus(promoId)
-  }
+  const result = await adminStore.togglePromoStatusAPI(promoId)
+  if (result && !result.ok) alert(result.message)
 }
 
 // Discount Simulation
@@ -82,8 +106,8 @@ const simResult = computed(() => {
         <h1 class="text-xl font-bold text-slate-900">จัดการโปรโมชันและแคมเปญส่วนลด (Promotions)</h1>
         <p class="text-xs text-slate-500">สร้างโค้ดส่วนลด กำหนดเงื่อนไขยอดสั่งซื้อขั้นต่ำ และควบคุมตรรกะส่วนลด (Order-level Discount Logic)</p>
       </div>
-      <button 
-        @click="isModalOpen = true"
+      <button
+        @click="openCreate"
         class="px-4 py-2.5 rounded-xl bg-[#2d5a43] hover:bg-[#183324] text-white font-bold text-xs shadow-md shadow-emerald-900/20 transition flex items-center gap-1.5"
       >
         <span>➕ สร้างโค้ดโปรโมชันใหม่</span>
@@ -111,13 +135,22 @@ const simResult = computed(() => {
               </span>
             </div>
           </div>
-          <button 
-            @click="deletePromo(promo.promo_id)" 
-            class="text-slate-400 hover:text-red-500 text-xs p-1"
-            title="ลบ"
-          >
-            🗑️
-          </button>
+          <div class="flex items-center gap-1">
+            <button
+              @click="openEdit(promo)"
+              class="text-slate-400 hover:text-[#2d5a43] text-xs p-1"
+              title="แก้ไข"
+            >
+              ✏️
+            </button>
+            <button
+              @click="deletePromo(promo.promo_id)"
+              class="text-slate-400 hover:text-red-500 text-xs p-1"
+              title="ลบ"
+            >
+              🗑️
+            </button>
+          </div>
         </div>
 
         <!-- Details -->
@@ -127,8 +160,18 @@ const simResult = computed(() => {
             <span class="font-bold text-slate-800">฿{{ promo.min_order_price }} บาท</span>
           </div>
           <div class="flex items-center justify-between">
+            <span class="text-slate-400">เริ่มใช้:</span>
+            <span class="font-medium text-slate-800">
+              {{ promo.start_date || '-' }}
+              <span v-if="notStarted(promo)" class="ml-1 text-[10px] font-bold text-amber-600">(ยังไม่เริ่ม)</span>
+            </span>
+          </div>
+          <div class="flex items-center justify-between">
             <span class="text-slate-400">หมดอายุ:</span>
-            <span class="font-medium text-slate-800">{{ promo.expiry_date }}</span>
+            <span class="font-medium" :class="isExpired(promo) ? 'text-red-500' : 'text-slate-800'">
+              {{ promo.expiry_date }}
+              <span v-if="isExpired(promo)" class="ml-1 text-[10px] font-bold">(หมดอายุแล้ว)</span>
+            </span>
           </div>
           <div class="flex items-center justify-between">
             <span class="text-slate-400">ใช้งานแล้ว:</span>
@@ -200,7 +243,7 @@ const simResult = computed(() => {
     <div v-if="isModalOpen" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
       <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 text-xs">
         <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-          <h3 class="font-bold text-base text-slate-900">➕ สร้างโค้ดโปรโมชันใหม่</h3>
+          <h3 class="font-bold text-base text-slate-900">{{ editingId ? '✏️ แก้ไขโค้ดโปรโมชัน' : '➕ สร้างโค้ดโปรโมชันใหม่' }}</h3>
           <button @click="isModalOpen = false" class="text-slate-400 hover:text-slate-600 text-lg">✕</button>
         </div>
 
@@ -236,22 +279,35 @@ const simResult = computed(() => {
             </div>
           </div>
 
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">ยอดสั่งซื้อขั้นต่ำ (บาท)</label>
+            <input
+              type="number"
+              v-model="newPromo.min_order_price"
+              class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none"
+            />
+          </div>
+
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block font-bold text-slate-700 mb-1">ยอดสั่งซื้อขั้นต่ำ (บาท)</label>
-              <input 
-                type="number" 
-                v-model="newPromo.min_order_price"
-                class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none"
+              <label class="block font-bold text-slate-700 mb-1">วันเริ่ม {{ editingId ? '' : '🔒' }}</label>
+              <input
+                type="date"
+                v-model="newPromo.start_date"
+                :disabled="!editingId"
+                class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
               />
+              <span v-if="!editingId" class="text-[10px] text-slate-400 mt-0.5 block">ล็อกเป็นวันนี้ เปลี่ยนได้ตอนแก้ไข</span>
             </div>
             <div>
-              <label class="block font-bold text-slate-700 mb-1">วันหมดอายุ</label>
-              <input 
-                type="date" 
+              <label class="block font-bold text-slate-700 mb-1">วันหมดอายุ *</label>
+              <input
+                type="date"
                 v-model="newPromo.expiry_date"
+                :min="newPromo.start_date"
                 class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-[#2d5a43]/50 focus:outline-none"
               />
+              <span class="text-[10px] text-slate-400 mt-0.5 block">ใช้ได้ถึงสิ้นวัน · หมดอายุแล้วระบบปิด/ลบให้เอง</span>
             </div>
           </div>
         </div>
@@ -263,11 +319,12 @@ const simResult = computed(() => {
           >
             ยกเลิก
           </button>
-          <button 
+          <button
             @click="savePromo"
-            class="px-5 py-2 rounded-xl bg-[#2d5a43] hover:bg-[#183324] text-white font-bold text-xs shadow-md shadow-emerald-900/20 transition"
+            :disabled="isSaving"
+            class="px-5 py-2 rounded-xl bg-[#2d5a43] hover:bg-[#183324] text-white font-bold text-xs shadow-md shadow-emerald-900/20 transition disabled:opacity-60"
           >
-            บันทึกโปรโมชัน
+            {{ isSaving ? 'กำลังบันทึก…' : (editingId ? 'บันทึกการแก้ไข' : 'บันทึกโปรโมชัน') }}
           </button>
         </div>
       </div>

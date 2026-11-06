@@ -3,21 +3,39 @@ import {
   Injectable,
   NotFoundException,
   OnModuleInit,
+  OnModuleDestroy,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { CreatePromotionDto } from './dto/create-promotion.dto';
 import { UpdatePromotionDto } from './dto/update-promotion.dto';
 
+// ต้นวัน (00:00) ตามเวลาไทยของวันที่ระบุ
+const startOfThaiDay = (d: Date) => {
+  const ymd = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(d);
+  return new Date(`${ymd}T00:00:00+07:00`);
+};
+
+// วันหมดอายุ = สิ้นวัน (23:59:59) ตามเวลาไทย ถ้าส่งมาแค่วันที่ (YYYY-MM-DD)
+const toExpiryDate = (value: string) =>
+  /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T23:59:59+07:00`) : new Date(value);
+
 @Injectable()
-export class PromotionsService implements OnModuleInit {
+export class PromotionsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PromotionsService.name);
+  private expiryTimer?: NodeJS.Timeout;
 
   constructor(private readonly prisma: PrismaService) {}
 
   async onModuleInit() {
     await this.ensureUserClaimedPromotionsTable();
     await this.seedDefaultPromotionsIfEmpty();
+    await this.cleanupExpiredPromotions();
+    this.expiryTimer = setInterval(() => void this.cleanupExpiredPromotions(), 10 * 60_000);
+  }
+
+  onModuleDestroy() {
+    if (this.expiryTimer) clearInterval(this.expiryTimer);
   }
 
   // สร้างตาราง USER_CLAIMED_PROMOTIONS สำหรับเก็บประวัติการกดรับโค้ดของแต่ละ User
@@ -91,18 +109,23 @@ export class PromotionsService implements OnModuleInit {
 
   // 1. ดึงโปรโมชันทั้งหมด
   async findAll() {
-    return this.prisma.promotion.findMany({
+    const promos = await this.prisma.promotion.findMany({
       orderBy: { promo_id: 'desc' },
+      include: { _count: { select: { orders: true } } },
     });
+    // used_count = จำนวนออเดอร์ที่ใช้โค้ดนี้ (หน้าแอดมินแสดง "ใช้งานแล้ว X ครั้ง")
+    return promos.map(({ _count, ...p }) => ({ ...p, used_count: _count.orders }));
   }
 
-  // 2. ดึงโปรโมชันเฉพาะรายการที่เปิดใช้งานและยังไม่หมดอายุ
+  // 2. ดึงโปรโมชันเฉพาะรายการที่เปิดใช้งาน ถึงวันเริ่มแล้ว และยังไม่หมดอายุ
   async findActive() {
+    const now = new Date();
     return this.prisma.promotion.findMany({
       where: {
         is_active: true,
+        start_date: { lte: now },
         expiry_date: {
-          gte: new Date(),
+          gte: now,
         },
       },
       orderBy: { expiry_date: 'asc' },
@@ -129,6 +152,9 @@ export class PromotionsService implements OnModuleInit {
     if (!promo || !promo.is_active || new Date(promo.expiry_date) < new Date()) {
       throw new NotFoundException('โค้ดส่วนลดนี้ไม่ถูกต้อง ปิดใช้งาน หรือหมดอายุแล้ว');
     }
+    if (new Date(promo.start_date) > new Date()) {
+      throw new NotFoundException('โค้ดส่วนลดนี้ยังไม่ถึงวันเริ่มใช้งาน');
+    }
     return promo;
   }
 
@@ -140,6 +166,9 @@ export class PromotionsService implements OnModuleInit {
     }
     if (new Date(promo.expiry_date) < new Date()) {
       throw new BadRequestException('ขออภัย โค้ดโปรโมชันนี้หมดอายุแล้ว ไม่สามารถเก็บได้');
+    }
+    if (new Date(promo.start_date) > new Date()) {
+      throw new BadRequestException('โค้ดโปรโมชันนี้ยังไม่ถึงวันเริ่มใช้งาน');
     }
 
     try {
@@ -204,7 +233,7 @@ export class PromotionsService implements OnModuleInit {
     }
   }
 
-  // 7. สร้างโปรโมชันใหม่ (Admin)
+  // 7. สร้างโปรโมชันใหม่ (Admin) — วันเริ่มล็อกเป็นวันนี้เสมอ (แก้ทีหลังได้ในหน้าแก้ไข)
   async create(createDto: CreatePromotionDto) {
     const existing = await this.prisma.promotion.findUnique({
       where: { code: createDto.code.trim().toUpperCase() },
@@ -213,13 +242,20 @@ export class PromotionsService implements OnModuleInit {
       throw new BadRequestException('รหัสโปรโมชันนี้ถูกใช้งานแล้ว');
     }
 
+    const startDate = startOfThaiDay(new Date());
+    const expiryDate = toExpiryDate(createDto.expiry_date);
+    if (expiryDate < startDate) {
+      throw new BadRequestException('วันหมดอายุต้องไม่ก่อนวันเริ่ม (วันนี้)');
+    }
+
     return this.prisma.promotion.create({
       data: {
         code: createDto.code.trim().toUpperCase(),
         discount_type: createDto.discount_type.toUpperCase(),
         discount_value: createDto.discount_value,
         min_order_price: createDto.min_order_price ?? 0,
-        expiry_date: new Date(createDto.expiry_date),
+        start_date: startDate,
+        expiry_date: expiryDate,
         is_active: createDto.is_active ?? true,
       },
     });
@@ -227,7 +263,17 @@ export class PromotionsService implements OnModuleInit {
 
   // 8. แก้ไขโปรโมชัน (Admin)
   async update(promo_id: number, updateDto: UpdatePromotionDto) {
-    await this.findOne(promo_id);
+    const current = await this.findOne(promo_id);
+
+    const startDate = updateDto.start_date ? startOfThaiDay(new Date(updateDto.start_date)) : current.start_date;
+    const expiryDate = updateDto.expiry_date ? toExpiryDate(updateDto.expiry_date) : current.expiry_date;
+    if (expiryDate < startDate) {
+      throw new BadRequestException('วันหมดอายุต้องไม่ก่อนวันเริ่ม');
+    }
+    // โปรที่หมดอายุแล้วเปิดใช้ใหม่ไม่ได้ ต้องเลื่อนวันหมดอายุก่อน
+    if (updateDto.is_active === true && expiryDate < new Date()) {
+      throw new BadRequestException('โปรโมชันนี้หมดอายุแล้ว กรุณาแก้วันหมดอายุก่อนเปิดใช้งาน');
+    }
 
     return this.prisma.promotion.update({
       where: { promo_id },
@@ -235,9 +281,35 @@ export class PromotionsService implements OnModuleInit {
         ...updateDto,
         code: updateDto.code ? updateDto.code.trim().toUpperCase() : undefined,
         discount_type: updateDto.discount_type ? updateDto.discount_type.toUpperCase() : undefined,
-        expiry_date: updateDto.expiry_date ? new Date(updateDto.expiry_date) : undefined,
+        start_date: updateDto.start_date ? startDate : undefined,
+        expiry_date: updateDto.expiry_date ? expiryDate : undefined,
       },
     });
+  }
+
+  // 10. จัดการโปรที่หมดอายุ (รันตอนเปิดระบบและทุก 10 นาที)
+  //  - ไม่เคยถูกใช้ในออเดอร์ → ลบทิ้ง (พร้อมคูปองที่ลูกค้ากดเก็บไว้)
+  //  - เคยถูกใช้แล้ว → ปิดใช้งานไว้ ไม่ลบ เพื่อให้ประวัติออเดอร์ยังอ้างถึงโปรนี้ได้
+  async cleanupExpiredPromotions() {
+    try {
+      const expired = await this.prisma.promotion.findMany({
+        where: { expiry_date: { lt: new Date() } },
+        select: { promo_id: true, code: true, is_active: true, _count: { select: { orders: true } } },
+      });
+
+      for (const promo of expired) {
+        if (promo._count.orders === 0) {
+          await this.prisma.$executeRawUnsafe('DELETE FROM USER_CLAIMED_PROMOTIONS WHERE promo_id = ?', promo.promo_id);
+          await this.prisma.promotion.delete({ where: { promo_id: promo.promo_id } });
+          this.logger.log(`ลบโปรโมชัน ${promo.code} ที่หมดอายุและไม่เคยถูกใช้`);
+        } else if (promo.is_active) {
+          await this.prisma.promotion.update({ where: { promo_id: promo.promo_id }, data: { is_active: false } });
+          this.logger.log(`ปิดใช้งานโปรโมชัน ${promo.code} ที่หมดอายุ (เคยใช้ใน ${promo._count.orders} ออเดอร์)`);
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`จัดการโปรโมชันหมดอายุไม่สำเร็จ: ${err?.message}`);
+    }
   }
 
   // 9. ลบโปรโมชัน (Admin)

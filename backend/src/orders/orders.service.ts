@@ -151,6 +151,10 @@ export class OrdersService implements OnModuleInit {
           throw new BadRequestException('ขออภัย โค้ดส่วนลดนี้หมดอายุการใช้งานแล้ว');
         }
 
+        if (promo.start_date && new Date(promo.start_date) > new Date()) {
+          throw new BadRequestException('ขออภัย โค้ดส่วนลดนี้ยังไม่ถึงวันเริ่มใช้งาน');
+        }
+
         if (totalAmount < Number(promo.min_order_price || 0)) {
           throw new BadRequestException(
             `ยอดสั่งซื้ออาหารขั้นต่ำต้องครบ ฿${Number(promo.min_order_price)} จึงจะสามารถใช้โค้ด "${promo.code}" ได้`,

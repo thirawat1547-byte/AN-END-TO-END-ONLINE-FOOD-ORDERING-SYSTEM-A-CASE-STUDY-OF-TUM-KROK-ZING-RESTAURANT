@@ -770,6 +770,8 @@ async function main() {
   ];
 
   for (const promo of defaultPromotions) {
+    // ไม่สร้างโค้ดที่หมดอายุไปแล้ว (ระบบลบโปรหมดอายุที่ไม่เคยใช้ทิ้งอัตโนมัติ ถ้าสร้างใหม่ทุก deploy จะวนลบ-สร้างไม่จบ)
+    if (promo.expiry_date < new Date()) continue;
     const existing = await prisma.promotion.findUnique({ where: { code: promo.code } });
     if (!existing) {
       await prisma.promotion.create({ data: promo });

@@ -30,6 +30,32 @@ import imgKaon from '../../assets/kaon.jpg'
 import imgNamtokmoo from '../../assets/namtokmoo.jpg'
 
 // แนบ JWT Token สำหรับ fetch() ที่เรียก API ซึ่งมี Guard (axios แนบให้อัตโนมัติใน main.js แต่ fetch ไม่ผ่าน interceptor)
+// วันที่ตามเวลาไทยแบบ YYYY-MM-DD (เลื่อนไปข้างหน้าได้ addDays วัน)
+export function thaiDateStr(addDays = 0, from = new Date()) {
+  const d = new Date(from.getTime() + addDays * 86400000)
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(d)
+}
+
+// แปลงโปรโมชันจาก API เป็นรูปแบบที่หน้าแอดมินใช้ (วันที่แสดงตามเวลาไทย)
+function mapPromotion(p) {
+  return {
+    promo_id: p.promo_id || p.id,
+    code: p.code,
+    discount_type: (p.discount_type || 'FIXED').toUpperCase() === 'PERCENTAGE' ? 'Percentage' : 'Fixed',
+    discount_value: Number(p.discount_value || 0),
+    min_order_price: Number(p.min_order_price || 0),
+    start_date: p.start_date ? thaiDateStr(0, new Date(p.start_date)) : '',
+    expiry_date: p.expiry_date ? thaiDateStr(0, new Date(p.expiry_date)) : '',
+    is_active: p.is_active ?? true,
+    used_count: Number(p.used_count || 0)
+  }
+}
+
+function apiMessage(body, fallback) {
+  const m = body?.message
+  return (Array.isArray(m) ? m.join(', ') : m) || fallback
+}
+
 function authHeaders(extra = {}) {
   const token = localStorage.getItem('access_token') || localStorage.getItem('token') || sessionStorage.getItem('token')
   return token ? { ...extra, Authorization: `Bearer ${token}` } : { ...extra }
@@ -746,16 +772,7 @@ export const adminStore = reactive({
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       if (Array.isArray(data)) {
-        this.promotions = data.map(p => ({
-          promo_id: p.promo_id || p.id,
-          code: p.code,
-          discount_type: (p.discount_type || 'FIXED').toUpperCase() === 'PERCENTAGE' ? 'Percentage' : 'Fixed',
-          discount_value: Number(p.discount_value || 0),
-          min_order_price: Number(p.min_order_price || 0),
-          expiry_date: p.expiry_date ? String(p.expiry_date).slice(0, 10) : '2026-12-31',
-          is_active: p.is_active ?? true,
-          used_count: p.used_count || 0
-        }))
+        this.promotions = data.map(mapPromotion)
       }
       console.log(`✅ โหลดโปรโมชันจาก API สำเร็จ: ${this.promotions.length} รายการ`)
       return true
@@ -780,14 +797,16 @@ export const adminStore = reactive({
         },
         body: JSON.stringify({ is_active: p.is_active })
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const saved = await res.json()
+      const saved = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(apiMessage(saved, `HTTP ${res.status}`))
       // ใช้ค่าที่บันทึกจริงในฐานข้อมูล เพื่อไม่ให้สถานะเด้งกลับเมื่อโหลดใหม่
       p.is_active = saved?.is_active ?? p.is_active
       console.log(`✅ สลับสถานะโปรโมชัน #${promoId} สำเร็จ`)
+      return { ok: true }
     } catch (err) {
       p.is_active = previous
       console.warn('⚠️ สลับสถานะโปรโมชัน API ไม่สำเร็จ:', err.message)
+      return { ok: false, message: err.message }
     }
   },
   togglePromoStatus(promoId) {
@@ -797,7 +816,8 @@ export const adminStore = reactive({
   async addPromotionAPI(promo) {
     try {
       const token = localStorage.getItem('access_token') || localStorage.getItem('token') || sessionStorage.getItem('token')
-      const expDate = promo.expiry_date ? new Date(promo.expiry_date).toISOString() : new Date('2026-12-31T23:59:59Z').toISOString()
+      // ส่งเป็นวันที่ (YYYY-MM-DD) ให้ backend ตั้งเป็นสิ้นวันตามเวลาไทย · วันเริ่ม backend ล็อกเป็นวันนี้เอง
+      const expDate = promo.expiry_date || thaiDateStr(30)
       const res = await fetch(`${API_BASE}/promotions`, {
         method: 'POST',
         headers: {
@@ -813,23 +833,41 @@ export const adminStore = reactive({
           is_active: promo.is_active ?? true
         })
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const created = await res.json()
-      this.promotions.push({
-        promo_id: created.promo_id || created.id,
-        code: created.code,
-        discount_type: (created.discount_type || 'FIXED').toUpperCase() === 'PERCENTAGE' ? 'Percentage' : 'Fixed',
-        discount_value: Number(created.discount_value),
-        min_order_price: Number(created.min_order_price),
-        expiry_date: created.expiry_date ? String(created.expiry_date).slice(0, 10) : promo.expiry_date,
-        is_active: created.is_active ?? true,
-        used_count: 0
-      })
-      console.log(`✅ เพิ่มโปรโมชันใหม่ลง Database สำเร็จ: ${created.code}`)
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(apiMessage(body, `HTTP ${res.status}`))
+      this.promotions.unshift(mapPromotion({ ...body, used_count: 0 }))
+      console.log(`✅ เพิ่มโปรโมชันใหม่ลง Database สำเร็จ: ${body.code}`)
+      return { ok: true }
     } catch (err) {
       console.warn('⚠️ เพิ่มโปรโมชัน API ไม่สำเร็จ:', err.message)
-      const id = this.promotions.length > 0 ? Math.max(...this.promotions.map(p => p.promo_id)) + 1 : 1
-      this.promotions.push({ promo_id: id, used_count: 0, ...promo })
+      return { ok: false, message: err.message }
+    }
+  },
+
+  // แก้ไขโปรโมชัน (รวมถึงวันเริ่มและวันหมดอายุ)
+  async updatePromotionAPI(promoId, promo) {
+    try {
+      const res = await fetch(`${API_BASE}/promotions/${promoId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({
+          code: String(promo.code || '').toUpperCase(),
+          discount_type: (promo.discount_type || 'FIXED').toUpperCase(),
+          discount_value: Number(promo.discount_value),
+          min_order_price: Number(promo.min_order_price || 0),
+          start_date: promo.start_date,
+          expiry_date: promo.expiry_date
+        })
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(apiMessage(body, `HTTP ${res.status}`))
+      const idx = this.promotions.findIndex(p => p.promo_id === promoId)
+      const used = idx >= 0 ? this.promotions[idx].used_count : 0
+      if (idx >= 0) this.promotions[idx] = mapPromotion({ ...body, used_count: used })
+      return { ok: true }
+    } catch (err) {
+      console.warn('⚠️ แก้ไขโปรโมชัน API ไม่สำเร็จ:', err.message)
+      return { ok: false, message: err.message }
     }
   },
   addPromotion(promo) {
