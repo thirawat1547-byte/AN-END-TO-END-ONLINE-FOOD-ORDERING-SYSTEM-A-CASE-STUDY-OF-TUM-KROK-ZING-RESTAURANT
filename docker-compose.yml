@@ -72,6 +72,22 @@ services:
     depends_on:
       - backend
 
+  # 4. Nginx Reverse Proxy: ด่านหน้ารับ HTTP/HTTPS (พอร์ต 80/443) จัดการ SSL ด้วยใบรับรอง Let's Encrypt
+  # แล้วส่งต่อคำขอไปยัง frontend ผ่านเครือข่ายภายในของ Docker
+  nginx-proxy:
+    image: nginx:alpine
+    container_name: tumkrokzing_proxy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx-proxy/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    depends_on:
+      - frontend
+
 # ประกาศสร้าง Volume สำหรับเก็บข้อมูล MySQL และรูปภาพที่อัปโหลดแบบถาวร
 volumes:
   mysql_data:

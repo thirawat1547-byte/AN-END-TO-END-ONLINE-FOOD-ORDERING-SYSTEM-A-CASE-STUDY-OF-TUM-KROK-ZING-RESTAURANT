@@ -27,7 +27,7 @@ MEMORY_USAGE=$(free -m | awk 'NR==2{printf "%.2f%%", $3*100/$2 }')
 echo "ℹ️ [INFO] RAM Usage: $MEMORY_USAGE" >> "$LOG_FILE"
 
 # 3. เช็คสถานะ Docker Containers หลักของระบบ
-CONTAINERS=("tumkrokzing_db" "tumkrokzing_backend" "tumkrokzing_frontend")
+CONTAINERS=("tumkrokzing_db" "tumkrokzing_backend" "tumkrokzing_frontend" "tumkrokzing_proxy")
 
 for container in "${CONTAINERS[@]}"; do
     if [ "$(docker inspect -f '{{.State.Running}}' $container 2>/dev/null)" == "true" ]; then

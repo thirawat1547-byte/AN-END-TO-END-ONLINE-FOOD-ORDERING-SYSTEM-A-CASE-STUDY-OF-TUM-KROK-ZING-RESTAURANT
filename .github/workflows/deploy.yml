@@ -33,6 +33,19 @@ jobs:
             grep -oP '^[A-Z_]+(?==)' .env || true
           fi
           
+          # ย้าย Reverse Proxy เข้าคอนเทนเนอร์ nginx-proxy: ปิด Nginx ที่ติดตั้งบนเครื่องเพื่อคืนพอร์ต 80/443
+          # (ทำเฉพาะเมื่อมีใบรับรองแล้ว ถ้ายังไม่มีจะปล่อย Nginx เดิมให้บริการต่อเพื่อไม่ให้เว็บล่ม)
+          sudo mkdir -p /var/www/certbot
+          if sudo test -f /etc/letsencrypt/live/tumkrokzing.duckdns.org/fullchain.pem; then
+            if systemctl is-active --quiet nginx; then
+              echo "Stopping host Nginx (moved to nginx-proxy container)"
+              sudo systemctl stop nginx
+              sudo systemctl disable nginx
+            fi
+          else
+            echo "⚠️ WARNING: SSL certificate not found, host Nginx is kept running"
+          fi
+
           # รัน Docker โดยอ่านค่าจากไฟล์ .env อัตโนมัติ (docker-compose อ่าน .env เองในโฟลเดอร์เดียวกัน)
           sudo docker-compose up -d --build
 
