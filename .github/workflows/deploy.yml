@@ -53,8 +53,18 @@ jobs:
           sleep 8
 
           # ซิงค์โครงสร้างตารางฐานข้อมูลและใส่ข้อมูลสูตรอาหารลงในเซิร์ฟเวอร์จริง
-          sudo docker-compose exec -T backend npx prisma db push --accept-data-loss
+          # (ไม่ใช้ --accept-data-loss: ถ้าการเปลี่ยน schema จะลบคอลัมน์/ตารางที่มีข้อมูล คำสั่งจะหยุดแทนการลบข้อมูลจริง)
+          sudo docker-compose exec -T backend npx prisma db push || echo "⚠️ WARNING: prisma db push stopped (possible data loss) — schema not applied"
           sudo docker-compose exec -T backend npx prisma db seed
+
+          # สร้าง Database Views 5 วิวจาก database/views.sql เฉพาะเมื่อยังไม่ครบ (ไม่เขียนทับ View ที่ใช้งานอยู่)
+          VIEW_COUNT=$(sudo docker-compose exec -T mysql-db mysql -uroot -prootpassword -N -e "SELECT COUNT(*) FROM information_schema.VIEWS WHERE TABLE_SCHEMA='tum_krok_zing'" 2>/dev/null | tr -d '[:space:]')
+          if [ -n "$VIEW_COUNT" ] && [ "$VIEW_COUNT" -lt 5 ]; then
+            echo "Creating Database Views (found $VIEW_COUNT of 5)"
+            sudo docker-compose exec -T mysql-db mysql -uroot -prootpassword tum_krok_zing < database/views.sql
+          else
+            echo "✅ Database Views: $VIEW_COUNT of 5"
+          fi
 
           # รีสตาร์ท Backend เพื่อโหลดสูตรและคลังวัตถุดิบใหม่เข้าสู่ระบบ (พร้อม fallback ถ้าคอนเทนเนอร์หยุดทำงาน)
           sudo docker-compose restart backend || sudo docker-compose up -d backend
