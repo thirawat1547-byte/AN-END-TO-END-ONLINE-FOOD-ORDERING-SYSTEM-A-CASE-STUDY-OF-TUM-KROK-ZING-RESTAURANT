@@ -60,6 +60,21 @@ jobs:
           sudo docker-compose restart backend || sudo docker-compose up -d backend
           sudo docker-compose up -d
 
+          # ตั้ง Cron ต่ออายุใบรับรอง SSL อัตโนมัติทุกวันตี 3 (เพิ่มครั้งเดียว ถ้ามีอยู่แล้วจะไม่เพิ่มซ้ำ)
+          APP_DIR=$(pwd)
+          CRON_LINE="0 3 * * * /bin/bash $APP_DIR/scripts/renew-cert.sh >> /var/log/renew-cert.log 2>&1"
+          if sudo crontab -l 2>/dev/null | grep -qF "scripts/renew-cert.sh"; then
+            echo "✅ SSL renewal cron already installed"
+          else
+            (sudo crontab -l 2>/dev/null; echo "$CRON_LINE") | sudo crontab -
+            echo "✅ SSL renewal cron installed"
+          fi
+          sudo crontab -l | grep -F "scripts/renew-cert.sh"
+
+          # ซ้อมต่ออายุใบรับรองผ่าน nginx-proxy (ไม่ออกใบจริง) เพื่อยืนยันว่าการต่ออายุอัตโนมัติจะทำงานได้
+          echo "=== SSL renewal dry-run ==="
+          sudo certbot renew --dry-run --webroot -w /var/www/certbot || echo "⚠️ WARNING: SSL renewal dry-run failed"
+
           # แสดง Log ล่าสุดของ Backend เพื่อตรวจสอบ OAuth Initialization
           echo "=== Backend Startup Logs (last 20 lines) ==="
           sleep 3
