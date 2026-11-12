@@ -342,7 +342,9 @@ const onCashSubmitted = (payload) => {
     showSuccess('ไรเดอร์แจ้งนำส่งเงินสด', `${riderName(payload.rider_id)} • ${payload.count} งาน • ฿${money(payload.total_cash_amount)}`)
   }
 }
-const onOrderUpdated = () => loadCash()
+// รีเฟรชเงียบๆ (ไม่ขึ้นสถานะกำลังโหลด) ให้ตัวเลขการเงินเป็น real-time
+const refreshSilently = () => Promise.all([loadFinance(), loadCash()])
+const onOrderUpdated = () => refreshSilently()
 
 watch(range, () => {
   loading.value = true
@@ -355,11 +357,14 @@ onMounted(() => {
   loadAll()
   socket.on('cash_submitted', onCashSubmitted)
   socket.on('order_status_updated', onOrderUpdated)
-  timer = setInterval(loadCash, 30000)
+  socket.on('new_order', onOrderUpdated)
+  // สำรองกรณี socket หลุด: ดึงยอดเงินและเงินสดใหม่ทุก 15 วินาที
+  timer = setInterval(refreshSilently, 15000)
 })
 onBeforeUnmount(() => {
   socket.off('cash_submitted', onCashSubmitted)
   socket.off('order_status_updated', onOrderUpdated)
+  socket.off('new_order', onOrderUpdated)
   clearInterval(timer)
 })
 </script>

@@ -47,7 +47,10 @@ const formattedThaiDate = computed(() => {
 })
 
 // โหลดสถิติแชทบอทใหม่ทุกครั้งที่เปลี่ยนวัน
-watch(selectedDate, (date) => adminStore.fetchChatbotStats(date))
+watch(selectedDate, (date) => {
+  adminStore.fetchChatbotStats(date)
+  adminStore.fetchAdminDashboardData()
+})
 
 // ปรับเลื่อนวันก่อนหน้า / วันถัดไป
 function changeDate(deltaDays) {
@@ -132,11 +135,12 @@ const totalGrossSales = computed(() => {
   return validDayOrders.value.reduce((sum, o) => sum + Number(o.total_price || 0), 0)
 })
 
-const totalOrdersCount = computed(() => adminStore.orders.length)
+// นับเฉพาะออเดอร์ของวันที่เลือก (ไม่รวมที่ยกเลิก) ให้สอดคล้องกับยอดขายประจำวัน
+const totalOrdersCount = computed(() => validDayOrders.value.length)
 
 // สัดส่วนแยกประเภทออเดอร์ เดลิเวอรี่ (Delivery) vs ทานในร้าน (Dine-in)
 const deliveryOrders = computed(() => {
-  return adminStore.orders.filter(o => 
+  return validDayOrders.value.filter(o => 
     o.raw_order_type === 'DELIVERY' || 
     o.order_type === 'Delivery' || 
     (!o.table_id && o.order_type !== 'In-store')
@@ -152,7 +156,7 @@ const deliveryGrossSales = computed(() => {
 })
 
 const dineInOrders = computed(() => {
-  return adminStore.orders.filter(o => 
+  return validDayOrders.value.filter(o => 
     o.raw_order_type === 'DINE_IN' || 
     o.order_type === 'In-store' || 
     Boolean(o.table_id)
@@ -168,13 +172,17 @@ const dineInGrossSales = computed(() => {
 })
 
 const totalItemsSold = computed(() => {
-  return adminStore.orders.reduce((sum, o) => {
+  return validDayOrders.value.reduce((sum, o) => {
     if (!o.items || !Array.isArray(o.items)) return sum
     return sum + o.items.reduce((s, i) => s + Number(i.quantity || 0), 0)
   }, 0)
 })
 
 const occupiedTablesCount = computed(() => {
+  if (!isTodaySelected.value) {
+    // วันย้อนหลัง: นับจำนวนโต๊ะ (ไม่ซ้ำ) ที่มีออเดอร์ทานในร้านในวันนั้น
+    return new Set(validDayOrders.value.filter(o => o.table_id).map(o => o.table_id)).size
+  }
   return adminStore.tables.filter(t => t.status === 'Occupied' || t.status === 'OCCUPIED' || t.status === 'Billing').length
 })
 
@@ -662,7 +670,7 @@ const avgPrepTimeMinutes = computed(() => {
       <!-- Card 3: Active Tables (Untouched) -->
       <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition">
         <div class="flex items-center justify-between">
-          <span class="text-xs font-semibold text-slate-500">โต๊ะที่กำลังใช้งาน (Table Active)</span>
+          <span class="text-xs font-semibold text-slate-500">{{ isTodaySelected ? 'โต๊ะที่กำลังใช้งาน (Table Active)' : 'โต๊ะที่มีลูกค้าในวันนั้น' }}</span>
           <div class="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center text-lg">
             🪑
           </div>
@@ -671,7 +679,7 @@ const avgPrepTimeMinutes = computed(() => {
           <div class="text-2xl font-black text-slate-900">{{ occupiedTablesCount }} / {{ adminStore.tables.length }} <span class="text-sm font-normal text-slate-500">โต๊ะ</span></div>
           <div class="flex items-center gap-1.5 mt-1 text-xs text-orange-600 font-medium">
             <span>{{ adminStore.tables.length ? Math.round((occupiedTablesCount / adminStore.tables.length) * 100) : 0 }}%</span>
-            <span class="text-slate-400 font-normal">อัตราการครองโต๊ะ</span>
+            <span class="text-slate-400 font-normal">{{ isTodaySelected ? 'อัตราการครองโต๊ะ' : 'ของโต๊ะทั้งหมดถูกใช้ในวันนั้น' }}</span>
           </div>
         </div>
       </div>
@@ -1005,7 +1013,10 @@ const avgPrepTimeMinutes = computed(() => {
           </div>
           <router-link to="/admin/inventory" class="text-xs text-[#2d5a43] hover:text-[#183324] font-semibold">ดูคลังทั้งหมด →</router-link>
         </div>
-        <p class="text-xs text-slate-400 mb-3">วัตถุดิบที่มีปริมาณคงเหลือต่ำกว่าเกณฑ์สั่งซื้อ (Reorder Level)</p>
+        <p class="text-xs text-slate-400 mb-3">
+          วัตถุดิบที่มีปริมาณคงเหลือต่ำกว่าเกณฑ์สั่งซื้อ (Reorder Level)
+          <span v-if="!isTodaySelected" class="block mt-1 text-amber-600 font-semibold">แสดงสต็อกปัจจุบัน (ระบบไม่ได้เก็บสต็อกย้อนหลังรายวัน)</span>
+        </p>
 
         <div class="flex-1 space-y-2.5 overflow-y-auto max-h-[220px]">
           <div 
