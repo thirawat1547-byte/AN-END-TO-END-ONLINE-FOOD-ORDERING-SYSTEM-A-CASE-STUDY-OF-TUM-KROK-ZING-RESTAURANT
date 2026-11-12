@@ -57,6 +57,23 @@ function changeDate(deltaDays) {
   selectedDate.value = toLocalDateStr(dt)
 }
 
+// เปิดปฏิทินของ input[type=date] ที่ซ่อนอยู่ เมื่อกดที่ปุ่มวันที่ (รวมไอคอน 📅)
+const datePickerInput = ref(null)
+function openDatePicker() {
+  const el = datePickerInput.value
+  if (!el) return
+  try {
+    if (typeof el.showPicker === 'function') {
+      el.showPicker()
+      return
+    }
+  } catch {
+    // บางเบราว์เซอร์ไม่อนุญาต showPicker → ใช้ focus/click แทน
+  }
+  el.focus()
+  el.click()
+}
+
 function goToToday() {
   selectedDate.value = toLocalDateStr(new Date())
 }
@@ -509,17 +526,25 @@ const avgPrepTimeMinutes = computed(() => {
             ◀
           </button>
 
-          <div class="relative flex items-center gap-1.5 px-2 cursor-pointer">
+          <!-- กดตรงไหนก็ได้ (รวมไอคอน 📅) เพื่อเปิดปฏิทินเลือกวัน -->
+          <button
+            type="button"
+            @click="openDatePicker"
+            class="relative flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+            title="คลิกเพื่อเลือกวันที่ในปฏิทิน"
+          >
             <span>📅</span>
             <span class="font-bold text-slate-900">{{ formattedThaiDate }}</span>
             <span v-if="isTodaySelected" class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full font-bold">วันนี้</span>
-            <input 
-              type="date" 
+            <input
+              ref="datePickerInput"
+              type="date"
               v-model="selectedDate"
-              class="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-              title="คลิกเพื่อเลือกวันที่ในปฏิทิน"
+              tabindex="-1"
+              aria-hidden="true"
+              class="absolute inset-0 opacity-0 pointer-events-none w-full h-full"
             />
-          </div>
+          </button>
 
           <button 
             @click="changeDate(1)" 

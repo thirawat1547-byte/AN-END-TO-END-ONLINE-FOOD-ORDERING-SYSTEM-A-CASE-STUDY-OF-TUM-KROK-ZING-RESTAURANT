@@ -67,8 +67,51 @@
         <span class="status-label">{{ isStoreOpen ? 'ร้านเปิด' : 'ร้านปิด' }}</span>
       </div>
 
-      <button class="icon-btn" title="การแจ้งเตือน" type="button">🔔</button>
-      <button class="icon-btn cart-btn" title="ตะกร้าสินค้า" type="button" @click="onCartClick">🛒</button>
+      <!-- กระดิ่ง: แจ้งเตือนสถานะออเดอร์ที่กำลังดำเนินการของลูกค้า -->
+      <div class="notif-wrapper" ref="notifWrapper">
+        <button class="icon-btn badge-host" title="การแจ้งเตือนออเดอร์" type="button" @click="toggleNotif">
+          🔔
+          <span v-if="activeOrders.length" class="icon-badge">{{ activeOrders.length }}</span>
+        </button>
+
+        <div v-if="showNotif" class="notif-dropdown">
+          <div class="notif-head">
+            <span>การแจ้งเตือนออเดอร์</span>
+            <button v-if="authStore.isLoggedIn" class="notif-refresh" type="button" title="รีเฟรช" @click="loadActiveOrders">↻</button>
+          </div>
+
+          <div v-if="!authStore.isLoggedIn" class="notif-empty">
+            เข้าสู่ระบบเพื่อดูสถานะออเดอร์ของคุณ
+            <router-link to="/login" class="notif-link" @click="showNotif = false">เข้าสู่ระบบ</router-link>
+          </div>
+          <div v-else-if="notifLoading && !activeOrders.length" class="notif-empty">กำลังโหลด...</div>
+          <div v-else-if="notifError" class="notif-empty">{{ notifError }}</div>
+          <div v-else-if="!activeOrders.length" class="notif-empty">
+            ไม่มีออเดอร์ที่กำลังดำเนินการ
+            <router-link to="/history" class="notif-link" @click="showNotif = false">ดูประวัติการสั่งซื้อ</router-link>
+          </div>
+
+          <button
+            v-for="o in activeOrders"
+            :key="o.order_id"
+            type="button"
+            class="notif-item"
+            @click="openOrder(o)"
+          >
+            <span class="notif-emoji">{{ statusInfo(o.status).emoji }}</span>
+            <span class="notif-body">
+              <span class="notif-title">ออเดอร์ #{{ o.order_id }} · {{ statusInfo(o.status).label }}</span>
+              <span class="notif-sub">{{ orderTypeLabel(o.order_type) }} · สั่งเมื่อ {{ timeAgo(o.created_at) }}</span>
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ตะกร้า: เลื่อนไปที่แผงตะกร้าในหน้าแรก -->
+      <button class="icon-btn cart-btn badge-host" title="ตะกร้าสินค้า" type="button" @click="onCartClick">
+        🛒
+        <span v-if="cartBadge > 0" class="icon-badge">{{ cartBadge }}</span>
+      </button>
 
       <!-- เมื่อล็อกอินแล้ว -->
       <template v-if="authStore.isLoggedIn">
@@ -138,6 +181,11 @@ export default {
     modelValue: {
       type: String,
       default: ''
+    },
+    // จำนวนสินค้าในตะกร้า (หน้าแรกส่งค่าจริงมา หน้าอื่นอ่านจาก localStorage แทน)
+    cartCount: {
+      type: Number,
+      default: null
     }
   },
   emits: ['update:modelValue', 'cart-click'],
@@ -149,6 +197,82 @@ export default {
     const locationWrapper = ref(null);
     const avatarInitial = computed(() => getInitial(authStore.userProfile?.name || authStore.userProfile?.username));
     const isStoreOpen = ref(true);
+
+    // ---- การแจ้งเตือนออเดอร์ (กระดิ่ง) ----
+    const notifWrapper = ref(null);
+    const showNotif = ref(false);
+    const activeOrders = ref([]);
+    const notifLoading = ref(false);
+    const notifError = ref('');
+    let notifTimer = null;
+    const ACTIVE_STATUSES = ['PENDING', 'CONFIRMED', 'COOKING', 'READY', 'SERVED', 'IN_DELIVERY', 'DELIVERING'];
+    const STATUS_INFO = {
+      PENDING: { emoji: '🧾', label: 'รอครัวรับออเดอร์' },
+      CONFIRMED: { emoji: '✅', label: 'ยืนยันออเดอร์แล้ว' },
+      COOKING: { emoji: '🍳', label: 'กำลังปรุงอาหาร' },
+      READY: { emoji: '🔔', label: 'อาหารเสร็จแล้ว' },
+      SERVED: { emoji: '🍽️', label: 'เสิร์ฟแล้ว' },
+      IN_DELIVERY: { emoji: '🛵', label: 'ไรเดอร์กำลังนำส่ง' },
+      DELIVERING: { emoji: '🛵', label: 'ไรเดอร์กำลังนำส่ง' }
+    };
+    const statusInfo = (st) => STATUS_INFO[st] || { emoji: '📦', label: st };
+    const orderTypeLabel = (t) => ({ DELIVERY: 'เดลิเวอรี่', DINE_IN: 'ทานที่ร้าน', TAKEAWAY: 'รับกลับบ้าน' }[t] || t || '');
+    const timeAgo = (iso) => {
+      const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+      if (m < 1) return 'เมื่อสักครู่';
+      if (m < 60) return `${m} นาทีที่แล้ว`;
+      const h = Math.floor(m / 60);
+      return h < 24 ? `${h} ชม.ที่แล้ว` : new Date(iso).toLocaleDateString('th-TH');
+    };
+
+    const loadActiveOrders = async () => {
+      const token = localStorage.getItem('access_token');
+      if (!authStore.isLoggedIn || !token) {
+        activeOrders.value = [];
+        return;
+      }
+      notifLoading.value = true;
+      notifError.value = '';
+      try {
+        const res = await fetch(`${API_BASE}/orders/my-orders`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        activeOrders.value = (Array.isArray(data) ? data : [])
+          .filter((o) => ACTIVE_STATUSES.includes(String(o.status || '').toUpperCase()))
+          .slice(0, 8);
+      } catch (err) {
+        notifError.value = 'โหลดการแจ้งเตือนไม่สำเร็จ ลองใหม่อีกครั้ง';
+      } finally {
+        notifLoading.value = false;
+      }
+    };
+
+    const toggleNotif = () => {
+      showNotif.value = !showNotif.value;
+      if (showNotif.value) loadActiveOrders();
+    };
+
+    const openOrder = (o) => {
+      showNotif.value = false;
+      if (o.order_type === 'DELIVERY') {
+        router.push({ path: '/tracking', query: { orderId: o.order_id } });
+      } else {
+        router.push('/history');
+      }
+    };
+
+    // ---- ตะกร้า ----
+    const storedCartCount = ref(0);
+    const readStoredCart = () => {
+      try {
+        const raw = sessionStorage.getItem('cartData') || localStorage.getItem('cartData');
+        const items = raw ? JSON.parse(raw) : [];
+        storedCartCount.value = Array.isArray(items) ? items.reduce((n, i) => n + (Number(i.qty) || 1), 0) : 0;
+      } catch {
+        storedCartCount.value = 0;
+      }
+    };
+    const cartBadge = computed(() => (props.cartCount ?? storedCartCount.value));
 
     const isHomeActive = computed(() => route.path === '/');
     const isTrackingActive = computed(() => route.path === '/tracking');
@@ -173,11 +297,18 @@ export default {
       if (locationWrapper.value && !locationWrapper.value.contains(e.target)) {
         showAddressDropdown.value = false;
       }
+      if (notifWrapper.value && !notifWrapper.value.contains(e.target)) {
+        showNotif.value = false;
+      }
     };
 
     onMounted(async () => {
       authStore.syncAuth();
       document.addEventListener('click', handleClickOutside);
+      readStoredCart();
+      // ตัวเลขบนกระดิ่ง: โหลดตอนเปิดหน้าและทุก 60 วินาที
+      loadActiveOrders();
+      notifTimer = setInterval(loadActiveOrders, 60000);
       try {
         const res = await fetch(`${API_BASE}/settings`);
         if (res.ok) {
@@ -193,6 +324,7 @@ export default {
 
     onUnmounted(() => {
       document.removeEventListener('click', handleClickOutside);
+      if (notifTimer) clearInterval(notifTimer);
     });
 
     const handleLogout = () => {
@@ -206,9 +338,11 @@ export default {
     };
 
     const onCartClick = () => {
-      emit('cart-click');
-      if (route.path !== '/') {
-        router.push('/');
+      if (route.path === '/') {
+        // หน้าแรกรับ event นี้แล้วเลื่อนไปที่แผงตะกร้า
+        emit('cart-click');
+      } else {
+        router.push({ path: '/', query: { cart: '1' } });
       }
     };
 
@@ -228,13 +362,98 @@ export default {
       handleLogout,
       goToProfileEdit,
       onCartClick,
-      isStoreOpen
+      isStoreOpen,
+      notifWrapper,
+      showNotif,
+      activeOrders,
+      notifLoading,
+      notifError,
+      loadActiveOrders,
+      toggleNotif,
+      openOrder,
+      statusInfo,
+      orderTypeLabel,
+      timeAgo,
+      cartBadge
     };
   }
 };
 </script>
 
 <style scoped>
+/* ป้ายตัวเลขบนไอคอนกระดิ่ง/ตะกร้า */
+.badge-host { position: relative; }
+.icon-badge {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #e11d48;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* เมนูแจ้งเตือนออเดอร์ */
+.notif-wrapper { position: relative; }
+.notif-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 300px;
+  max-width: calc(100vw - 32px);
+  background: #fff;
+  border: 1px solid #ede9dc;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  padding: 8px;
+  z-index: 1000;
+}
+.notif-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  border-bottom: 1px solid #f1eee4;
+  margin-bottom: 4px;
+}
+.notif-refresh { background: none; border: none; cursor: pointer; font-size: 15px; color: #557c61; padding: 0 4px; }
+.notif-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 8px;
+  font-size: 13px;
+  color: #777;
+  text-align: center;
+}
+.notif-link { color: #3f634b; font-weight: 600; font-size: 12px; text-decoration: underline; }
+.notif-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  width: 100%;
+  padding: 8px;
+  border: none;
+  background: none;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+}
+.notif-item:hover { background: #f6f4ec; }
+.notif-emoji { font-size: 18px; line-height: 1.2; }
+.notif-body { display: flex; flex-direction: column; gap: 2px; }
+.notif-title { font-size: 13px; font-weight: 600; color: #333; }
+.notif-sub { font-size: 11px; color: #888; }
+
 @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap');
 
 .customer-navbar {

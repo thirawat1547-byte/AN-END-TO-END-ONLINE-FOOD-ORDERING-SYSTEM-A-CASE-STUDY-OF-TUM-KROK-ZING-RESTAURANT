@@ -1,7 +1,12 @@
 <template>
   <div class="page-container">
     <!-- Top Navbar มาตรฐานเดียวกันทุกหน้า -->
-    <CustomerNavbar v-model="searchQuery" :showSearch="true" />
+    <CustomerNavbar v-model="searchQuery" :showSearch="true" :cartCount="cartQty" @cart-click="focusCart" />
+
+    <!-- แจ้งเตือนสั้นๆ เมื่อกดตะกร้าแต่ยังไม่มีสินค้า -->
+    <transition name="cart-notice-fade">
+      <div v-if="cartNotice" class="cart-empty-notice">🛒 {{ cartNotice }}</div>
+    </transition>
 
     <!-- 🛑 ป้ายแจ้งเตือนเมื่อร้านปิดให้บริการ -->
     <div v-if="!isStoreOpen" class="store-closed-top-banner">
@@ -89,7 +94,7 @@
       </div>
 
       <!-- แผงตะกร้าสินค้าด้านขวา -->
-      <aside class="cart-panel" v-if="cartItems.length > 0">
+      <aside ref="cartPanel" :class="['cart-panel', { 'cart-panel-flash': cartFlash }]" v-if="cartItems.length > 0">
         <h3 class="cart-header-title">ตะกร้าของคุณ</h3>
         <p class="cart-sub">พร้อมชำระเงินหรือยัง?</p>
 
@@ -348,6 +353,8 @@ export default {
   data() {
     return {
       authStore,
+      cartNotice: '',
+      cartFlash: false,
       isLoggedIn: false,
       isStoreOpen: true,
       showAuthModal: false,
@@ -399,6 +406,7 @@ export default {
   },
   computed: {
     subtotal() { return this.cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0); },
+    cartQty() { return this.cartItems.reduce((n, item) => n + (Number(item.qty) || 1), 0); },
     cartTotalCalories() {
       return this.cartItems.reduce((sum, item) => sum + ((Number(item.calories) || 0) * item.qty), 0);
     },
@@ -498,6 +506,12 @@ export default {
 
     // ซิงก์ราคาและข้อมูลสดจาก Database Backend
     await this.fetchMenus();
+
+    // มาจากการกดไอคอนตะกร้าในหน้าอื่น → เลื่อนไปที่ตะกร้า แล้วล้าง query ออก
+    if (this.$route.query.cart) {
+      this.focusCart();
+      this.$router.replace({ path: '/', query: {} });
+    }
     await this.fetchStoreSettings();
 
     // ⚡ ดักฟังสัญญาณอัปเดตเมนูและสารก่อภูมิแพ้แบบ Real-time (Socket.io + BroadcastChannel + Storage)
@@ -550,6 +564,24 @@ export default {
     }
   },
   methods: {
+    // กดไอคอนตะกร้าที่ Navbar: เลื่อนไปที่แผงตะกร้าและไฮไลต์ หรือแจ้งว่าตะกร้ายังว่าง
+    focusCart() {
+      if (!this.cartItems.length) {
+        this.cartNotice = 'ตะกร้ายังว่างอยู่ เลือกเมนูที่ชอบได้เลย';
+        clearTimeout(this._cartNoticeTimer);
+        this._cartNoticeTimer = setTimeout(() => { this.cartNotice = ''; }, 2500);
+        return;
+      }
+      this.$nextTick(() => {
+        const el = this.$refs.cartPanel;
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        this.cartFlash = false;
+        requestAnimationFrame(() => { this.cartFlash = true; });
+        clearTimeout(this._cartFlashTimer);
+        this._cartFlashTimer = setTimeout(() => { this.cartFlash = false; }, 1200);
+      });
+    },
     getItemAllergens(item) {
       if (!item) return [];
       let ids = item.allergen_ids;
@@ -989,6 +1021,28 @@ export default {
 .plus-btn { background: #6b8e73; color: white; border: none; width: 26px; height: 26px; border-radius: 50%; font-size: 16px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .plus-btn:hover { background: #557c61; }
 
+.cart-panel-flash { animation: cart-flash 1.2s ease; }
+@keyframes cart-flash {
+  0%, 100% { box-shadow: 0 4px 20px rgba(0,0,0,0.04); }
+  30% { box-shadow: 0 0 0 3px #557c61, 0 8px 28px rgba(85,124,97,0.25); }
+}
+.cart-empty-notice {
+  position: fixed;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1100;
+  background: #2e4d3a;
+  color: #fff;
+  font-size: 13px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  max-width: calc(100vw - 32px);
+  text-align: center;
+}
+.cart-notice-fade-enter-active, .cart-notice-fade-leave-active { transition: opacity 0.25s, transform 0.25s; }
+.cart-notice-fade-enter-from, .cart-notice-fade-leave-to { opacity: 0; transform: translate(-50%, -6px); }
 .cart-panel { width: 340px; background: white; padding: 25px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.04); display: flex; flex-direction: column; flex-shrink: 0; position: sticky; top: 20px; max-height: calc(100vh - 40px); }
 .cart-header-title { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 2px; }
 .cart-sub { font-size: 12px; color: #777; margin-bottom: 20px; }
