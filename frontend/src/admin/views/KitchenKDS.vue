@@ -39,9 +39,15 @@ onBeforeUnmount(() => {
 
 // ดึงเฉพาะออเดอร์ที่พร้อมให้ครัวทำ (รอทำ / จ่ายแล้วรอทำ / กำลังปรุง) — เดลิเวอรีจ่ายออนไลน์ต้องจ่ายสำเร็จก่อน
 // ออเดอร์ที่จ่ายแล้ว (PAID) แต่ครัวยังไม่ได้ทำ ให้แสดงเป็น "รอคิวปรุง"
+// แสดงเฉพาะออเดอร์ของวันนี้ (เวลาไทย) เหมือนจอครัวของพนักงาน — ออเดอร์ค้างจากวันก่อนจะไม่ขึ้นจอ
+const bangkokDate = (d) =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
+
 const activeOrders = computed(() => {
+  const today = bangkokDate(new Date())
   return (adminStore.orders || [])
     .filter(o => o.in_kitchen_queue)
+    .filter(o => o.created_at && bangkokDate(new Date(o.created_at)) === today)
     .map(o => ({ ...o, status: o.raw_status === 'COOKING' ? 'Cooking' : 'Pending' }))
 })
 
