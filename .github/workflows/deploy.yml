@@ -15,6 +15,8 @@ jobs:
         host: ${{ secrets.HOST }}
         username: ${{ secrets.USERNAME }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
+        # ค่าเริ่มต้น 10 นาทีไม่พอ (build backend + frontend บนเซิร์ฟเวอร์ใช้ ~5-8 นาที)
+        command_timeout: 20m
         script: |
           cd ~/AN-END-TO-END-ONLINE-FOOD-ORDERING-SYSTEM-A-CASE-STUDY-OF-TUM-KROK-ZING-RESTAURANT
           
@@ -83,7 +85,8 @@ jobs:
 
           # ซ้อมต่ออายุใบรับรองผ่าน nginx-proxy (ไม่ออกใบจริง) เพื่อยืนยันว่าการต่ออายุอัตโนมัติจะทำงานได้
           echo "=== SSL renewal dry-run ==="
-          sudo certbot renew --dry-run --webroot -w /var/www/certbot || echo "⚠️ WARNING: SSL renewal dry-run failed"
+          # --no-random-sleep-on-renew: certbot แบบ non-interactive จะสุ่มหน่วงเวลาได้ถึง ~8 นาที ทำให้ deploy เกิน timeout
+          sudo certbot renew --dry-run --no-random-sleep-on-renew --webroot -w /var/www/certbot || echo "⚠️ WARNING: SSL renewal dry-run failed"
 
           # แสดง Log ล่าสุดของ Backend เพื่อตรวจสอบ OAuth Initialization
           echo "=== Backend Startup Logs (last 20 lines) ==="
