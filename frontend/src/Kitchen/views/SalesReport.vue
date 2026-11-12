@@ -44,6 +44,23 @@ function changeDate(deltaDays) {
   selectedDate.value = toLocalDateStr(dt)
 }
 
+// เปิดปฏิทินของ input[type=date] ที่ซ่อนอยู่ เมื่อกดที่ปุ่มวันที่ (รวมไอคอน 📅)
+const datePickerInput = ref(null)
+function openDatePicker() {
+  const el = datePickerInput.value
+  if (!el) return
+  try {
+    if (typeof el.showPicker === 'function') {
+      el.showPicker()
+      return
+    }
+  } catch {
+    // บางเบราว์เซอร์ไม่อนุญาต showPicker → ใช้ focus/click แทน
+  }
+  el.focus()
+  el.click()
+}
+
 function goToToday() {
   selectedDate.value = toLocalDateStr(new Date())
 }
@@ -493,18 +510,27 @@ onBeforeUnmount(() => {
                 ◀
               </button>
 
-              <div style="position: relative; display: flex; align-items: center; gap: 6px; padding: 2px 6px; cursor: pointer;">
+              <!-- กดตรงไหนก็ได้ (รวมไอคอน 📅) เพื่อเปิดปฏิทินเลือกวัน -->
+              <button
+                type="button"
+                class="date-pick-btn"
+                @click="openDatePicker"
+                style="position: relative; display: flex; align-items: center; gap: 6px; padding: 4px 8px; cursor: pointer; background: none; border: none; border-radius: 8px; font: inherit; color: inherit;"
+                title="คลิกเพื่อเลือกวันที่ในปฏิทิน"
+              >
                 <span>📅</span>
                 <span style="font-weight: 600; color: #1F2937;">{{ formattedThaiDate }}</span>
                 <span v-if="isTodaySelected" style="font-size: 10px; background: #DCFCE7; color: #166534; padding: 2px 7px; border-radius: 9999px; font-weight: 700;">วันนี้</span>
-                <!-- Native hidden date input to allow picking any calendar date -->
-                <input 
-                  type="date" 
-                  v-model="selectedDate" 
-                  style="position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;"
-                  title="คลิกเพื่อเลือกวันที่ในปฏิทิน"
+                <!-- input วันที่แบบซ่อน: เปิดผ่าน showPicker() เมื่อกดปุ่ม -->
+                <input
+                  ref="datePickerInput"
+                  type="date"
+                  v-model="selectedDate"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  style="position: absolute; inset: 0; opacity: 0; pointer-events: none; width: 100%; height: 100%;"
                 />
-              </div>
+              </button>
 
               <button 
                 @click="changeDate(1)" 
@@ -865,6 +891,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.date-pick-btn:hover { background-color: #F3F4F6 !important; }
 @media print {
   header.no-print,
   .no-print {
