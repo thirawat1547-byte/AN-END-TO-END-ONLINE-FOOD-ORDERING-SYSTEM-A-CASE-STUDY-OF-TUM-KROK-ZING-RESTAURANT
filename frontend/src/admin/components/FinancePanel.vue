@@ -7,23 +7,9 @@
         <p class="text-[11px] text-slate-500">{{ rangeLabel }} • นับเฉพาะรายการชำระสำเร็จ</p>
       </div>
       <div class="flex flex-wrap items-center gap-2 text-xs">
-        <div class="flex bg-slate-100 rounded-xl p-1">
-          <button
-            v-for="p in PERIODS"
-            :key="p.id"
-            @click="period = p.id"
-            class="px-3 py-1.5 rounded-lg font-bold transition"
-            :class="period === p.id ? 'bg-white text-[#2d5a43] shadow-sm' : 'text-slate-500 hover:text-slate-800'"
-          >
-            {{ p.label }}
-          </button>
-        </div>
-        <template v-if="period === 'custom'">
-          <input v-model="customFrom" type="date" class="px-2 py-1.5 rounded-lg border border-slate-200 bg-slate-50" />
-          <span class="text-slate-400">ถึง</span>
-          <input v-model="customTo" type="date" class="px-2 py-1.5 rounded-lg border border-slate-200 bg-slate-50" />
-        </template>
-        <button @click="loadAll" :disabled="loading" class="px-3 py-1.5 rounded-lg border border-slate-200 font-bold hover:bg-slate-50 disabled:opacity-50">
+        <!-- ช่วงเวลาตามวันที่ที่เลือกจากแถบด้านบนของหน้าภาพรวม -->
+        <span class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-semibold">ตามวันที่ที่เลือกด้านบน</span>
+        <button @click="loadAll" :disabled="loading" title="รีเฟรชข้อมูล" class="px-3 py-1.5 rounded-lg border border-slate-200 font-bold hover:bg-slate-50 disabled:opacity-50">
           {{ loading ? 'กำลังโหลด…' : '🔄' }}
         </button>
       </div>
@@ -218,12 +204,10 @@ import { API_BASE } from '../../config/api'
 import { socket } from '../../config/socket'
 import { showSuccess, showError, showConfirm } from '../../utils/swal'
 
-const PERIODS = [
-  { id: 'day', label: 'วันนี้' },
-  { id: 'week', label: 'สัปดาห์นี้' },
-  { id: 'month', label: 'เดือนนี้' },
-  { id: 'custom', label: 'เลือกเอง' }
-]
+// วันที่มาจากตัวเลือกวันที่ด้านบนของหน้าภาพรวม (AdminDashboard) เพื่อให้ทุกส่วนในหน้าเปลี่ยนพร้อมกัน
+const props = defineProps({
+  date: { type: String, default: '' }
+})
 
 const ymd = (d) => {
   const p = (n) => String(n).padStart(2, '0')
@@ -231,30 +215,9 @@ const ymd = (d) => {
 }
 const todayStr = () => ymd(new Date())
 
-const period = ref('day')
-const customFrom = ref(ymd(new Date(new Date().getFullYear(), new Date().getMonth(), 1)))
-const customTo = ref(todayStr())
-
-// ช่วงวันที่ + การจัดกลุ่มกราฟตามช่วงเวลาที่เลือก
 const range = computed(() => {
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  if (period.value === 'week') {
-    const monday = new Date(today)
-    monday.setDate(today.getDate() - ((today.getDay() + 6) % 7))
-    return { from: ymd(monday), to: ymd(today), group: 'day' }
-  }
-  if (period.value === 'month') {
-    return { from: ymd(new Date(today.getFullYear(), today.getMonth(), 1)), to: ymd(today), group: 'day' }
-  }
-  if (period.value === 'custom') {
-    let from = customFrom.value || ymd(today)
-    let to = customTo.value || ymd(today)
-    if (from > to) [from, to] = [to, from]
-    const days = (new Date(to) - new Date(from)) / 86400000
-    return { from, to, group: days > 92 ? 'month' : days > 31 ? 'week' : 'day' }
-  }
-  return { from: ymd(today), to: ymd(today), group: 'day' }
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(props.date) ? props.date : todayStr()
+  return { from: day, to: day, group: 'day' }
 })
 
 const thaiDate = (s) => new Date(`${s}T00:00:00`).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })

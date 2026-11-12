@@ -580,7 +580,7 @@ const avgPrepTimeMinutes = computed(() => {
     </div>
 
     <!-- สรุปการเงิน: ยอดแยกช่องทาง, รายจ่าย, กำไรสุทธิ, ไรเดอร์ + เงินสด, ค่าน้ำมัน -->
-    <FinancePanel />
+    <FinancePanel :date="selectedDate" />
 
     <!-- 4 Key Executive Metric Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
