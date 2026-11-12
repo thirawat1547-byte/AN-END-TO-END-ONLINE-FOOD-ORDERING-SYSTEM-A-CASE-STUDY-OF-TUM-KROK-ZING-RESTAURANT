@@ -50,7 +50,7 @@
               <p class="text-[11px] text-emerald-100/80">
                 ผู้ช่วยร้านตำครกซิ่ง •
                 <span :class="geminiReady ? 'text-emerald-300' : 'text-yellow-300'">
-                  {{ geminiReady ? '✨ Gemini AI' : '⚡ ตอบทันใจ' }}
+                  {{ geminiReady ? '✨ Gemini AI' : '⚙️ โหมดสำรอง' }}
                 </span>
               </p>
             </div>
@@ -406,17 +406,26 @@ const formatMessage = (text) => {
 
 const sendToGemini = async (userMessage) => {
   try {
+    // ส่งโต๊ะ (หน้าสั่งผ่าน QR) และ token (ถ้าล็อกอิน) เพื่อให้น้องส้มตำเช็กสถานะออเดอร์ของลูกค้าคนนี้ได้
+    const tableParam = String(route.path || '').startsWith('/table/') ? route.params.tableId : null
     const body = {
       message: userMessage,
       history: chatHistory.value,
+      ...(tableParam ? { tableNumber: String(tableParam) } : {}),
     }
+    const token = localStorage.getItem('access_token')
     const res = await fetch(`${CHATBOT_API}/ask`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify(body),
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = await res.json()
+    // ป้ายหัวแชทบอกตามจริงว่าคำตอบล่าสุดมาจาก Gemini หรือโหมดสำรอง
+    if (data.engine) geminiReady.value = data.engine === 'gemini'
 
     chatHistory.value.push(
       { role: 'user', text: userMessage },
@@ -432,6 +441,7 @@ const sendToGemini = async (userMessage) => {
     return data.reply
   } catch (err) {
     console.error('Chatbot API error:', err)
+    geminiReady.value = false
     return getFallbackReply(userMessage)
   }
 }

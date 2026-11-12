@@ -3,6 +3,9 @@ import * as path from 'path';
 import { Injectable, Logger } from '@nestjs/common';
 import { GoogleGenAI } from '@google/genai';
 import { PrismaService } from '../prisma.service';
+import { ReportsService } from '../reports/reports.service';
+import { AdminAiTools, ADMIN_TOOL_DECLARATIONS, bkkDate } from './admin-ai-tools';
+import { CustomerAiTools, CUSTOMER_TOOL_DECLARATIONS, CustomerScope } from './customer-ai-tools';
 import { AskChatbotDto, ChatbotReplyDto, ChatRole } from './dto/chat-message.dto';
 
 @Injectable()
@@ -13,8 +16,15 @@ export class ChatbotService {
   private logsLoaded = false;
   private aiClient: GoogleGenAI | null = null;
   private readonly modelName: string;
+  private readonly adminTools: AdminAiTools;
+  private readonly customerTools: CustomerAiTools;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly reportsService: ReportsService,
+  ) {
+    this.adminTools = new AdminAiTools(prisma, reportsService);
+    this.customerTools = new CustomerAiTools(prisma);
     const apiKey = process.env.GEMINI_API_KEY;
     this.modelName = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 
@@ -127,7 +137,23 @@ export class ChatbotService {
     }
   }
 
-  private buildSystemInstruction(liveContext: string): string {
+  private buildOrderStatusInstruction(scope: CustomerScope): string {
+    if (scope.userId) {
+      return `[การเช็กสถานะออเดอร์]
+ลูกค้าคนนี้เข้าสู่ระบบแล้ว เมื่อถามเรื่องออเดอร์ของตัวเอง (อาหารถึงไหนแล้ว, อีกนานไหม, ไรเดอร์มาหรือยัง, จ่ายเงินแล้วหรือยัง) ให้เรียกเครื่องมือ get_my_orders ก่อนตอบทุกครั้ง
+- บอกสถานะเป็นภาษาง่ายๆ, คิวที่รออยู่ก่อนหน้า, เวลาที่รอมาแล้ว และถ้ามีเวลาปรุงเฉลี่ยให้ประมาณเวลาแบบคร่าวๆ พร้อมบอกว่าเป็นการประมาณ
+- ห้ามเดาสถานะเอง ถ้าเครื่องมือบอกว่าไม่พบออเดอร์ ให้บอกตามนั้น`;
+    }
+    if (scope.tableNumber) {
+      return `[การเช็กสถานะออเดอร์]
+ลูกค้านั่งที่โต๊ะ ${scope.tableNumber} (สั่งผ่าน QR) เมื่อถามว่าอาหารได้หรือยัง ให้เรียกเครื่องมือ get_my_orders ซึ่งจะแสดงเฉพาะออเดอร์ที่ยังเปิดอยู่ของโต๊ะนี้
+- บอกสถานะเป็นภาษาง่ายๆ และคิวที่รออยู่ก่อนหน้า ห้ามเดาสถานะเอง`;
+    }
+    return `[การเช็กสถานะออเดอร์]
+ลูกค้าคนนี้ยังไม่ได้เข้าสู่ระบบ ถ้าถามเรื่องสถานะออเดอร์ของตัวเอง ให้แนะนำอย่างสุภาพว่าเข้าสู่ระบบก่อนแล้วถามใหม่ได้เลย หรือดูได้ที่หน้า "ติดตามออเดอร์" ห้ามเดาสถานะออเดอร์เด็ดขาด`;
+  }
+
+  private buildSystemInstruction(liveContext: string, scope: CustomerScope = {}): string {
     return `
 คุณคือ "น้องส้มตำ AI" ผู้ช่วยอัจฉริยะประจำร้านอาหาร "ตำครกซิ่ง" (Tum Krok Zing Restaurant)
 ร้านตำครกซิ่งเป็นร้านอาหารอีสานและส้มตำรสเด็ดชื่อดัง มีเอกลักษณ์คือรสแซ่บ จัดจ้าน วัตถุดิบสดใหม่ ปลาร้าต้มสุกหอมนัว
@@ -147,15 +173,22 @@ export class ChatbotService {
 [ข้อมูลเมนู โปรโมชั่น และข้อมูลร้านปัจจุบันจากระบบ]
 ${liveContext}
 
+${this.buildOrderStatusInstruction(scope)}
+
 [กฎเหล็ก — ห้ามละเมิดโดยเด็ดขาด]
-1. ตอบเฉพาะเรื่องที่เกี่ยวกับร้านตำครกซิ่งเท่านั้น ได้แก่ เมนู ราคา สารก่อภูมิแพ้ โปรโมชั่น เวลา ที่อยู่ การสั่งอาหาร และบริการของร้าน
+1. ตอบเฉพาะเรื่องที่เกี่ยวกับร้านตำครกซิ่งเท่านั้น ได้แก่ เมนู ราคา สารก่อภูมิแพ้ โปรโมชั่น เวลา ที่อยู่ การสั่งอาหาร สถานะออเดอร์ของลูกค้า และบริการของร้าน
 2. หากถามเรื่องนอกเหนือจากร้าน (การเมือง ดารา การบ้าน คณิตศาสตร์ ฯลฯ) ให้ปฏิเสธสุภาพว่า "ขออภัยด้วยนะคะ น้องส้มตำ AI ช่วยได้แค่เรื่องเมนูและบริการของร้านตำครกซิ่งเท่านั้นค่ะ มีเมนูไหนสนใจไหมคะ? 🌶️"
 3. ตอบภาษาไทยที่อ่านง่าย กระชับ น่ารัก
 4. ปิดท้ายด้วยคำเชิญชวนน่ารักเสมอ
 `.trim();
   }
 
-  async ask(dto: AskChatbotDto): Promise<ChatbotReplyDto> {
+  async ask(dto: AskChatbotDto, user?: { user_id?: number } | null): Promise<ChatbotReplyDto> {
+    // ขอบเขตข้อมูลออเดอร์ที่ลูกค้าคนนี้ดูได้ (กำหนดจาก token ฝั่งเซิร์ฟเวอร์)
+    const scope: CustomerScope = {
+      userId: user?.user_id ? Number(user.user_id) : null,
+      tableNumber: dto.tableNumber ? String(dto.tableNumber).trim() : null,
+    };
     const startTime = Date.now();
     const userMessage = dto.message?.trim();
     if (!userMessage) {
@@ -175,15 +208,17 @@ ${liveContext}
         reply: fallbackRes.reply,
         responseTime: elapsedSec,
         source: 'customer',
+        engine: 'fallback',
+        fallbackReason: 'ยังไม่ได้ตั้งค่า GEMINI_API_KEY',
       });
-      return { ...fallbackRes, responseTimeSec: elapsedSec };
+      return { ...fallbackRes, responseTimeSec: elapsedSec, engine: 'fallback', fallbackReason: 'ยังไม่ได้ตั้งค่า GEMINI_API_KEY' };
     }
 
     try {
       const liveContext = await this.getRestaurantLiveContext();
-      const systemInstruction = this.buildSystemInstruction(liveContext);
+      const systemInstruction = this.buildSystemInstruction(liveContext, scope);
 
-      const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
+      const contents: any[] = [];
 
       if (dto.history && Array.isArray(dto.history)) {
         for (const item of dto.history) {
@@ -202,15 +237,17 @@ ${liveContext}
       }
       contents.push({ role: 'user', parts: [{ text: finalUserPrompt }] });
 
-      // เรียก Gemini API โดยไม่จำกัดเวลา เพื่อให้ AI สามารถประมวลผลและตอบข้อมูลจริงได้อย่างครบถ้วน
-      const response = await this.aiClient.models.generateContent({
-        model: this.modelName,
-        contents: contents,
-        config: { systemInstruction: systemInstruction },
-      });
+      // เรียก Gemini พร้อมเครื่องมือเช็กสถานะออเดอร์ (เฉพาะเมื่อรู้ตัวตนลูกค้าหรือโต๊ะ)
+      const canCheckOrders = Boolean(scope.userId || scope.tableNumber);
+      const { text, toolsUsed, tokens } = await this.runGeminiWithTools(
+        systemInstruction,
+        contents,
+        canCheckOrders ? CUSTOMER_TOOL_DECLARATIONS : [],
+        (name, args) => this.customerTools.execute(name, args, scope),
+      );
 
       const replyText =
-        response.text ||
+        text ||
         'น้องส้มตำ AI รับคำถามแล้วจ้า สนใจสั่งเมนูไหนไหมคะ? 😊';
 
       const elapsedSec = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
@@ -219,6 +256,10 @@ ${liveContext}
         reply: replyText,
         responseTime: elapsedSec,
         source: 'customer',
+        engine: 'gemini',
+        model: this.modelName,
+        toolsUsed,
+        tokens,
       });
 
       return {
@@ -226,14 +267,17 @@ ${liveContext}
         suggestedQuestions: this.generateDynamicSuggestions(userMessage),
         timestamp: new Date().toISOString(),
         responseTimeSec: elapsedSec,
+        engine: 'gemini',
+        model: this.modelName,
+        toolsUsed: [...new Set(toolsUsed)],
+        tokens,
       };
     } catch (error) {
       this.logger.error('เกิดข้อผิดพลาดในการเรียก Gemini API:', error);
 
       if (
         error?.message?.includes('API_KEY_INVALID') ||
-        error?.message?.includes('API key not valid') ||
-        error?.status === 400
+        error?.message?.includes('API key not valid')
       ) {
         return {
           reply: 'GEMINI_API_KEY ไม่ถูกต้อง กรุณาตรวจสอบในไฟล์ .env จ้า',
@@ -256,8 +300,15 @@ ${liveContext}
         reply: fallbackRes.reply,
         responseTime: elapsedSec,
         source: 'customer',
+        engine: 'fallback',
+        fallbackReason: `Gemini ขัดข้อง: ${String(error?.message || 'unknown').slice(0, 80)}`,
       });
-      return { ...fallbackRes, responseTimeSec: elapsedSec };
+      return {
+        ...fallbackRes,
+        responseTimeSec: elapsedSec,
+        engine: 'fallback',
+        fallbackReason: `Gemini ขัดข้อง: ${String(error?.message || 'unknown').slice(0, 80)}`,
+      };
     }
   }
 
@@ -516,12 +567,14 @@ ${liveContext}
       context += `- เบอร์โทรร้าน: ${storeSetting?.phone || '02-987-6543'}\n`;
       context += `- PromptPay: ${storeSetting?.promptpay_number || '-'} (${storeSetting?.promptpay_name || '-'})\n`;
 
-      context += '\n[2. ภาพรวมยอดขายและการเงิน]\n';
-      context += `- ยอดขายวันนี้: ${totalTodayRevenue.toLocaleString('th-TH')} บาท (จำนวน ${todayOrders.length} ออเดอร์)\n`;
-      context += `- ยอดขายสะสมทั้งหมด: ${totalAllRevenue.toLocaleString('th-TH')} บาท (จำนวน ${allOrders.length} ออเดอร์)\n`;
+      context += '\n[2. ยอดสั่ง/ยอดออเดอร์ (รวมออเดอร์ที่ยังไม่ชำระ ไม่รวมที่ยกเลิก) — ไม่ใช่เงินเข้าจริง]\n';
+      context += `- ยอดสั่งวันนี้: ${totalTodayRevenue.toLocaleString('th-TH')} บาท (จำนวน ${todayOrders.length} ออเดอร์)\n`;
+      context += `- ยอดสั่งสะสมทั้งหมด: ${totalAllRevenue.toLocaleString('th-TH')} บาท (จำนวน ${allOrders.length} ออเดอร์)\n`;
       if (recentTransactions.length > 0) {
         context += `- ธุรกรรมชำระเงินล่าสุด: ${recentTransactions.map((t) => `#${t.transaction_id} (฿${Number(t.amount)} ผ่าน ${t.payment_method})`).join(', ')}\n`;
       }
+
+      context += await this.getAdminFinanceContext();
 
       context += '\n[3. คลังวัตถุดิบ & แจ้งเตือนสต็อก]\n';
       context += `- วัตถุดิบทั้งหมดในระบบ: ${ingredients.length} รายการ\n`;
@@ -569,32 +622,172 @@ ${liveContext}
     }
   }
 
+  /**
+   * สรุปรายรับ-รายจ่าย-กำไรสุทธิ โดยใช้ ReportsService.getFinanceReport ตัวเดียวกับหน้า "สรุปการเงิน"
+   * เพื่อให้ตัวเลขที่ AI ตอบตรงกับหน้าจอแอดมินทุกประการ
+   */
+  private async getAdminFinanceContext(): Promise<string> {
+    try {
+      const bkk = (d: Date) =>
+        new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Bangkok',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(d);
+      const today = bkk(new Date());
+      const monthStart = `${today.slice(0, 8)}01`;
+      const last30 = new Date(`${today}T00:00:00+07:00`);
+      last30.setDate(last30.getDate() - 29);
+      const last30Str = bkk(last30);
+
+      const [todayRep, monthRep, rep30, recentPurchases] = await Promise.all([
+        this.reportsService.getFinanceReport({ from: today, to: today, group: 'day' }),
+        this.reportsService.getFinanceReport({ from: monthStart, to: today, group: 'day' }),
+        this.reportsService.getFinanceReport({ from: last30Str, to: today, group: 'day' }),
+        this.prisma.ingredientPurchase.findMany({
+          take: 10,
+          orderBy: { purchased_at: 'desc' },
+          select: { ingredient_name: true, quantity: true, unit: true, total_price: true, purchased_at: true },
+        }),
+      ]);
+
+      const baht = (n: number) => `${Number(n || 0).toLocaleString('th-TH', { maximumFractionDigits: 2 })} บาท`;
+      const block = (label: string, r: any) =>
+        `- ${label} (${r.start_date} ถึง ${r.end_date}):\n` +
+        `  • รายรับรวม (ชำระสำเร็จ): ${baht(r.total_revenue)} [บัตร ${baht(r.revenue_card)}, พร้อมเพย์ ${baht(r.revenue_promptpay)}, เงินสด ${baht(r.revenue_cash)}]\n` +
+        `  • รายจ่ายรวม: ${baht(r.total_expenses)} [ค่าวัตถุดิบ ${baht(r.total_ingredients)}, ค่าไรเดอร์ ${baht(r.total_rider_fee)}, ค่าน้ำมันรถร้าน ${baht(r.total_fuel)}, ค่าธรรมเนียม Stripe ${baht(r.total_stripe_fee)}]\n` +
+        `  • กำไรสุทธิ: ${baht(r.net_profit)} (อัตรากำไร ${r.profit_margin_percentage}%)\n`;
+
+      let ctx = '\n[2.1 รายรับ-รายจ่าย-กำไรสุทธิ (ข้อมูลเดียวกับหน้า "สรุปการเงิน")]\n';
+      ctx += '- หมายเหตุ: รายรับนับเฉพาะธุรกรรมที่ชำระสำเร็จ; ค่าน้ำมันวันที่เปิดร้านแต่ยังไม่บันทึกจะประมาณอัตโนมัติวันละ 300 บาท\n';
+      ctx += block('วันนี้', todayRep);
+      ctx += block('เดือนนี้', monthRep);
+      ctx += block('ย้อนหลัง 30 วัน', rep30);
+
+      if (recentPurchases.length > 0) {
+        ctx += '- ประวัติการซื้อวัตถุดิบล่าสุด:\n';
+        recentPurchases.forEach((p) => {
+          ctx += `  • ${bkk(p.purchased_at)} ${p.ingredient_name} ${Number(p.quantity)} ${p.unit} ราคา ${baht(Number(p.total_price))}\n`;
+        });
+      } else {
+        ctx += '- ยังไม่มีประวัติการซื้อวัตถุดิบ\n';
+      }
+      return ctx;
+    } catch (error) {
+      this.logger.error('Failed to get admin finance context:', error);
+      return '\n[2.1 รายรับ-รายจ่าย-กำไรสุทธิ]\n- ดึงข้อมูลรายจ่ายไม่สำเร็จในขณะนี้\n';
+    }
+  }
+
   private buildAdminSystemInstruction(adminContext: string): string {
+    const today = bkkDate(new Date());
+    const weekday = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', weekday: 'long' }).format(new Date());
     return `
 คุณคือ "น้องส้มตำ AI" ในบทบาท "ผู้ช่วยผู้จัดการร้านอัจฉริยะ" ประจำร้านอาหาร "ตำครกซิ่ง" (Tum Krok Zing Restaurant)
 คุณกำลังสนทนาและให้คำปรึกษากับ "เจ้าของร้าน / ผู้จัดการร้าน (Admin)" โดยตรง
+วันนี้คือ${weekday}ที่ ${today} (เวลาไทย) ใช้วันนี้เป็นฐานในการตีความช่วงเวลา เช่น "เมื่อวาน", "สัปดาห์นี้", "เดือนที่แล้ว", "ไตรมาสนี้"
 
-[หน้าที่และความรับผิดชอบของคุณ]
-1. รายงานและวิเคราะห์ข้อมูลการดำเนินงานของร้านตามข้อมูลจริงแบบเรียลไทม์ (ยอดขาย, คลังวัตถุดิบ, จอห้องครัว KDS, ผังโต๊ะอาหาร, เมนู, โปรโมชั่น, การเงิน)
-2. เมื่อแอดมินถามเรื่องยอดขาย: สรุปยอดขายวันนี้, จำนวนออเดอร์, ยอดสะสมรวม พร้อมให้มุมมองสรุปสั้นกระชับ
-3. เมื่อแอดมินถามเรื่องวัตถุดิบ/สต็อก: ตรวจสอบและระบุรายการวัตถุดิบที่ใกล้หมดหรือต่ำกว่าเกณฑ์ทันที พร้อมเตือนให้สั่งซื้อเพิ่ม
-4. เมื่อแอดมินถามเรื่องห้องครัว/KDS/ออเดอร์: สรุปออเดอร์ที่กำลังปรุง ออเดอร์รอทำในครัว
-5. เมื่อแอดมินถามเรื่องโต๊ะอาหาร: รายงานจำนวนโต๊ะว่าง โต๊ะที่มีลูกค้า
-6. สามารถให้คำแนะนำกลยุทธ์ร้าน เช่น การจัดโปรโมชั่น การบริหารวัตถุดิบ การเพิ่มยอดขาย
+[เครื่องมือดึงข้อมูลจริง (Function Calling)]
+คุณมีเครื่องมือดึงข้อมูลจากฐานข้อมูลของร้านได้ทุกช่วงเวลา ให้เรียกใช้ทุกครั้งที่คำถามต้องการตัวเลข/รายละเอียดที่ไม่มีในภาพรวมด้านล่าง หรือถามช่วงเวลาอื่นที่ไม่ใช่วันนี้/เดือนนี้
+- รายรับ รายจ่าย กำไร ขาดทุน ต้นทุนรวม → get_finance_report
+- ยอดสั่ง จำนวนออเดอร์ ช่วงเวลาขายดี ประเภทออเดอร์ ยอดเฉลี่ยต่อบิล → get_sales_summary
+- เมนูขายดี/ขายไม่ดี ต้นทุนต่อจาน กำไรต่อจาน ควรตัด/ดันเมนูไหน → get_menu_performance
+- รายละเอียดเมนู สูตร สารก่อภูมิแพ้ ตัวเลือกเสริม → get_menu_catalog
+- สต็อก ของใกล้หมด จะพอใช้อีกกี่วัน มูลค่าคลัง → get_ingredient_stock
+- ประวัติซื้อวัตถุดิบ ราคาวัตถุดิบ → get_ingredient_purchases
+- เดลิเวอรี่ ไรเดอร์ เงินสดค้างกับไรเดอร์ เวลาส่ง → get_delivery_report
+- รีวิว คะแนน คำชม คำติ → get_reviews
+- ความเร็วครัว เวลารอ คิวในครัว → get_kitchen_performance
+- รายละเอียดออเดอร์เฉพาะ/ค้นหาออเดอร์ → get_orders
+- โต๊ะ → get_tables
+- โปรโมชั่นและผลของโค้ดส่วนลด → get_promotions
+- ลูกค้าใหม่/ประจำ ลูกค้าใช้จ่ายสูงสุด → get_customer_insights
+- การตั้งค่าร้าน ค่าส่ง สูตรค่าไรเดอร์ → get_store_settings
+เรียกหลายเครื่องมือพร้อมกันได้ถ้าคำถามกว้าง (เช่น "สรุปภาพรวมร้านเดือนนี้" ให้เรียกการเงิน ยอดขาย เมนู รีวิว) และเปรียบเทียบช่วงเวลาได้โดยเรียกเครื่องมือเดิมหลายช่วง
+
+[นิยามตัวเลขที่ต้องแยกให้ถูก — สำคัญมาก]
+- "ยอดสั่ง/ยอดออเดอร์" (get_sales_summary, หัวข้อ [2] ด้านล่าง) = ผลรวมราคาออเดอร์ที่ไม่ถูกยกเลิก รวมออเดอร์ที่ยังไม่ชำระเงิน
+- "รายรับ/เงินเข้าจริง" (get_finance_report, หัวข้อ [2.1]) = เฉพาะธุรกรรมที่ชำระสำเร็จแล้วเท่านั้น
+- ถ้าสองค่านี้ไม่เท่ากัน ให้บอกผู้จัดการว่าเป็นเพราะมีออเดอร์ที่ยังไม่ชำระ/ยังไม่ปิดบิล ห้ามเอามาปนกัน และเมื่อพูดถึงกำไรให้ใช้รายรับที่ชำระสำเร็จเสมอ
+- ค่าน้ำมันวันที่ร้านเปิดแต่ยังไม่บันทึก ระบบจะประมาณอัตโนมัติตามค่าน้ำมันต่อวันในการตั้งค่าร้าน
 
 [บุคลิกและสไตล์การพูด]
 - สุภาพ มั่นใจ กระตือรือร้น คล่องแคล่ว มีไหวพริบแบบผู้ช่วยผู้จัดการมือโปร
-- แฝงความน่ารัก เป็นกันเองในเอกลักษณ์ของ "น้องส้มตำ AI" (ลงท้ายด้วย "ค่ะ", "นะคะ", "จ้า", "เด้อจ้า")
-- จัดรูปแบบข้อความให้อ่านง่าย สบายตา โดยใช้ Markdown (หัวข้อ, ตัวหนา, bullet point, emoji ที่เหมาะสม)
-- เมื่อมีตัวเลข ให้ระบุหน่วยชัดเจน เช่น บาท, รายการ, กก., ตัว
+- แฝงความน่ารัก เป็นกันเองในเอกลักษณ์ของ "น้องส้มตำ AI" (ลงท้ายด้วย "ค่ะ", "นะคะ")
+- จัดรูปแบบให้อ่านง่ายด้วย Markdown (หัวข้อ, ตัวหนา, bullet point, ตารางเมื่อเปรียบเทียบหลายรายการ, emoji พอประมาณ)
+- ระบุหน่วยชัดเจน (บาท, จาน, ออเดอร์, กก.) และระบุช่วงวันที่ของข้อมูลที่ใช้ตอบเสมอ
+- หลังรายงานตัวเลข ให้วิเคราะห์สั้นๆ ว่าตัวเลขบอกอะไร และให้คำแนะนำที่ทำได้จริง 1-3 ข้อ
 
-[ข้อมูลการดำเนินงานจริงของร้านตำครกซิ่งจากระบบล่าสุด]
+[ภาพรวมร้านล่าสุด (snapshot ณ ตอนถาม)]
 ${adminContext}
 
 [กฎสำคัญ]
-1. อ้างอิงตัวเลขและข้อมูลจริงจากระบบที่ให้ไว้ด้านบนเท่านั้น ห้ามแต่งตัวเลขขึ้นเอง
-2. สามารถตอบคำถามเชิงวิเคราะห์ หรือให้คำแนะนำการบริหารร้านแก่แอดมินได้เต็มที่
+1. ทุกตัวเลขต้องมาจากภาพรวมด้านบนหรือผลของเครื่องมือเท่านั้น ห้ามแต่งหรือประมาณตัวเลขขึ้นเอง
+2. ถ้าเครื่องมือคืนค่าว่าง/ศูนย์ ให้บอกตรงๆ ว่าช่วงนั้นยังไม่มีข้อมูล ห้ามบอกว่าระบบไม่มีฟังก์ชันนั้น
+3. ถ้าข้อมูลที่ถามไม่มีในระบบจริงๆ (เช่น ค่าเช่า ค่าแรงพนักงาน ค่าไฟ) ให้บอกว่ายังไม่ได้บันทึกในระบบ และแจกแจงรายจ่ายที่ระบบมีให้แทน
+4. ตอบคำถามเชิงวิเคราะห์และให้คำแนะนำการบริหารร้านได้เต็มที่
 `.trim();
+  }
+
+  /**
+   * เรียก Gemini พร้อม Function Calling: ให้โมเดลเลือกเครื่องมือดึงข้อมูลเอง วนได้หลายรอบ
+   * จนกว่าโมเดลจะตอบเป็นข้อความ (สูงสุด MAX_TOOL_ROUNDS รอบ)
+   */
+  private async runGeminiWithTools(
+    systemInstruction: string,
+    contents: any[],
+    declarations: any[],
+    execute: (name: string, args: Record<string, any>) => Promise<unknown>,
+  ) {
+    const MAX_TOOL_ROUNDS = 6;
+    const toolsUsed: string[] = [];
+    const tokens = { prompt: 0, output: 0, total: 0 };
+    const addUsage = (u: any) => {
+      tokens.prompt += Number(u?.promptTokenCount || 0);
+      tokens.output += Number(u?.candidatesTokenCount || 0) + Number(u?.thoughtsTokenCount || 0);
+      tokens.total += Number(u?.totalTokenCount || 0);
+    };
+
+    for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+      const lastRound = round === MAX_TOOL_ROUNDS;
+      const response = await this.aiClient!.models.generateContent({
+        model: this.modelName,
+        contents,
+        config: {
+          systemInstruction,
+          // รอบสุดท้ายไม่ส่งเครื่องมือ บังคับให้โมเดลสรุปคำตอบจากข้อมูลที่ได้แล้ว
+          ...(lastRound || !declarations.length ? {} : { tools: [{ functionDeclarations: declarations }] }),
+        },
+      });
+      addUsage(response.usageMetadata);
+
+      const calls = response.functionCalls || [];
+      if (!calls.length) {
+        return { text: response.text || '', toolsUsed, tokens };
+      }
+
+      // ส่ง content ของโมเดลกลับไปทั้งก้อน (รักษา thought signature ของ Gemini 3)
+      const modelContent = response.candidates?.[0]?.content;
+      contents.push(modelContent || { role: 'model', parts: calls.map((c) => ({ functionCall: c })) });
+
+      const results = await Promise.all(
+        calls.map(async (c) => {
+          toolsUsed.push(c.name || 'unknown');
+          this.logger.log(`AI tool → ${c.name}(${JSON.stringify(c.args || {})})`);
+          const result = await execute(c.name || '', (c.args as Record<string, any>) || {});
+          return {
+            functionResponse: {
+              ...(c.id ? { id: c.id } : {}),
+              name: c.name,
+              response: { result: JSON.parse(JSON.stringify(result ?? null)) },
+            },
+          };
+        }),
+      );
+      contents.push({ role: 'user', parts: results });
+    }
+    return { text: '', toolsUsed, tokens };
   }
 
   async adminAsk(dto: AskChatbotDto): Promise<ChatbotReplyDto> {
@@ -608,25 +801,31 @@ ${adminContext}
       };
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!this.aiClient || !apiKey || apiKey === 'your_gemini_api_key_here' || apiKey.trim() === '') {
+    const elapsed = () => Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
+    const fallback = async (reason: string): Promise<ChatbotReplyDto> => {
       const fallbackRes = await this.handleAdminFallbackReply(userMessage);
-      const elapsedSec = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
+      const elapsedSec = elapsed();
       this.recordChatbotLog({
         question: userMessage,
         reply: fallbackRes.reply,
         responseTime: elapsedSec,
         source: 'admin',
+        engine: 'fallback',
+        fallbackReason: reason,
       });
-      return { ...fallbackRes, responseTimeSec: elapsedSec };
+      return { ...fallbackRes, responseTimeSec: elapsedSec, engine: 'fallback', fallbackReason: reason };
+    };
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!this.aiClient || !apiKey || apiKey === 'your_gemini_api_key_here' || apiKey.trim() === '') {
+      return fallback('ยังไม่ได้ตั้งค่า GEMINI_API_KEY');
     }
 
     try {
       const adminLiveContext = await this.getAdminLiveContext();
       const systemInstruction = this.buildAdminSystemInstruction(adminLiveContext);
 
-      const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
-
+      const contents: any[] = [];
       if (dto.history && Array.isArray(dto.history)) {
         for (const item of dto.history) {
           if (item.text && item.role) {
@@ -637,26 +836,27 @@ ${adminContext}
           }
         }
       }
-
       contents.push({ role: 'user', parts: [{ text: userMessage }] });
 
-      // เรียก Gemini API โดยไม่จำกัดเวลา เพื่อให้ AI สามารถประมวลผลและตอบข้อมูลจริงได้อย่างครบถ้วน
-      const response = await this.aiClient.models.generateContent({
-        model: this.modelName,
-        contents: contents,
-        config: { systemInstruction: systemInstruction },
-      });
-
+      const { text, toolsUsed, tokens } = await this.runGeminiWithTools(
+        systemInstruction,
+        contents,
+        ADMIN_TOOL_DECLARATIONS,
+        (name, args) => this.adminTools.execute(name, args),
+      );
       const replyText =
-        response.text ||
-        'น้องส้มตำ AI (ผู้ช่วยผู้จัดการ) รับคำถามแล้วค่ะ ต้องการข้อมูลส่วนไหนเพิ่มเติมแจ้งได้เลยนะคะ 🌶️';
+        text || 'น้องส้มตำ AI (ผู้ช่วยผู้จัดการ) รับคำถามแล้วค่ะ ต้องการข้อมูลส่วนไหนเพิ่มเติมแจ้งได้เลยนะคะ 🌶️';
 
-      const elapsedSec = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
+      const elapsedSec = elapsed();
       this.recordChatbotLog({
         question: userMessage,
         reply: replyText,
         responseTime: elapsedSec,
         source: 'admin',
+        engine: 'gemini',
+        model: this.modelName,
+        toolsUsed,
+        tokens,
       });
 
       return {
@@ -664,31 +864,25 @@ ${adminContext}
         suggestedQuestions: this.generateAdminSuggestions(userMessage),
         timestamp: new Date().toISOString(),
         responseTimeSec: elapsedSec,
+        engine: 'gemini',
+        model: this.modelName,
+        toolsUsed: [...new Set(toolsUsed)],
+        tokens,
       };
     } catch (error) {
       this.logger.error('เกิดข้อผิดพลาดในการเรียก Gemini API (Admin):', error);
 
-      if (
-        error?.message?.includes('API_KEY_INVALID') ||
-        error?.message?.includes('API key not valid') ||
-        error?.status === 400
-      ) {
+      if (error?.message?.includes('API_KEY_INVALID') || error?.message?.includes('API key not valid')) {
         return {
           reply: 'GEMINI_API_KEY ไม่ถูกต้อง กรุณาตรวจสอบในไฟล์ .env จ้า',
           timestamp: new Date().toISOString(),
+          engine: 'fallback',
+          fallbackReason: 'API key ไม่ถูกต้อง',
         };
       }
 
-      this.logger.warn(`Gemini API Admin ขัดข้อง (${error?.message?.slice(0, 50)}) — ใช้ Admin DB Fallback`);
-      const fallbackRes = await this.handleAdminFallbackReply(userMessage);
-      const elapsedSec = Math.max(0.1, Number(((Date.now() - startTime) / 1000).toFixed(1)));
-      this.recordChatbotLog({
-        question: userMessage,
-        reply: fallbackRes.reply,
-        responseTime: elapsedSec,
-        source: 'admin',
-      });
-      return { ...fallbackRes, responseTimeSec: elapsedSec };
+      this.logger.warn(`Gemini API Admin ขัดข้อง (${error?.message?.slice(0, 80)}) — ใช้ Admin DB Fallback`);
+      return fallback(`Gemini ขัดข้อง: ${String(error?.message || 'unknown').slice(0, 80)}`);
     }
   }
 
@@ -715,6 +909,16 @@ ${adminContext}
     const msg = userMessage.toLowerCase();
 
     try {
+      // 0. คำถามเรื่องรายจ่าย / ต้นทุน / กำไร
+      if (['รายจ่าย', 'ค่าใช้จ่าย', 'ต้นทุน', 'กำไร', 'ขาดทุน', 'ค่าน้ำมัน', 'ค่าไรเดอร์'].some((k) => msg.includes(k))) {
+        const finance = await this.getAdminFinanceContext();
+        return {
+          reply: `💸 **สรุปรายรับ-รายจ่ายร้านตำครกซิ่ง:**\n${finance}\n_ดูรายละเอียดเพิ่มเติมได้ที่เมนู "ประวัติบิล & การเงิน" ค่ะ_ 😊`,
+          suggestedQuestions: ['📊 สรุปยอดขายวันนี้', '⚠️ เช็กวัตถุดิบที่ใกล้หมดสต็อก'],
+          timestamp: new Date().toISOString(),
+        };
+      }
+
       // 1. คำถามเรื่องยอดขาย / รายได้ / บิล
       if (msg.includes('ยอดขาย') || msg.includes('รายได้') || msg.includes('เงิน') || msg.includes('บิล') || msg.includes('ขายได้')) {
         const now = new Date();
@@ -877,7 +1081,18 @@ ${adminContext}
     }).format(date);
   }
 
-  recordChatbotLog(entry: { question: string; reply: string; responseTime?: number; source?: string; timestamp?: string }) {
+  recordChatbotLog(entry: {
+    question: string;
+    reply: string;
+    responseTime?: number;
+    source?: string;
+    timestamp?: string;
+    engine?: 'gemini' | 'fallback';
+    model?: string;
+    fallbackReason?: string;
+    toolsUsed?: string[];
+    tokens?: { prompt: number; output: number; total: number };
+  }) {
     this.loadLogsFromFile();
     const ts = entry.timestamp || new Date().toISOString();
     const dateKey = this.toThaiDateKey(new Date(ts));
@@ -888,7 +1103,12 @@ ${adminContext}
       question: entry.question || '',
       reply: entry.reply || '',
       responseTime: typeof entry.responseTime === 'number' ? Number(entry.responseTime.toFixed(1)) : 0.6,
-      source: entry.source || 'customer'
+      source: entry.source || 'customer',
+      engine: entry.engine || null,
+      model: entry.engine === 'gemini' ? entry.model || this.modelName : null,
+      fallbackReason: entry.fallbackReason || null,
+      toolsUsed: entry.toolsUsed || [],
+      tokens: entry.tokens || null,
     };
     this.cachedLogs.push(logItem);
     this.saveLogsToFile();

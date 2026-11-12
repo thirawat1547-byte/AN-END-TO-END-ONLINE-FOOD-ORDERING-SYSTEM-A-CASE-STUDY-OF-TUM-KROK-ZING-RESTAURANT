@@ -84,4 +84,26 @@ export class ChatbotReplyDto {
     example: 0.6,
   })
   responseTimeSec?: number;
+
+  @ApiPropertyOptional({
+    description: 'แหล่งที่มาของคำตอบ: gemini = ตอบโดย Google Gemini AI จริง, fallback = ตอบจากเงื่อนไขในระบบ (ดึงข้อมูลจาก DB)',
+    enum: ['gemini', 'fallback'],
+    example: 'gemini',
+  })
+  engine?: 'gemini' | 'fallback';
+
+  @ApiPropertyOptional({ description: 'ชื่อโมเดล Gemini ที่ใช้ตอบ', example: 'gemini-3.5-flash-lite' })
+  model?: string;
+
+  @ApiPropertyOptional({ description: 'เหตุผลที่ใช้โหมดสำรอง (ถ้า engine = fallback)' })
+  fallbackReason?: string;
+
+  @ApiPropertyOptional({
+    description: 'เครื่องมือ (Function Calling) ที่ Gemini เรียกเพื่อดึงข้อมูลจริงก่อนตอบ',
+    example: ['get_finance_report', 'get_menu_performance'],
+  })
+  toolsUsed?: string[];
+
+  @ApiPropertyOptional({ description: 'จำนวน token ที่ใช้ (prompt / output / total)' })
+  tokens?: { prompt: number; output: number; total: number };
 }

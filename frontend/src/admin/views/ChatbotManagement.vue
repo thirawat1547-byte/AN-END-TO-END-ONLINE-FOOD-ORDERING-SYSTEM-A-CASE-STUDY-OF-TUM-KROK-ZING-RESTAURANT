@@ -167,7 +167,25 @@
                   <div class="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
                     <span>น้องส้มตำ AI</span>
                     <span class="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold">BOT</span>
+                    <span
+                      v-if="msg.meta && msg.meta.engine"
+                      :class="engineBadge(msg.meta).cls"
+                      :title="engineBadge(msg.meta).title"
+                      class="text-[9px] px-1.5 py-0.5 rounded-full font-bold border cursor-help"
+                    >{{ engineBadge(msg.meta).label }}</span>
                     <span class="text-[10px] font-normal text-slate-400">• {{ msg.time }}</span>
+                    <span v-if="msg.meta && msg.meta.responseTimeSec" class="text-[10px] font-normal text-slate-400">• {{ msg.meta.responseTimeSec }} วิ</span>
+                  </div>
+
+                  <!-- เครื่องมือที่ Gemini เรียกดึงข้อมูลจริงก่อนตอบ (Function Calling) -->
+                  <div v-if="msg.meta && msg.meta.toolsUsed && msg.meta.toolsUsed.length" class="flex flex-wrap items-center gap-1 text-[10px] text-slate-500">
+                    <span>🔎 ดึงข้อมูลจริง:</span>
+                    <span
+                      v-for="t in msg.meta.toolsUsed"
+                      :key="t"
+                      :title="t"
+                      class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-600"
+                    >{{ toolLabel(t) }}</span>
                   </div>
 
                   <div 
@@ -436,6 +454,48 @@ const formatMessage = (text) => {
     .replace(/\n/g, '<br>')
 }
 
+// ป้ายบอกแหล่งที่มาของคำตอบ (Gemini AI จริง / โหมดสำรองจากฐานข้อมูล / ออฟไลน์)
+const TOOL_LABELS = {
+  get_finance_report: 'การเงิน/กำไร',
+  get_sales_summary: 'ยอดขาย',
+  get_menu_performance: 'เมนูขายดี',
+  get_menu_catalog: 'ข้อมูลเมนู',
+  get_ingredient_stock: 'สต็อก',
+  get_ingredient_purchases: 'การซื้อวัตถุดิบ',
+  get_delivery_report: 'เดลิเวอรี่',
+  get_reviews: 'รีวิว',
+  get_kitchen_performance: 'ครัว',
+  get_orders: 'ออเดอร์',
+  get_tables: 'โต๊ะ',
+  get_promotions: 'โปรโมชั่น',
+  get_customer_insights: 'ลูกค้า',
+  get_store_settings: 'ตั้งค่าร้าน'
+}
+const toolLabel = (name) => TOOL_LABELS[name] || name
+
+const engineBadge = (meta) => {
+  if (meta.engine === 'gemini') {
+    const tk = meta.tokens && meta.tokens.total ? ` • ${meta.tokens.total.toLocaleString()} tokens` : ''
+    return {
+      label: '✨ Gemini AI',
+      cls: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+      title: `คำตอบสร้างโดย Google Gemini (${meta.model || '-'})${tk}`
+    }
+  }
+  if (meta.engine === 'fallback') {
+    return {
+      label: '⚙️ โหมดสำรอง',
+      cls: 'bg-amber-50 text-amber-700 border-amber-200',
+      title: `ตอบจากเงื่อนไขในระบบ + ข้อมูลจริงใน DB (ไม่ได้ใช้ Gemini) • สาเหตุ: ${meta.fallbackReason || '-'}`
+    }
+  }
+  return {
+    label: '⛔ ออฟไลน์',
+    cls: 'bg-rose-50 text-rose-700 border-rose-200',
+    title: meta.fallbackReason || 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'
+  }
+}
+
 const simSubmit = async () => {
   const q = simInput.value.trim()
   if (!q) return
@@ -451,6 +511,7 @@ const simSubmit = async () => {
   simIsTyping.value = true
 
   let botReply = ''
+  let botMeta = null
   try {
     const historyPayload = simMessages.value.slice(-10).map(m => ({
       role: m.sender === 'user' ? 'user' : 'model',
@@ -471,27 +532,26 @@ const simSubmit = async () => {
       const data = await res.json()
       if (data && data.reply) {
         botReply = data.reply
+        botMeta = {
+          engine: data.engine || null,
+          model: data.model || null,
+          fallbackReason: data.fallbackReason || null,
+          toolsUsed: data.toolsUsed || [],
+          tokens: data.tokens || null,
+          responseTimeSec: data.responseTimeSec || null
+        }
       }
+    } else {
+      botMeta = { engine: 'offline', fallbackReason: `เซิร์ฟเวอร์ตอบกลับ HTTP ${res.status}` }
     }
   } catch {
-    // fallback
+    botMeta = { engine: 'offline', fallbackReason: 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้' }
   }
 
   if (!botReply) {
-    const lower = q.toLowerCase()
-    if (lower.includes('ยอดขาย') || lower.includes('ขายได้') || lower.includes('รายได้') || lower.includes('เงิน')) {
-      botReply = '📊 <b>สรุปยอดขายร้านตำครกซิ่ง:</b> ยอดขายสะสมทั้งหมด <b>฿2,510</b> (รวม 33 ออเดอร์) ระบบพร้อมเปิดรับออเดอร์ตลอดวันค่ะ 📈'
-    } else if (lower.includes('วัตถุดิบ') || lower.includes('สต็อก') || lower.includes('หมด')) {
-      botReply = '⚠️ <b>แจ้งเตือนสต็อกวัตถุดิบ:</b> ตรวจพบ <b>พริกป่น</b> คงเหลือ 1 กก. (ต่ำกว่าเกณฑ์ 1.5 กก.) แนะนำให้สั่งซื้อเพิ่มทันทีค่ะ 🌶️'
-    } else if (lower.includes('โต๊ะ') || lower.includes('ที่นั่ง') || lower.includes('ผัง')) {
-      botReply = '🪑 <b>ผังโต๊ะอาหาร:</b> ปัจจุบันมีโต๊ะว่างพร้อมให้บริการทั้งหมด 5 โต๊ะ (T-01 ถึง T-05) ค่ะ'
-    } else if (lower.includes('ครัว') || lower.includes('kds') || lower.includes('ออเดอร์') || lower.includes('ปรุง')) {
-      botReply = '🍳 <b>จอครัว KDS:</b> ขณะนี้ไม่มีออเดอร์ค้างในห้องครัว ทุกออเดอร์ปรุงและเสิร์ฟเรียบร้อยค่ะ ✨'
-    } else if (lower.includes('สวัสดี') || lower.includes('หวัดดี') || lower.includes('hello')) {
-      botReply = 'สวัสดีค่ะผู้จัดการ! หนูน้องส้มตำ AI พร้อมช่วยรายงานยอดขาย เช็กสต็อกวัตถุดิบ และดูสถานะร้านให้ค่ะ 😊🌶️'
-    } else {
-      botReply = `น้องส้มตำ AI กำลังประมวลผลข้อมูลเกี่ยวกับ "<b>${q}</b>" ให้ผู้จัดการค่ะ สามารถสอบถามเรื่องยอดขาย สต็อก หรือออเดอร์ในครัวได้ตลอดเลยนะคะ 🌶️✨`
-    }
+    // ไม่แสดงตัวเลขสมมติ — แจ้งตามจริงว่าเชื่อมต่อไม่ได้
+    botMeta = botMeta || { engine: 'offline', fallbackReason: 'ไม่ได้รับคำตอบจากเซิร์ฟเวอร์' }
+    botReply = `ขออภัยค่ะผู้จัดการ ตอนนี้น้องส้มตำ AI เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ (${botMeta.fallbackReason}) จึงยังดึงข้อมูลจริงของร้านไม่ได้ กรุณาลองใหม่อีกครั้ง หรือตรวจสอบว่าเข้าสู่ระบบในฐานะผู้จัดการแล้วนะคะ 🙏`
   }
 
   setTimeout(() => {
@@ -499,7 +559,8 @@ const simSubmit = async () => {
     simMessages.value.push({
       sender: 'bot',
       text: botReply,
-      time: getSimTime()
+      time: getSimTime(),
+      meta: botMeta
     })
     scrollSimToBottom()
   }, 400)

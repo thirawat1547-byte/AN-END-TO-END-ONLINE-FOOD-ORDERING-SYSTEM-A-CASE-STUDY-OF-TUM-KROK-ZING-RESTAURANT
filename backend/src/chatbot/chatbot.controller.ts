@@ -1,10 +1,11 @@
-import { BadRequestException, Body, Controller, Get, Post, HttpCode, HttpStatus, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Post, HttpCode, HttpStatus, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ChatbotService } from './chatbot.service';
 import { AskChatbotDto, ChatbotReplyDto } from './dto/chat-message.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { ChatbotOptionalAuthGuard } from './chatbot-optional-auth.guard';
 
 @ApiTags('Chatbot')
 @Controller('chatbot')
@@ -12,6 +13,8 @@ export class ChatbotController {
   constructor(private readonly chatbotService: ChatbotService) {}
 
   @Post('ask')
+  @UseGuards(ChatbotOptionalAuthGuard)
+  @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'ส่งข้อความถาม-ตอบกับแชทบอทร้านอาหารตำครกซิ่ง (น้องส้มตำ AI)',
@@ -23,8 +26,9 @@ export class ChatbotController {
     description: 'ประมวลผลคำตอบสำเร็จ',
     type: ChatbotReplyDto,
   })
-  async ask(@Body() askDto: AskChatbotDto): Promise<ChatbotReplyDto> {
-    return this.chatbotService.ask(askDto);
+  async ask(@Body() askDto: AskChatbotDto, @Req() req: any): Promise<ChatbotReplyDto> {
+    // ถ้าส่ง token มา AI จะเช็กสถานะออเดอร์ของลูกค้าคนนั้นได้ (ไม่บังคับล็อกอิน)
+    return this.chatbotService.ask(askDto, req.user || null);
   }
 
   @Post('admin-ask')
