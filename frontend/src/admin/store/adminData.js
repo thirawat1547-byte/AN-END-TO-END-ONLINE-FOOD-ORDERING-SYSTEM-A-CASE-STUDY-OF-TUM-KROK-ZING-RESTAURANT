@@ -4,6 +4,12 @@ import { reactive } from 'vue'
 import { API_BASE } from '../../config/api'
 import { isInKitchenQueue } from '../../utils/kitchenQueue'
 import { broadcastMenuUpdated, DEFAULT_ALLERGENS } from '../../utils/menuSync'
+
+// ออเดอร์ที่ยังเปิดอยู่บนโต๊ะ (ยังไม่ชำระ/ไม่จบ และไม่ถูกยกเลิก)
+const isOpenTableOrder = (o) => {
+  const s = String(o?.raw_status || o?.status || '').toUpperCase()
+  return !['COMPLETED', 'PAID', 'CANCELLED', 'CANCELED'].includes(s)
+}
 import imgChick from '../../assets/chick.jpg'
 import imgCoke from '../../assets/coke.jpg'
 import imgGek from '../../assets/gek.jpg'
@@ -258,10 +264,13 @@ export const adminStore = reactive({
     }
 
     // 4. Update table active orders & bills dynamically
+    // สถานะโต๊ะยึดตามฐานข้อมูล (Backend ตั้ง OCCUPIED/AVAILABLE เองตอนสั่ง/จ่าย/ยกเลิก)
+    // ที่นี่แค่ผูกออเดอร์ที่ยังเปิดอยู่กับโต๊ะที่ไม่ว่าง — ไม่บังคับให้โต๊ะว่างกลายเป็นไม่ว่าง
+    // (เดิมนับออเดอร์ที่ยกเลิก/ออเดอร์เก่าที่ค้างสถานะ ทำให้โต๊ะขึ้นว่าไม่ว่างทั้งที่ว่างจริง)
     for (const tbl of this.tables) {
-      const activeOrd = this.orders.find(o => o.table_id === tbl.table_id && o.status !== 'Completed' && o.status !== 'PAID')
+      if (tbl.status !== 'Occupied') continue
+      const activeOrd = this.orders.find(o => o.table_id === tbl.table_id && isOpenTableOrder(o))
       if (activeOrd) {
-        tbl.status = 'Occupied'
         tbl.activeOrderId = activeOrd.order_id
         tbl.currentBill = Number(activeOrd.total_price || 0)
       }
@@ -630,7 +639,7 @@ export const adminStore = reactive({
       if (Array.isArray(data)) {
         this.tables = data.map(t => {
           const isOcc = (t.status === 'OCCUPIED' || t.status === 'Occupied')
-          const activeOrder = this.orders.find(o => o.table_id === t.table_id && o.status !== 'Completed' && o.status !== 'PAID')
+          const activeOrder = isOcc ? this.orders.find(o => o.table_id === t.table_id && isOpenTableOrder(o)) : null
           return {
             table_id: t.table_id || t.id,
             table_number: t.table_number || t.number,
